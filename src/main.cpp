@@ -5,10 +5,6 @@
 #include <iostream>
 #include <thread>
 
-LSTM_BEGIN
-    std::atomic<word> transaction::clock{0};
-LSTM_END
-
 int main() {
     for(int loop = 0; loop < 100; ++loop) {
         lstm::var<int> x{0};
@@ -17,7 +13,7 @@ int main() {
         auto start = std::chrono::high_resolution_clock::now();
         std::thread t0([&] {
             while (i0++ < 10000)
-                lstm::atomic([&](lstm::transaction& tx) {
+                lstm::atomic([&](auto& tx) {
                     if (i0 % 100 >= 20 && i0 % 100 < 25)
                         tx.store(x, tx.load(x) + 1);
                     else
@@ -28,7 +24,7 @@ int main() {
         int i1 = 0;
         std::thread t1([&] {
             while (i1++ < 10000)
-                lstm::atomic([&](lstm::transaction& tx) {
+                lstm::atomic([&](auto& tx) {
                     if (i1 % 100 >= 40 && i1 % 100 < 45)
                         tx.store(x, tx.load(x) + 1);
                     else
@@ -39,7 +35,7 @@ int main() {
         int i2 = 0;
         std::thread t2([&] {
             while (i2++ < 10000)
-                lstm::atomic([&](lstm::transaction& tx) {
+                lstm::atomic([&](auto& tx) {
                     if (i2 % 100 >= 60 && i2 % 100 < 65)
                         tx.store(x, tx.load(x) + 1);
                     else
@@ -50,7 +46,7 @@ int main() {
         int i3 = 0;
         std::thread t3([&] {
             while (i3++ < 10000)
-                lstm::atomic([&](lstm::transaction& tx) {
+                lstm::atomic([&](auto& tx) {
                     if (i3 % 100 >= 0 && i3 % 100 < 5)
                         tx.store(x, tx.load(x) + 1);
                     else
@@ -65,7 +61,7 @@ int main() {
         
         auto end = std::chrono::high_resolution_clock::now();
         
-        lstm::atomic([&](lstm::transaction& tx) {
+        lstm::atomic([&](auto& tx) {
             auto my_x = tx.load(x);
             assert(my_x == 2000);
         });

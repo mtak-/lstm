@@ -2,6 +2,7 @@
 #define LSTM_DETAIL_LSTM_FWD_HPP
 
 #include <cstdint>
+#include <memory>
 #include <type_traits>
 #include <utility>
 
@@ -39,17 +40,18 @@ LSTM_BEGIN
     template<typename T>
     struct var;
     
+    namespace detail {
+        struct atomic_fn;
+        struct var_base;
+    }
+    
+    template<typename Alloc = std::allocator<detail::var_base*>>
     struct transaction;
     
     template<typename T>
     struct var_proxy;
     
     struct tx_retry {};
-    
-    namespace detail {
-        struct var_base;
-        struct atomic_fn;
-    }
     
     template<typename T>
     using uncvref = std::remove_cv_t<std::remove_reference_t<T>>;

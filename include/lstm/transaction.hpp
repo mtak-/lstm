@@ -8,16 +8,22 @@
 #include <set>
 
 LSTM_BEGIN
-    struct transaction {
+    template<typename Alloc>
+    struct transaction : private Alloc {
         friend detail::atomic_fn;
     private:
         static std::atomic<word> clock;
         
-        std::set<const detail::var_base*> read_set;
-        std::map<detail::var_base*, void*> write_set;
+        std::set<const detail::var_base*, std::less<>, Alloc> read_set;
+        std::map<detail::var_base*, void*, std::less<>, Alloc> write_set;
         word version;
         
-        transaction() noexcept : version(clock.load(LSTM_ACQUIRE)) {}
+        transaction(Alloc alloc) noexcept
+            : Alloc(std::move(alloc))
+            , read_set(static_cast<Alloc&>(*this))
+            , write_set(static_cast<Alloc&>(*this))
+            , version(clock.load(LSTM_ACQUIRE))
+        {}
         
         bool lock(word& version_buf, const detail::var_base& v) const noexcept {
             while (version_buf <= version
@@ -39,11 +45,12 @@ LSTM_BEGIN
         void commit_lock_writes() {
             auto write_begin = std::begin(write_set);
             word write_version;
-            for (auto iter = write_begin; iter != std::end(write_set); (void)++iter) {
+            for (auto iter = write_begin; iter != std::end(write_set); ++iter) {
                 write_version = 0;
+                // TODO: only care what version the var is, if it's also a read
                 if (!lock(write_version, *iter->first)) {
-                    for (auto undo_iter = write_begin; undo_iter != iter; (void)++undo_iter)
-                        unlock(*undo_iter->first);
+                    for (; write_begin != iter; ++write_begin)
+                        unlock(*write_begin->first);
                     throw tx_retry{};
                 }
                 read_set.erase(iter->first); // FIXME: weird to have this here
@@ -127,6 +134,9 @@ LSTM_BEGIN
         template<typename T>
         void store(var<T>&& v) = delete;
     };
+    
+    template<typename Alloc>
+    std::atomic<word> transaction<Alloc>::clock{0};
 LSTM_END
 
 #endif /* LSTM_TRANSACTION_HPP */

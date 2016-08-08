@@ -7,33 +7,36 @@ LSTM_DETAIL_BEGIN
     template<typename...>
     using void_ = void;
 
-    template<typename Func, typename = void>
+    template<typename Func, typename Alloc, typename = void>
     struct is_void_transact_function : std::false_type {};
     
-    template<typename Func>
+    template<typename Func, typename Alloc>
     struct is_void_transact_function<
         Func,
+        Alloc,
         std::enable_if_t<
-            std::is_void<decltype(std::declval<const Func&>()(std::declval<transaction&>()))>{}>>
+            std::is_void<decltype(std::declval<const Func&>()(std::declval<transaction<Alloc>&>()))>{}>>
         : std::true_type {};
         
-    template<typename Func, typename = void>
+    template<typename Func, typename Alloc, typename = void>
     struct is_transact_function : std::false_type {};
     
-    template<typename Func>
+    template<typename Func, typename Alloc>
     struct is_transact_function<
         Func,
-        void_<decltype(std::declval<const Func&>()(std::declval<transaction&>()))>>
+        Alloc,
+        void_<decltype(std::declval<const Func&>()(std::declval<transaction<Alloc>&>()))>>
         : std::true_type {};
 
     struct atomic_fn {
         // TODO: noexcept
-        template<typename Func,
-            LSTM_REQUIRES_(is_transact_function<Func>() && !is_void_transact_function<Func>())>
-        decltype(auto) operator()(Func func) const {
+        template<typename Func, typename Alloc = std::allocator<detail::var_base*>,
+            LSTM_REQUIRES_(is_transact_function<Func, Alloc>()
+                && !is_void_transact_function<Func, Alloc>())>
+        decltype(auto) operator()(Func func, Alloc alloc = Alloc{}) const {
             while(true) {
                 try {
-                    transaction tx{};
+                    transaction<Alloc> tx{alloc};
                     decltype(auto) result = func(tx);
                     tx.commit();
                     return result;
@@ -42,12 +45,12 @@ LSTM_DETAIL_BEGIN
         }
         
         // TODO: noexcept
-        template<typename Func,
-            LSTM_REQUIRES_(is_void_transact_function<Func>())>
-        void operator()(Func func) const {
+        template<typename Func, typename Alloc = std::allocator<detail::var_base*>,
+            LSTM_REQUIRES_(is_void_transact_function<Func, Alloc>())>
+        void operator()(Func func, Alloc alloc = Alloc{}) const {
             while(true) {
                 try {
-                    transaction tx{};
+                    transaction<Alloc> tx{alloc};
                     func(tx);
                     tx.commit();
                     break;

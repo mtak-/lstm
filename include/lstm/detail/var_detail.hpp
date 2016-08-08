@@ -8,7 +8,8 @@
 LSTM_DETAIL_BEGIN
     struct var_base {
     protected:
-        friend transaction;
+        template<typename Alloc>
+        friend struct ::lstm::transaction;
         
         var_base(void* in_value)
             : version_lock{0}
