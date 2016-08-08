@@ -15,7 +15,7 @@ LSTM_DETAIL_BEGIN
             , value(in_value)
         {}
             
-        virtual void destroy_value() const = 0;
+        virtual void destroy_value(void* ptr) const = 0;
         
         mutable std::atomic<word> version_lock;
         std::atomic<void*> value;
@@ -28,10 +28,13 @@ LSTM_DETAIL_BEGIN
         constexpr var_impl(Us&&... us) noexcept(std::is_nothrow_constructible<T, Us&&...>{})
             : var_base{(void*)new T((Us&&)us...)}
         {}
+        
+        ~var_impl() noexcept(std::is_nothrow_destructible<T>{})
+        { delete static_cast<T*>(value.load(LSTM_RELAXED)); }
     
     private:
-        void destroy_value() const override
-        { delete static_cast<T*>(value.load(LSTM_ACQUIRE)); }
+        void destroy_value(void* ptr) const override
+        { delete static_cast<T*>(ptr); }
     };
 LSTM_DETAIL_END
 

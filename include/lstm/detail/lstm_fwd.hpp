@@ -46,11 +46,9 @@ LSTM_BEGIN
     
     struct tx_retry {};
     
-    template<typename Func>
-    void atomic(const Func& f);
-    
     namespace detail {
         struct var_base;
+        struct atomic_fn;
     }
     
     template<typename T>

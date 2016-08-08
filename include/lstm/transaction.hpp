@@ -9,8 +9,7 @@
 
 LSTM_BEGIN
     struct transaction {
-        template<typename Func>
-        friend void atomic(const Func&);
+        friend detail::atomic_fn;
     private:
         static std::atomic<word> clock;
         
@@ -20,12 +19,12 @@ LSTM_BEGIN
         
         transaction() noexcept : version(clock.load(LSTM_ACQUIRE)) {}
         
-        bool lock(word& read_version, const detail::var_base& v) const noexcept {
-            while (read_version <= version
-                && !v.version_lock.compare_exchange_weak(read_version,
-                                                         read_version | 1,
-                                                         LSTM_RELEASE));
-            return read_version <= version && !(read_version & 1);
+        bool lock(word& version_buf, const detail::var_base& v) const noexcept {
+            while (version_buf <= version
+                && !v.version_lock.compare_exchange_weak(version_buf,
+                                                         version_buf | 1,
+                                                         LSTM_RELEASE)); // TODO: is this correct?
+            return version_buf <= version && !(version_buf & 1);
         }
         
         void unlock(const word read_version, const detail::var_base& v) const noexcept
@@ -37,35 +36,46 @@ LSTM_BEGIN
         bool read_valid(const detail::var_base& v) const noexcept
         { return v.version_lock.load(LSTM_ACQUIRE) <= version; }
         
-        void commit() {
-            word read_version = 0;
-            for (auto iter = std::begin(write_set); iter != std::end(write_set); ++iter) {
-                word read_version = 0;
-                if (!lock(read_version, *iter->first)) {
-                    for (auto undo_iter = std::begin(write_set); undo_iter != iter; ++undo_iter)
+        void commit_lock_writes() {
+            auto write_begin = std::begin(write_set);
+            word write_version;
+            for (auto iter = write_begin; iter != std::end(write_set); (void)++iter) {
+                write_version = 0;
+                if (!lock(write_version, *iter->first)) {
+                    for (auto undo_iter = write_begin; undo_iter != iter; (void)++undo_iter)
                         unlock(*undo_iter->first);
                     throw tx_retry{};
                 }
-                read_set.erase(iter->first);
+                read_set.erase(iter->first); // FIXME: weird to have this here
             }
-            
+        }
+        
+        void commit_validate_reads() {
             for (auto& var : read_set) {
                 if (!read_valid(*var)) {
-                    for (auto& var_val : write_set) {
+                    for (auto& var_val : write_set)
                         unlock(*var_val.first);
-                    }
                     throw tx_retry{};
                 }
             }
-                    
-            word write_version = clock.fetch_add(2, LSTM_RELEASE) + 2;
-            
+        }
+        
+        void commit_writes(const word write_version) {
             for (auto& var_val : write_set) {
-                var_val.first->destroy_value();
+                var_val.first->destroy_value(var_val.first->value.load(LSTM_RELAXED));
                 var_val.first->value.store(var_val.second, LSTM_RELEASE);
-                // write_set
                 unlock(write_version, *var_val.first);
             }
+            
+            write_set.clear();
+        }
+        
+        void commit() {
+            commit_lock_writes();
+            
+            commit_validate_reads();
+            
+            commit_writes(clock.fetch_add(2, LSTM_RELEASE) + 2);
         }
         
     public:
@@ -73,6 +83,11 @@ LSTM_BEGIN
         transaction(transaction&&) = delete;
         transaction& operator=(const transaction&) = delete;
         transaction& operator=(transaction&&) = delete;
+        
+        ~transaction() {
+            for (auto& var_val : write_set)
+                var_val.first->destroy_value(var_val.second);
+        }
         
         template<typename T>
         T load(const var<T>& v) {

@@ -71,7 +71,7 @@ int main() {
         });
         
         std::cout << "LSTM: "
-                  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+                  << (std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() / 1000000.f)
                   << "ms"
                   << std::endl;
     }
