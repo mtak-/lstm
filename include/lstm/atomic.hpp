@@ -3,6 +3,8 @@
 
 #include <lstm/transaction.hpp>
 
+#include <lstm/detail/thread_local.hpp>
+
 LSTM_DETAIL_BEGIN
     template<typename...>
     using void_ = void;
@@ -29,32 +31,78 @@ LSTM_DETAIL_BEGIN
         : std::true_type {};
 
     struct atomic_fn {
+    private:
+        template<typename Alloc>
+        static transaction<Alloc>*& thread_local_transaction() {
+            static LSTM_THREAD_LOCAL transaction<Alloc>* tx = nullptr;
+            return tx;
+        }
+        
+    public:
         // TODO: noexcept
         template<typename Func, typename Alloc = std::allocator<detail::var_base*>,
             LSTM_REQUIRES_(is_transact_function<Func, Alloc>()
                 && !is_void_transact_function<Func, Alloc>())>
-        decltype(auto) operator()(Func func, Alloc alloc = Alloc{}) const {
+        decltype(auto) operator()(Func func, const Alloc& alloc = Alloc{}) const {
+            static constexpr auto tx_size = sizeof(transaction<Alloc>);
+            alignas(transaction<Alloc>) char storage[tx_size];
+            auto& tx = thread_local_transaction<Alloc>();
+            bool owns_tx = !tx;
+            
             while(true) {
                 try {
-                    transaction<Alloc> tx{alloc};
-                    decltype(auto) result = func(tx);
-                    tx.commit();
+                    if (owns_tx) {
+                        new(storage) transaction<Alloc>{alloc};
+                        tx = reinterpret_cast<transaction<Alloc>*>(storage);
+                    }
+                    
+                    decltype(auto) result = func(*tx);
+                    
+                    if (owns_tx) {
+                        tx->commit();
+                        tx->~transaction();
+                        tx = nullptr;
+                    }
                     return result;
-                } catch(const tx_retry&) {}
+                } catch(const tx_retry&) {
+                    if (owns_tx)
+                        tx->~transaction();
+                    else
+                        throw;
+                }
             }
         }
         
         // TODO: noexcept
         template<typename Func, typename Alloc = std::allocator<detail::var_base*>,
             LSTM_REQUIRES_(is_void_transact_function<Func, Alloc>())>
-        void operator()(Func func, Alloc alloc = Alloc{}) const {
+        void operator()(Func func, const Alloc& alloc = Alloc{}) const {
+            static constexpr auto tx_size = sizeof(transaction<Alloc>);
+            alignas(transaction<Alloc>) char storage[tx_size];
+            auto& tx = thread_local_transaction<Alloc>();
+            bool owns_tx = !tx;
+            
             while(true) {
                 try {
-                    transaction<Alloc> tx{alloc};
-                    func(tx);
-                    tx.commit();
+                    if (owns_tx) {
+                        new(storage) transaction<Alloc>{alloc};
+                        tx = reinterpret_cast<transaction<Alloc>*>(storage);
+                    }
+                    
+                    func(*tx);
+                    
+                    if (owns_tx) {
+                        tx->commit();
+                        tx->~transaction();
+                        tx = nullptr;
+                    }
                     break;
-                } catch(const tx_retry&) {}
+                } catch(const tx_retry&) {
+                    if (owns_tx)
+                        tx->~transaction();
+                    else
+                        throw;
+                }
             }
         }
     };

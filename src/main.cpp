@@ -14,10 +14,10 @@ int main() {
         std::thread t0([&] {
             while (i0++ < 10000)
                 lstm::atomic([&](auto& tx) {
-                    if (i0 % 100 >= 20 && i0 % 100 < 25)
+                    lstm::atomic([&](auto& tx) {
                         tx.store(x, tx.load(x) + 1);
-                    else
-                        auto my_x = tx.load(x);
+                    });
+                    tx.store(x, tx.load(x) + 1);
                 });
         });
         
@@ -25,10 +25,10 @@ int main() {
         std::thread t1([&] {
             while (i1++ < 10000)
                 lstm::atomic([&](auto& tx) {
-                    if (i1 % 100 >= 40 && i1 % 100 < 45)
+                    lstm::atomic([&](auto& tx) {
                         tx.store(x, tx.load(x) + 1);
-                    else
-                        auto my_x = tx.load(x);
+                    });
+                    tx.store(x, tx.load(x) + 1);
                 });
         });
         
@@ -36,10 +36,10 @@ int main() {
         std::thread t2([&] {
             while (i2++ < 10000)
                 lstm::atomic([&](auto& tx) {
-                    if (i2 % 100 >= 60 && i2 % 100 < 65)
+                    lstm::atomic([&](auto& tx) {
                         tx.store(x, tx.load(x) + 1);
-                    else
-                        auto my_x = tx.load(x);
+                    });
+                    tx.store(x, tx.load(x) + 1);
                 });
         });
         
@@ -47,10 +47,10 @@ int main() {
         std::thread t3([&] {
             while (i3++ < 10000)
                 lstm::atomic([&](auto& tx) {
-                    if (i3 % 100 >= 0 && i3 % 100 < 5)
+                    lstm::atomic([&](auto& tx) {
                         tx.store(x, tx.load(x) + 1);
-                    else
-                        auto my_x = tx.load(x);
+                    });
+                    tx.store(x, tx.load(x) + 1);
                 });
         });
         
@@ -63,7 +63,7 @@ int main() {
         
         lstm::atomic([&](auto& tx) {
             auto my_x = tx.load(x);
-            assert(my_x == 2000);
+            assert(my_x == 80000);
         });
         
         std::cout << "LSTM: "
