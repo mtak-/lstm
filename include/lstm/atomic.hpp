@@ -32,6 +32,8 @@ LSTM_DETAIL_BEGIN
 
     struct atomic_fn {
     private:
+        // TODO: Alloc... maybe the rootmost transaction does have control over allocation, which
+        // means transaction needs some kinda base class, with type erasure, or virtual methods :(
         template<typename Alloc>
         static transaction<Alloc>*& thread_local_transaction() {
             static LSTM_THREAD_LOCAL transaction<Alloc>* tx = nullptr;

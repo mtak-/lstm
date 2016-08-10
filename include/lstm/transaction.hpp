@@ -26,6 +26,8 @@ LSTM_BEGIN
         {}
         
         bool lock(word& version_buf, const detail::var_base& v) const noexcept {
+            // TODO: this feels wrong, especially since reads call this...
+            // reader writer style lock might be more appropriate, but that'd probly starve writes
             while (version_buf <= version
                 && !v.version_lock.compare_exchange_weak(version_buf,
                                                          version_buf | 1,
@@ -133,6 +135,20 @@ LSTM_BEGIN
         
         template<typename T>
         void store(var<T>&& v) = delete;
+        
+        template<typename T>
+        T& unsafe(var<T>& v) const noexcept { return *(T*)v.value.load(LSTM_RELAXED); }
+        
+        template<typename T>
+        const T& unsafe(const var<T>& v) const noexcept { return *(T*)v.value.load(LSTM_RELAXED); }
+        
+        template<typename T>
+        T&& unsafe(var<T>&& v) const noexcept
+        { return std::move(*(T*)v.value.load(LSTM_RELAXED)); }
+        
+        template<typename T>
+        const T&& unsafe(const var<T>&& v) const noexcept
+        { return std::move(*(T*)v.value.load(LSTM_RELAXED)); }
     };
     
     template<typename Alloc>
