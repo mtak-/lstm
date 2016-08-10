@@ -49,28 +49,28 @@ LSTM_DETAIL_BEGIN
             static constexpr auto tx_size = sizeof(transaction<Alloc>);
             alignas(transaction<Alloc>) char storage[tx_size];
             auto& tx = thread_local_transaction<Alloc>();
-            bool owns_tx = !tx;
+            
+            // this thread is already in a transaction
+            if (tx)
+                return func(*tx);
             
             while(true) {
                 try {
-                    if (owns_tx) {
-                        new(storage) transaction<Alloc>{alloc};
-                        tx = reinterpret_cast<transaction<Alloc>*>(storage);
-                    }
+                    new(storage) transaction<Alloc>{alloc};
+                    tx = reinterpret_cast<transaction<Alloc>*>(storage);
                     
                     decltype(auto) result = func(*tx);
                     
-                    if (owns_tx) {
-                        tx->commit();
-                        tx->~transaction();
-                        tx = nullptr;
-                    }
+                    tx->commit();
+                    tx->~transaction();
+                    tx = nullptr;
+                    
                     return result;
                 } catch(const tx_retry&) {
-                    if (owns_tx)
-                        tx->~transaction();
-                    else
-                        throw;
+                    tx->~transaction();
+                } catch(...) {
+                    tx->~transaction();
+                    throw;
                 }
             }
         }
@@ -82,28 +82,27 @@ LSTM_DETAIL_BEGIN
             static constexpr auto tx_size = sizeof(transaction<Alloc>);
             alignas(transaction<Alloc>) char storage[tx_size];
             auto& tx = thread_local_transaction<Alloc>();
-            bool owns_tx = !tx;
+            
+            if (!tx)
+                return func(*tx);
             
             while(true) {
                 try {
-                    if (owns_tx) {
-                        new(storage) transaction<Alloc>{alloc};
-                        tx = reinterpret_cast<transaction<Alloc>*>(storage);
-                    }
+                    new(storage) transaction<Alloc>{alloc};
+                    tx = reinterpret_cast<transaction<Alloc>*>(storage);
                     
                     func(*tx);
                     
-                    if (owns_tx) {
-                        tx->commit();
-                        tx->~transaction();
-                        tx = nullptr;
-                    }
+                    tx->commit();
+                    tx->~transaction();
+                    tx = nullptr;
+                        
                     break;
                 } catch(const tx_retry&) {
-                    if (owns_tx)
-                        tx->~transaction();
-                    else
-                        throw;
+                    tx->~transaction();
+                } catch(...) {
+                    tx->~transaction();
+                    throw;
                 }
             }
         }
