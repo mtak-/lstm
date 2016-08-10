@@ -83,7 +83,8 @@ LSTM_DETAIL_BEGIN
             alignas(transaction<Alloc>) char storage[tx_size];
             auto& tx = thread_local_transaction<Alloc>();
             
-            if (!tx)
+            // this thread is already in a transaction
+            if (tx)
                 return func(*tx);
             
             while(true) {
