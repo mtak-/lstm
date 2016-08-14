@@ -4,6 +4,7 @@
 #include <lstm/detail/var_detail.hpp>
 
 #include <atomic>
+#include <cassert>
 #include <map>
 #include <set>
 
@@ -11,6 +12,7 @@ LSTM_BEGIN
     template<typename Alloc>
     struct transaction : private Alloc {
         friend detail::atomic_fn;
+        friend test::transaction_tester;
     private:
         static std::atomic<word> clock;
         
@@ -18,8 +20,8 @@ LSTM_BEGIN
         std::map<detail::var_base*, void*, std::less<>, Alloc> write_set;
         word version;
         
-        transaction(Alloc alloc) noexcept
-            : Alloc(std::move(alloc))
+        transaction(const Alloc& alloc) noexcept
+            : Alloc(alloc)
             , read_set(static_cast<Alloc&>(*this))
             , write_set(static_cast<Alloc&>(*this))
             , version(clock.load(LSTM_ACQUIRE))
@@ -28,21 +30,26 @@ LSTM_BEGIN
         bool lock(word& version_buf, const detail::var_base& v) const noexcept {
             // TODO: this feels wrong, especially since reads call this...
             // reader writer style lock might be more appropriate, but that'd probly starve writes
-            while (version_buf <= version
-                && !v.version_lock.compare_exchange_weak(version_buf,
-                                                         version_buf | 1,
-                                                         LSTM_RELEASE)); // TODO: is this correct?
+            while (version_buf <= version &&
+                !v.version_lock.compare_exchange_weak(version_buf,
+                                                      version_buf | 1,
+                                                      LSTM_RELEASE)); // TODO: is this correct?
             return version_buf <= version && !(version_buf & 1);
         }
         
-        void unlock(const word read_version, const detail::var_base& v) const noexcept
-        { v.version_lock.store(read_version, LSTM_RELEASE); }
+        static void unlock(const word read_version, const detail::var_base& v) noexcept {
+            assert((v.version_lock.load(LSTM_RELAXED) & 1) == 1);
+            assert((read_version & 1) == 0);
+            v.version_lock.store(read_version, LSTM_RELEASE);
+        }
         
-        void unlock(const detail::var_base& v) const noexcept
-        { v.version_lock.fetch_sub(1, LSTM_RELEASE); }
+        static void unlock(const detail::var_base& v) noexcept {
+            assert((v.version_lock.load(LSTM_RELAXED) & 1) == 1);
+            v.version_lock.fetch_sub(1, LSTM_RELEASE);
+        }
         
         bool read_valid(const detail::var_base& v) const noexcept
-        { return v.version_lock.load(LSTM_ACQUIRE) <= version; }
+        { return v.version_lock.load(LSTM_ACQUIRE) <= (version | 1); }
         
         void commit_lock_writes() {
             auto write_begin = std::begin(write_set);
@@ -71,8 +78,8 @@ LSTM_BEGIN
         
         void commit_writes(const word write_version) {
             for (auto& var_val : write_set) {
-                var_val.first->destroy_value(var_val.first->value.load(LSTM_RELAXED));
-                var_val.first->value.store(var_val.second, LSTM_RELEASE);
+                var_val.first->destroy_deallocate(var_val.first->value);
+                var_val.first->value = var_val.second;
                 unlock(write_version, *var_val.first);
             }
             
@@ -87,16 +94,19 @@ LSTM_BEGIN
             commit_writes(clock.fetch_add(2, LSTM_RELEASE) + 2);
         }
         
+        void cleanup() {
+            for (auto& var_val : write_set)
+                var_val.first->destroy_deallocate(var_val.second);
+            write_set.clear();
+        }
+        
+        ~transaction() noexcept = default;
+        
     public:
         transaction(const transaction&) = delete;
         transaction(transaction&&) = delete;
         transaction& operator=(const transaction&) = delete;
         transaction& operator=(transaction&&) = delete;
-        
-        ~transaction() {
-            for (auto& var_val : write_set)
-                var_val.first->destroy_value(var_val.second);
-        }
         
         template<typename T>
         T load(const var<T>& v) {
@@ -104,13 +114,15 @@ LSTM_BEGIN
             if (write_iter == std::end(write_set)) {
                 word read_version = 0;
                 if (lock(read_version, v)) { // TODO: not sure locking is the best that can be done
-                    auto result = *(T*)v.value.load(LSTM_RELAXED);
+                    // if copying T causes a lock to be taken out on T, then this line will abort
+                    // the transaction. this is ok, because it is certainly a bug in the client code
+                    auto result = *(T*)v.value;
                     unlock(read_version, v);
                     
                     read_set.emplace(&v);
                     return result;
                 }
-            } else if (read_valid(v))
+            } else // TODO: would this improve or hurt speed? // if (read_valid(v))
                 return *static_cast<T*>(write_iter->second);
             throw tx_retry{};
         }
@@ -123,7 +135,7 @@ LSTM_BEGIN
             if (write_iter != std::end(write_set))
                 *static_cast<T*>(write_iter->second) = (U&&)u;
             else
-                write_set.emplace(&v, new T((U&&)u));
+                write_set.emplace(&v, v.alloc_construct((U&&)u));
             
             if (!read_valid(v))
                 throw tx_retry{};
@@ -135,20 +147,6 @@ LSTM_BEGIN
         
         template<typename T>
         void store(var<T>&& v) = delete;
-        
-        template<typename T>
-        T& unsafe(var<T>& v) const noexcept { return *(T*)v.value.load(LSTM_RELAXED); }
-        
-        template<typename T>
-        const T& unsafe(const var<T>& v) const noexcept { return *(T*)v.value.load(LSTM_RELAXED); }
-        
-        template<typename T>
-        T&& unsafe(var<T>&& v) const noexcept
-        { return std::move(*(T*)v.value.load(LSTM_RELAXED)); }
-        
-        template<typename T>
-        const T&& unsafe(const var<T>&& v) const noexcept
-        { return std::move(*(T*)v.value.load(LSTM_RELAXED)); }
     };
     
     template<typename Alloc>

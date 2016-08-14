@@ -29,6 +29,9 @@ LSTM_DETAIL_BEGIN
         Alloc,
         void_<decltype(std::declval<const Func&>()(std::declval<transaction<Alloc>&>()))>>
         : std::true_type {};
+        
+    template<typename Func, typename Alloc>
+    using result_type = decltype(std::declval<Func>()(std::declval<transaction<Alloc>&>()));
 
     struct atomic_fn {
     private:
@@ -42,67 +45,105 @@ LSTM_DETAIL_BEGIN
         
     public:
         // TODO: noexcept
-        template<typename Func, typename Alloc = std::allocator<detail::var_base*>,
+        template<typename Func, typename Alloc,
             LSTM_REQUIRES_(is_transact_function<Func, Alloc>()
                 && !is_void_transact_function<Func, Alloc>())>
-        decltype(auto) operator()(Func func, const Alloc& alloc = Alloc{}) const {
+        result_type<Func, Alloc> operator()(Func func, const Alloc& alloc) const {
             static constexpr auto tx_size = sizeof(transaction<Alloc>);
             alignas(transaction<Alloc>) char storage[tx_size];
-            auto& tx = thread_local_transaction<Alloc>();
+            auto& tls_tx = thread_local_transaction<Alloc>();
             
             // this thread is already in a transaction
-            if (tx)
-                return func(*tx);
+            if (tls_tx) {
+                auto stack_tx_ptr = tls_tx;
+                return func(*stack_tx_ptr);
+            }
+            
+            auto stack_tx_ptr = reinterpret_cast<transaction<Alloc>*>(storage);
+            tls_tx = stack_tx_ptr;
             
             while(true) {
                 try {
                     new(storage) transaction<Alloc>{alloc};
-                    tx = reinterpret_cast<transaction<Alloc>*>(storage);
                     
-                    decltype(auto) result = func(*tx);
+                    decltype(auto) result = func(*stack_tx_ptr);
                     
-                    tx->commit();
-                    tx->~transaction();
-                    tx = nullptr;
-                    
+                    stack_tx_ptr->commit();
+                    stack_tx_ptr->cleanup();
+                    stack_tx_ptr->~transaction();
+                    tls_tx = nullptr;
+                        
                     return result;
                 } catch(const tx_retry&) {
-                    tx->~transaction();
+                    try {
+                        stack_tx_ptr->cleanup();
+                    } catch(...) {
+                        tls_tx = nullptr;
+                        stack_tx_ptr->~transaction();
+                        throw;
+                    }
+                    stack_tx_ptr->~transaction();
                 } catch(...) {
-                    tx->~transaction();
+                    tls_tx = nullptr;
+                    
+                    try {
+                        stack_tx_ptr->cleanup();
+                    } catch(...) {
+                        std::terminate(); // two exceptions at once, no way to recover
+                    }
+                    stack_tx_ptr->~transaction();
                     throw;
                 }
             }
         }
         
         // TODO: noexcept
-        template<typename Func, typename Alloc = std::allocator<detail::var_base*>,
+        template<typename Func, typename Alloc,
             LSTM_REQUIRES_(is_void_transact_function<Func, Alloc>())>
-        void operator()(Func func, const Alloc& alloc = Alloc{}) const {
+        void operator()(Func func, const Alloc& alloc) const {
             static constexpr auto tx_size = sizeof(transaction<Alloc>);
             alignas(transaction<Alloc>) char storage[tx_size];
-            auto& tx = thread_local_transaction<Alloc>();
+            auto& tls_tx = thread_local_transaction<Alloc>();
             
             // this thread is already in a transaction
-            if (tx)
-                return func(*tx);
+            if (tls_tx) {
+                auto stack_tx_ptr = tls_tx;
+                return func(*stack_tx_ptr);
+            }
+            
+            auto stack_tx_ptr = reinterpret_cast<transaction<Alloc>*>(storage);
+            tls_tx = stack_tx_ptr;
             
             while(true) {
                 try {
                     new(storage) transaction<Alloc>{alloc};
-                    tx = reinterpret_cast<transaction<Alloc>*>(storage);
                     
-                    func(*tx);
+                    func(*stack_tx_ptr);
                     
-                    tx->commit();
-                    tx->~transaction();
-                    tx = nullptr;
+                    stack_tx_ptr->commit();
+                    stack_tx_ptr->cleanup();
+                    stack_tx_ptr->~transaction();
+                    tls_tx = nullptr;
                         
                     break;
                 } catch(const tx_retry&) {
-                    tx->~transaction();
+                    try {
+                        stack_tx_ptr->cleanup();
+                    } catch(...) {
+                        tls_tx = nullptr;
+                        stack_tx_ptr->~transaction();
+                        throw;
+                    }
+                    stack_tx_ptr->~transaction();
                 } catch(...) {
-                    tx->~transaction();
+                    tls_tx = nullptr;
+                    
+                    try {
+                        stack_tx_ptr->cleanup();
+                    } catch(...) {
+                        std::terminate(); // two exceptions at once, no way to recover
+                    }
+                    stack_tx_ptr->~transaction();
                     throw;
                 }
             }
@@ -111,8 +152,10 @@ LSTM_DETAIL_BEGIN
 LSTM_DETAIL_END
 
 LSTM_BEGIN
-    template<typename Func>
-    decltype(auto) atomic(Func func) { return detail::atomic_fn{}(std::move(func)); }
+    template<typename Func, typename Alloc = std::allocator<detail::var_base*>>
+    detail::result_type<Func, std::allocator<detail::var_base*>>
+    atomic(Func func, const Alloc& alloc = {})
+    { return detail::atomic_fn{}(std::move(func), alloc); }
 LSTM_END
 
 #endif /* LSTM_ATOMIC_HPP */

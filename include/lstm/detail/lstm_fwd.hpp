@@ -12,6 +12,9 @@
 #define LSTM_DETAIL_BEGIN LSTM_BEGIN namespace detail {
 #define LSTM_DETAIL_END LSTM_END }
 
+#define LSTM_TEST_BEGIN LSTM_BEGIN namespace test {
+#define LSTM_TEST_END LSTM_END }
+
 // from rangev3
 #define LSTM_PP_CAT_(X, Y) X ## Y
 #define LSTM_PP_CAT(X, Y)  LSTM_PP_CAT_(X, Y)
@@ -37,7 +40,7 @@ LSTM_BEGIN
     // TODO verify lockfreeness of this on each platform
     using word = std::uintptr_t;
     
-    template<typename T>
+    template<typename T, typename Alloc = std::allocator<std::remove_reference_t<T>>>
     struct var;
     
     namespace detail {
@@ -47,9 +50,6 @@ LSTM_BEGIN
     
     template<typename Alloc = std::allocator<detail::var_base*>>
     struct transaction;
-    
-    template<typename T>
-    struct var_proxy;
     
     struct tx_retry {};
     
@@ -72,6 +72,10 @@ LSTM_BEGIN
         std::integer_sequence<bool, Bs::value..., true>,
         std::integer_sequence<bool, true, Bs::value...>>;
 LSTM_END
+
+LSTM_TEST_BEGIN
+    struct transaction_tester;
+LSTM_TEST_END
 
 #ifndef LSTM_ALWAYS_SEQ_CST
     #define LSTM_ACQUIRE std::memory_order_acquire

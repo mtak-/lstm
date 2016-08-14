@@ -8,34 +8,131 @@
 LSTM_DETAIL_BEGIN
     struct var_base {
     protected:
-        template<typename Alloc>
-        friend struct ::lstm::transaction;
+        template<typename> friend struct ::lstm::transaction;
+        friend test::transaction_tester;
         
-        var_base(void* in_value)
+        inline var_base(void* in_value) noexcept
             : version_lock{0}
             , value(in_value)
         {}
-            
-        virtual void destroy_value(void* ptr) const = 0;
+        
+        virtual void destroy_deallocate(void* ptr) = 0;
         
         mutable std::atomic<word> version_lock;
-        std::atomic<void*> value;
+        void* value;
     };
-
+    
+    enum class var_type {
+        value,
+        lvalue_ref
+    };
+    
     template<typename T>
-    struct var_impl : var_base {
-        template<typename... Us,
-            LSTM_REQUIRES_(std::is_constructible<T, Us&&...>())>
-        constexpr var_impl(Us&&... us) noexcept(std::is_nothrow_constructible<T, Us&&...>{})
-            : var_base{(void*)new T((Us&&)us...)}
+    constexpr var_type var_type_switch() noexcept {
+        return std::is_lvalue_reference<T>{}
+            ? var_type::lvalue_ref
+            : var_type::value;
+    }
+    
+    template<typename T, typename Alloc, var_type = var_type_switch<T>()>
+    struct var_impl
+        : private Alloc
+        , var_base
+    {
+    private:
+        template<typename> friend struct ::lstm::transaction;
+        using alloc_traits = std::allocator_traits<Alloc>;
+        constexpr Alloc& alloc() noexcept { return static_cast<Alloc&>(*this); }
+        
+    public:
+        template<typename U, typename... Us,
+            LSTM_REQUIRES_(std::is_constructible<T, U&&, Us&&...>() &&
+                           !std::is_same<uncvref<U>, uncvref<Alloc>>())>
+        constexpr var_impl(U&& u, Us&&... us)
+            noexcept(noexcept(alloc_construct((U&&)u, (Us&&)us...)))
+            : var_base{(void*)alloc_construct((U&&)u, (Us&&)us...)}
         {}
         
-        ~var_impl() noexcept(std::is_nothrow_destructible<T>{})
-        { delete static_cast<T*>(value.load(LSTM_RELAXED)); }
+        LSTM_REQUIRES(std::is_constructible<T>())
+        constexpr var_impl() noexcept(noexcept(alloc_construct()))
+            : var_base{(void*)alloc_construct()}
+        {}
+        
+        template<typename... Us,
+            LSTM_REQUIRES_(std::is_constructible<T, Us&&...>())>
+        constexpr var_impl(const Alloc& in_alloc, Us&&... us)
+            noexcept(noexcept(alloc_construct((Us&&)us...)))
+            : Alloc{in_alloc}
+            , var_base{(void*)alloc_construct((Us&&)us...)}
+        {}
+        
+        T& unsafe() & noexcept { return *(T*)value; }
+        T&& unsafe() && noexcept { return std::move(*(T*)value); }
+        const T& unsafe() const & noexcept { return *(T*)value; }
+        const T&& unsafe() const && noexcept { return std::move(*(T*)value); }
+        
+        ~var_impl()
+            noexcept(noexcept(alloc_traits::destroy(alloc(), (T*)nullptr)) &&
+                     noexcept(alloc_traits::deallocate(alloc(), (T*)nullptr, 1)))
+        { destroy_deallocate(value); }
     
     private:
-        void destroy_value(void* ptr) const override
-        { delete static_cast<T*>(ptr); }
+        template<typename... Us>
+        constexpr T* alloc_construct(Us&&... us)
+            noexcept(noexcept(alloc_traits::allocate(alloc(), 1)) &&
+                     noexcept(alloc_traits::construct(alloc(), (T*)nullptr, (Us&&)us...)))
+        {
+            T* ptr = alloc_traits::allocate(alloc(), 1);
+            alloc_traits::construct(alloc(), ptr, (Us&&)us...);
+            return ptr;
+        }
+        
+        void destroy_deallocate(void* void_ptr) override final {
+            auto ptr = static_cast<T*>(void_ptr);
+            alloc_traits::destroy(alloc(), ptr);
+            alloc_traits::deallocate(alloc(), ptr, 1);
+        }
+    };
+
+    template<typename T, typename Alloc>
+    struct var_impl<T, Alloc, var_type::lvalue_ref>
+        : private Alloc
+        , var_base
+    {
+    private:
+        template<typename> friend struct ::lstm::transaction;
+        using elem_type = uncvref<T>;
+        using alloc_traits = std::allocator_traits<Alloc>;
+        constexpr Alloc& alloc() noexcept { return static_cast<Alloc&>(*this); }
+        
+    public:
+        template<typename U,
+            LSTM_REQUIRES_(std::is_constructible<T, U&>())>
+        constexpr var_impl(U& u) noexcept : var_base{(void*)std::addressof(u)} {}
+        
+        template<typename U,
+            LSTM_REQUIRES_(std::is_constructible<T, U&>())>
+        constexpr var_impl(const Alloc& in_alloc, U& u) noexcept
+            : Alloc(in_alloc)
+            , var_base{(void*)std::addressof(u)}
+        {}
+        
+        T unsafe() const noexcept { return static_cast<T>(*(elem_type*)value); }
+        
+        ~var_impl() noexcept {}
+    
+    private:
+        template<typename... Us>
+        constexpr elem_type* alloc_construct(Us&&... us)
+            noexcept(noexcept(alloc_traits::allocate(alloc(), 1)) &&
+                     noexcept(alloc_traits::construct(alloc(), (elem_type*)nullptr, (Us&&)us...)))
+        {
+            elem_type* ptr = alloc_traits::allocate(alloc(), 1);
+            alloc_traits::construct(alloc(), ptr, (Us&&)us...);
+            return ptr;
+        }
+        
+        void destroy_deallocate(void*) override final {}
     };
 LSTM_DETAIL_END
 
