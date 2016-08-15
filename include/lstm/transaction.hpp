@@ -59,14 +59,13 @@ LSTM_BEGIN
             transaction_base& operator=(const transaction_base&) = delete;
             transaction_base& operator=(transaction_base&&) = delete;
             
-            template<typename T>
+            template<typename T,
+                LSTM_REQUIRES_(var_type_switch<T>() != var_type::word_sized)>
             T load(const var<T>& v) {
                 void* write_ptr = find_write_set(const_cast<var<T>&>(v));
                 if (!write_ptr) {
                     word read_version = 0;
-                    
-                    // FIXME: locking/unlocking is more than half the overhead for word sized types
-                    if (lock(read_version, v)) { // TODO: not sure locking best possible solution
+                    if (lock(read_version, v)) {
                         // if copying T causes a lock to be taken out on T, then this line will
                         // abort the transaction or cause a stack overflow.
                         // this is ok, because it is certainly a bug in the client code
@@ -76,6 +75,24 @@ LSTM_BEGIN
                         
                         add_read_set(v);
                         return result;
+                    }
+                } else if (read_valid(v)) // TODO: does this if check improve or hurt speed?
+                    return *static_cast<T*>(write_ptr);
+                throw tx_retry{};
+            }
+            
+            template<typename T,
+                LSTM_REQUIRES_(var_type_switch<T>() == var_type::word_sized)>
+            T load(const var<T>& v) {
+                void* write_ptr = find_write_set(const_cast<var<T>&>(v));
+                if (!write_ptr) {
+                    auto v0 = v.version_lock.load(LSTM_ACQUIRE);
+                    if (v0 <= version && !(v0 & 1)) {
+                        auto result = reinterpret_cast<const std::atomic<T>&>(v.value).load(LSTM_RELAXED);
+                        if (v.version_lock.load(LSTM_ACQ_REL) == v0) {
+                            add_read_set(v);
+                            return result;
+                        }
                     }
                 } else if (read_valid(v)) // TODO: does this if check improve or hurt speed?
                     return *static_cast<T*>(write_ptr);

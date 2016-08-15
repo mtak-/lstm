@@ -25,6 +25,7 @@ LSTM_DETAIL_BEGIN
     
     enum class var_type {
         value,
+        word_sized,
         lvalue_ref
     };
     
@@ -32,7 +33,10 @@ LSTM_DETAIL_BEGIN
     constexpr var_type var_type_switch() noexcept {
         return std::is_lvalue_reference<T>{}
             ? var_type::lvalue_ref
-            : var_type::value;
+            : sizeof(T) <= sizeof(word) && alignof(T) <= alignof(word) &&
+                std::is_trivially_copyable<T>{}()
+                    ? var_type::word_sized
+                    : var_type::value;
     }
     
     template<typename T, typename Alloc, var_type = var_type_switch<T>()>
@@ -91,6 +95,51 @@ LSTM_DETAIL_BEGIN
             alloc_traits::destroy(alloc(), ptr);
             alloc_traits::deallocate(alloc(), ptr, 1);
         }
+    };
+    
+    template<typename T, typename Alloc>
+    struct var_impl<T, Alloc, var_type::word_sized>
+        : var_base
+    {
+    private:
+        template<typename> friend struct ::lstm::transaction;
+        friend struct ::lstm::detail::transaction_base;
+        
+    public:
+        template<typename U, typename... Us,
+            LSTM_REQUIRES_(std::is_constructible<T, U&&, Us&&...>() &&
+                           !std::is_same<uncvref<U>, uncvref<Alloc>>())>
+        constexpr var_impl(U&& u, Us&&... us)
+            noexcept(noexcept(T((U&&)u, (Us&&)us...)))
+            : var_base{reinterpret_cast<void*>(T((U&&)u, (Us&&)us...))}
+        {}
+        
+        LSTM_REQUIRES(std::is_constructible<T>())
+        constexpr var_impl() noexcept(noexcept(T()))
+            : var_base{reinterpret_cast<void*>(T())}
+        {}
+        
+        template<typename... Us,
+            LSTM_REQUIRES_(std::is_constructible<T, Us&&...>())>
+        constexpr var_impl(const Alloc&, Us&&... us)
+            noexcept(noexcept(T((Us&&)us...)))
+            : var_base{reinterpret_cast<void*>(T((Us&&)us...))}
+        {}
+        
+        T& unsafe() & noexcept { return reinterpret_cast<T&>(value); }
+        T&& unsafe() && noexcept { return reinterpret_cast<T&&>(value); }
+        const T& unsafe() const & noexcept { return reinterpret_cast<const T&>(value); }
+        const T&& unsafe() const && noexcept { return reinterpret_cast<const T&&>(value); }
+        
+        ~var_impl() noexcept { destroy_deallocate(value); }
+    
+    private:
+        template<typename... Us>
+        constexpr void* allocate_construct(Us&&... us) noexcept(noexcept(T((Us&&)us...)))
+        { return reinterpret_cast<void*>(T((Us&&)us...)); }
+        
+        void destroy_deallocate(void* void_ptr) noexcept override final
+        { reinterpret_cast<T&>(void_ptr).~T(); }
     };
 
     // TODO: this one is super broke
