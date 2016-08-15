@@ -17,12 +17,22 @@ int main() {
 void lstm::test::transaction_tester::run_tests() {
     // init
     {
-        CHECK(transaction<>::clock == 0u);
-        transaction<> tx{{}};
-        CHECK(tx.version == 0u);
-        CHECK(transaction<>::clock == 0u);
-        CHECK(tx.write_set.size() == 0u);
-        CHECK(tx.read_set.size() == 0u);
+        {
+            CHECK(transaction<>::clock == 0u);
+            transaction<> tx{{}};
+            CHECK(tx.version == 0u);
+            CHECK(transaction<>::clock == 0u);
+            CHECK(tx.write_set.size() == 0u);
+            CHECK(tx.read_set.size() == 0u);
+        }
+        {
+            transaction<>::clock = 42;
+            
+            transaction<> tx{{}};
+            CHECK(tx.version == 42u);
+            
+            transaction<>::clock = 0;
+        }
     }
     
     // locking (private but important)
@@ -111,5 +121,8 @@ void lstm::test::transaction_tester::run_tests() {
         CHECK(tx1.load(x) == 44);
         CHECK(tx0.load(x) == 43);
         CHECK(x.unsafe() == 42);
+        
+        tx0.cleanup();
+        tx1.cleanup();
     }
 }

@@ -35,23 +35,29 @@ LSTM_DETAIL_BEGIN
 
     struct atomic_fn {
     private:
-        // TODO: Alloc... maybe the rootmost transaction does have control over allocation, which
-        // means transaction needs some kinda base class, with type erasure, or virtual methods :(
+        // TODO: Alloc: see transaction.hpp
+#ifdef LSTM_THREAD_LOCAL
         template<typename Alloc>
-        static transaction<Alloc>*& thread_local_transaction() {
+        static transaction<Alloc>*& tls_transaction() {
             static LSTM_THREAD_LOCAL transaction<Alloc>* tx = nullptr;
             return tx;
         }
+#else
+    #error "TODO: pthreads implementation of thread locals"
+        template<typename Alloc>
+        static transaction<Alloc>*& tls_transaction() {
+            // TODO: this
+        }
+#endif
         
     public:
-        // TODO: noexcept
         template<typename Func, typename Alloc,
             LSTM_REQUIRES_(is_transact_function<Func, Alloc>()
                 && !is_void_transact_function<Func, Alloc>())>
         result_type<Func, Alloc> operator()(Func func, const Alloc& alloc) const {
             static constexpr auto tx_size = sizeof(transaction<Alloc>);
             alignas(transaction<Alloc>) char storage[tx_size];
-            auto& tls_tx = thread_local_transaction<Alloc>();
+            transaction<Alloc>*& tls_tx = tls_transaction<Alloc>();
             
             // this thread is already in a transaction
             if (tls_tx) {
@@ -97,13 +103,12 @@ LSTM_DETAIL_BEGIN
             }
         }
         
-        // TODO: noexcept
         template<typename Func, typename Alloc,
             LSTM_REQUIRES_(is_void_transact_function<Func, Alloc>())>
         void operator()(Func func, const Alloc& alloc) const {
             static constexpr auto tx_size = sizeof(transaction<Alloc>);
             alignas(transaction<Alloc>) char storage[tx_size];
-            auto& tls_tx = thread_local_transaction<Alloc>();
+            transaction<Alloc>*& tls_tx = tls_transaction<Alloc>();
             
             // this thread is already in a transaction
             if (tls_tx) {

@@ -49,21 +49,21 @@ LSTM_DETAIL_BEGIN
             LSTM_REQUIRES_(std::is_constructible<T, U&&, Us&&...>() &&
                            !std::is_same<uncvref<U>, uncvref<Alloc>>())>
         constexpr var_impl(U&& u, Us&&... us)
-            noexcept(noexcept(alloc_construct((U&&)u, (Us&&)us...)))
-            : var_base{(void*)alloc_construct((U&&)u, (Us&&)us...)}
+            noexcept(noexcept(allocate_construct((U&&)u, (Us&&)us...)))
+            : var_base{(void*)allocate_construct((U&&)u, (Us&&)us...)}
         {}
         
         LSTM_REQUIRES(std::is_constructible<T>())
-        constexpr var_impl() noexcept(noexcept(alloc_construct()))
-            : var_base{(void*)alloc_construct()}
+        constexpr var_impl() noexcept(noexcept(allocate_construct()))
+            : var_base{(void*)allocate_construct()}
         {}
         
         template<typename... Us,
             LSTM_REQUIRES_(std::is_constructible<T, Us&&...>())>
         constexpr var_impl(const Alloc& in_alloc, Us&&... us)
-            noexcept(noexcept(alloc_construct((Us&&)us...)))
+            noexcept(noexcept(allocate_construct((Us&&)us...)))
             : Alloc{in_alloc}
-            , var_base{(void*)alloc_construct((Us&&)us...)}
+            , var_base{(void*)allocate_construct((Us&&)us...)}
         {}
         
         T& unsafe() & noexcept { return *(T*)value; }
@@ -78,7 +78,7 @@ LSTM_DETAIL_BEGIN
     
     private:
         template<typename... Us>
-        constexpr T* alloc_construct(Us&&... us)
+        constexpr T* allocate_construct(Us&&... us)
             noexcept(noexcept(alloc_traits::allocate(alloc(), 1)) &&
                      noexcept(alloc_traits::construct(alloc(), (T*)nullptr, (Us&&)us...)))
         {
@@ -123,7 +123,7 @@ LSTM_DETAIL_BEGIN
     
     private:
         template<typename... Us>
-        constexpr elem_type* alloc_construct(Us&&... us)
+        constexpr elem_type* allocate_construct(Us&&... us)
             noexcept(noexcept(alloc_traits::allocate(alloc(), 1)) &&
                      noexcept(alloc_traits::construct(alloc(), (elem_type*)nullptr, (Us&&)us...)))
         {

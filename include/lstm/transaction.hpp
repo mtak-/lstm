@@ -9,11 +9,13 @@
 #include <set>
 
 LSTM_BEGIN
+    // TODO: Alloc... the rootmost transaction has control over allocation, which means transaction
+    // needs some kinda base class, with type erasure, or virtual methods :(
     template<typename Alloc>
-    struct transaction : private Alloc {
+    struct transaction {
+    private:
         friend detail::atomic_fn;
         friend test::transaction_tester;
-    private:
         static std::atomic<word> clock;
         
         std::set<const detail::var_base*, std::less<>, Alloc> read_set;
@@ -21,9 +23,8 @@ LSTM_BEGIN
         word version;
         
         transaction(const Alloc& alloc) noexcept
-            : Alloc(alloc)
-            , read_set(static_cast<Alloc&>(*this))
-            , write_set(static_cast<Alloc&>(*this))
+            : read_set(alloc)
+            , write_set(alloc)
             , version(clock.load(LSTM_ACQUIRE))
         {}
         
@@ -49,7 +50,7 @@ LSTM_BEGIN
         }
         
         bool read_valid(const detail::var_base& v) const noexcept
-        { return v.version_lock.load(LSTM_ACQUIRE) <= (version | 1); }
+        { return v.version_lock.load(LSTM_ACQUIRE) <= version; }
         
         void commit_lock_writes() {
             auto write_begin = std::begin(write_set);
@@ -67,6 +68,7 @@ LSTM_BEGIN
         }
         
         void commit_validate_reads() {
+            // reads do not need to be locked to be validated
             for (auto& var : read_set) {
                 if (!read_valid(*var)) {
                     for (auto& var_val : write_set)
@@ -76,7 +78,7 @@ LSTM_BEGIN
             }
         }
         
-        void commit_writes(const word write_version) {
+        void commit_publish(const word write_version) {
             for (auto& var_val : write_set) {
                 var_val.first->destroy_deallocate(var_val.first->value);
                 var_val.first->value = var_val.second;
@@ -86,20 +88,22 @@ LSTM_BEGIN
             write_set.clear();
         }
         
+        // ONLY called by owning lstm::atomic call (i.e. exact type is known w.r.t. allocators)
         void commit() {
             commit_lock_writes();
-            
+            auto write_version = clock.fetch_add(2, LSTM_RELEASE) + 2;
             commit_validate_reads();
-            
-            commit_writes(clock.fetch_add(2, LSTM_RELEASE) + 2);
+            commit_publish(write_version);
         }
         
+        // ONLY called by owning lstm::atomic call (i.e. exact type is known w.r.t. allocators)
         void cleanup() {
             for (auto& var_val : write_set)
                 var_val.first->destroy_deallocate(var_val.second);
             write_set.clear();
         }
         
+        // ONLY called by owning lstm::atomic call (i.e. exact type is known w.r.t. allocators)
         ~transaction() noexcept = default;
         
     public:
@@ -115,14 +119,15 @@ LSTM_BEGIN
                 word read_version = 0;
                 if (lock(read_version, v)) { // TODO: not sure locking is the best that can be done
                     // if copying T causes a lock to be taken out on T, then this line will abort
-                    // the transaction. this is ok, because it is certainly a bug in the client code
+                    // the transaction or cause a stack overflow.
+                    // this is ok, because it is certainly a bug in the client code (me thinks..)
                     auto result = *(T*)v.value;
                     unlock(read_version, v);
                     
                     read_set.emplace(&v);
                     return result;
                 }
-            } else // TODO: would this improve or hurt speed? // if (read_valid(v))
+            } else if (read_valid(v)) // TODO: does this improve or hurt speed?
                 return *static_cast<T*>(write_iter->second);
             throw tx_retry{};
         }
@@ -135,13 +140,13 @@ LSTM_BEGIN
             if (write_iter != std::end(write_set))
                 *static_cast<T*>(write_iter->second) = (U&&)u;
             else
-                write_set.emplace(&v, v.alloc_construct((U&&)u));
+                write_set.emplace(&v, v.allocate_construct((U&&)u));
             
             if (!read_valid(v))
                 throw tx_retry{};
         }
         
-        // reading/writing an rvalue probably never makes sense?
+        // TODO: reading/writing an rvalue probably never makes sense?
         template<typename T>
         void load(const var<T>&& v) = delete;
         
