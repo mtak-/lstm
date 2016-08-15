@@ -64,12 +64,14 @@ LSTM_BEGIN
                 void* write_ptr = find_write_set(const_cast<var<T>&>(v));
                 if (!write_ptr) {
                     word read_version = 0;
+                    
+                    // FIXME: locking/unlocking is more than half the overhead for word sized types
                     if (lock(read_version, v)) { // TODO: not sure locking best possible solution
                         // if copying T causes a lock to be taken out on T, then this line will
                         // abort the transaction or cause a stack overflow.
                         // this is ok, because it is certainly a bug in the client code
                         // (me thinks..)
-                        auto result = *(T*)v.value;
+                        auto result = v.unsafe();
                         unlock(read_version, v);
                         
                         add_read_set(v);

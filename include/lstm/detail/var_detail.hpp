@@ -93,6 +93,7 @@ LSTM_DETAIL_BEGIN
         }
     };
 
+    // TODO: this one is super broke
     template<typename T, typename Alloc>
     struct var_impl<T, Alloc, var_type::lvalue_ref>
         : private Alloc
