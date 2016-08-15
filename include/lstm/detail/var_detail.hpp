@@ -9,6 +9,7 @@ LSTM_DETAIL_BEGIN
     struct var_base {
     protected:
         template<typename> friend struct ::lstm::transaction;
+        friend struct ::lstm::detail::transaction_base;
         friend test::transaction_tester;
         
         inline var_base(void* in_value) noexcept
@@ -16,7 +17,7 @@ LSTM_DETAIL_BEGIN
             , value(in_value)
         {}
         
-        virtual void destroy_deallocate(void* ptr) = 0;
+        virtual void destroy_deallocate(void* ptr) noexcept = 0;
         
         mutable std::atomic<word> version_lock;
         void* value;
@@ -41,6 +42,7 @@ LSTM_DETAIL_BEGIN
     {
     private:
         template<typename> friend struct ::lstm::transaction;
+        friend struct ::lstm::detail::transaction_base;
         using alloc_traits = std::allocator_traits<Alloc>;
         constexpr Alloc& alloc() noexcept { return static_cast<Alloc&>(*this); }
         
@@ -71,10 +73,7 @@ LSTM_DETAIL_BEGIN
         const T& unsafe() const & noexcept { return *(T*)value; }
         const T&& unsafe() const && noexcept { return std::move(*(T*)value); }
         
-        ~var_impl()
-            noexcept(noexcept(alloc_traits::destroy(alloc(), (T*)nullptr)) &&
-                     noexcept(alloc_traits::deallocate(alloc(), (T*)nullptr, 1)))
-        { destroy_deallocate(value); }
+        ~var_impl() noexcept { destroy_deallocate(value); }
     
     private:
         template<typename... Us>
@@ -87,7 +86,7 @@ LSTM_DETAIL_BEGIN
             return ptr;
         }
         
-        void destroy_deallocate(void* void_ptr) override final {
+        void destroy_deallocate(void* void_ptr) noexcept override final {
             auto ptr = static_cast<T*>(void_ptr);
             alloc_traits::destroy(alloc(), ptr);
             alloc_traits::deallocate(alloc(), ptr, 1);
@@ -101,6 +100,7 @@ LSTM_DETAIL_BEGIN
     {
     private:
         template<typename> friend struct ::lstm::transaction;
+        friend struct ::lstm::detail::transaction_base;
         using elem_type = uncvref<T>;
         using alloc_traits = std::allocator_traits<Alloc>;
         constexpr Alloc& alloc() noexcept { return static_cast<Alloc&>(*this); }
@@ -132,7 +132,7 @@ LSTM_DETAIL_BEGIN
             return ptr;
         }
         
-        void destroy_deallocate(void*) override final {}
+        void destroy_deallocate(void*) noexcept override final {}
     };
 LSTM_DETAIL_END
 

@@ -16,10 +16,10 @@ int main() {
         std::thread t0([&] {
             while (i0++ < 10000)
                 lstm::atomic([&](auto& tx) {
-                    lstm::atomic([&](auto& tx) {
+                    if (i0 % 100 >= 0 && i0 % 100 < 5)
                         tx.store(x, tx.load(x) + 1);
-                    });
-                    tx.store(x, tx.load(x) + 1);
+                    else
+                        tx.load(x);
                 });
         });
         
@@ -27,10 +27,10 @@ int main() {
         std::thread t1([&] {
             while (i1++ < 10000)
                 lstm::atomic([&](auto& tx) {
-                    lstm::atomic([&](auto& tx) {
+                    if (i1 % 100 >= 25 && i1 % 100 < 30)
                         tx.store(x, tx.load(x) + 1);
-                    });
-                    tx.store(x, tx.load(x) + 1);
+                    else
+                        tx.load(x);
                 });
         });
         
@@ -38,10 +38,10 @@ int main() {
         std::thread t2([&] {
             while (i2++ < 10000)
                 lstm::atomic([&](auto& tx) {
-                    lstm::atomic([&](auto& tx) {
+                    if (i2 % 100 >= 50 && i2 % 100 < 55)
                         tx.store(x, tx.load(x) + 1);
-                    });
-                    tx.store(x, tx.load(x) + 1);
+                    else
+                        tx.load(x);
                 });
         });
         
@@ -49,10 +49,10 @@ int main() {
         std::thread t3([&] {
             while (i3++ < 10000)
                 lstm::atomic([&](auto& tx) {
-                    lstm::atomic([&](auto& tx) {
+                    if (i3 % 100 >= 75 && i3 % 100 < 80)
                         tx.store(x, tx.load(x) + 1);
-                    });
-                    tx.store(x, tx.load(x) + 1);
+                    else
+                        tx.load(x);
                 });
         });
         
@@ -65,7 +65,7 @@ int main() {
         
         lstm::atomic([&](auto& tx) {
             auto my_x = tx.load(x);
-            assert(my_x == 80000);
+            assert(my_x == 2000);
         });
         
         std::cout << "LSTM: "

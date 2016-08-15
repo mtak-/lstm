@@ -37,15 +37,13 @@ LSTM_DETAIL_BEGIN
     private:
         // TODO: Alloc: see transaction.hpp
 #ifdef LSTM_THREAD_LOCAL
-        template<typename Alloc>
-        static transaction<Alloc>*& tls_transaction() {
-            static LSTM_THREAD_LOCAL transaction<Alloc>* tx = nullptr;
+        static inline detail::transaction_base*& tls_transaction() noexcept {
+            static LSTM_THREAD_LOCAL detail::transaction_base* tx = nullptr;
             return tx;
         }
 #else
     #error "TODO: pthreads implementation of thread locals"
-        template<typename Alloc>
-        static transaction<Alloc>*& tls_transaction() {
+        static inline detail::transaction_base*& tls_transaction() noexcept {
             // TODO: this
         }
 #endif
@@ -55,22 +53,23 @@ LSTM_DETAIL_BEGIN
             LSTM_REQUIRES_(is_transact_function<Func, Alloc>()
                 && !is_void_transact_function<Func, Alloc>())>
         result_type<Func, Alloc> operator()(Func func, const Alloc& alloc) const {
-            static constexpr auto tx_size = sizeof(transaction<Alloc>);
-            alignas(transaction<Alloc>) char storage[tx_size];
-            transaction<Alloc>*& tls_tx = tls_transaction<Alloc>();
-            
+            auto& tls_tx = tls_transaction();
             // this thread is already in a transaction
             if (tls_tx) {
                 auto stack_tx_ptr = tls_tx;
                 return func(*stack_tx_ptr);
             }
             
+            static constexpr auto tx_size = sizeof(transaction<Alloc>);
+            alignas(transaction<Alloc>) char storage[tx_size];
+            
             auto stack_tx_ptr = reinterpret_cast<transaction<Alloc>*>(storage);
             tls_tx = stack_tx_ptr;
             
+            new(storage) transaction<Alloc>{alloc};
             while(true) {
                 try {
-                    new(storage) transaction<Alloc>{alloc};
+                    stack_tx_ptr->version = transaction_base::get_clock();
                     
                     decltype(auto) result = func(*stack_tx_ptr);
                     
@@ -81,22 +80,11 @@ LSTM_DETAIL_BEGIN
                         
                     return result;
                 } catch(const tx_retry&) {
-                    try {
-                        stack_tx_ptr->cleanup();
-                    } catch(...) {
-                        tls_tx = nullptr;
-                        stack_tx_ptr->~transaction();
-                        throw;
-                    }
-                    stack_tx_ptr->~transaction();
+                    stack_tx_ptr->cleanup();
                 } catch(...) {
                     tls_tx = nullptr;
                     
-                    try {
-                        stack_tx_ptr->cleanup();
-                    } catch(...) {
-                        std::terminate(); // two exceptions at once, no way to recover
-                    }
+                    stack_tx_ptr->cleanup();
                     stack_tx_ptr->~transaction();
                     throw;
                 }
@@ -106,22 +94,23 @@ LSTM_DETAIL_BEGIN
         template<typename Func, typename Alloc,
             LSTM_REQUIRES_(is_void_transact_function<Func, Alloc>())>
         void operator()(Func func, const Alloc& alloc) const {
-            static constexpr auto tx_size = sizeof(transaction<Alloc>);
-            alignas(transaction<Alloc>) char storage[tx_size];
-            transaction<Alloc>*& tls_tx = tls_transaction<Alloc>();
-            
-            // this thread is already in a transaction
+            auto& tls_tx = tls_transaction();
             if (tls_tx) {
+                // this thread is already in a transaction
                 auto stack_tx_ptr = tls_tx;
                 return func(*stack_tx_ptr);
             }
             
+            static constexpr auto tx_size = sizeof(transaction<Alloc>);
+            alignas(transaction<Alloc>) char storage[tx_size];
+            
             auto stack_tx_ptr = reinterpret_cast<transaction<Alloc>*>(storage);
             tls_tx = stack_tx_ptr;
             
+            new(storage) transaction<Alloc>{alloc};
             while(true) {
                 try {
-                    new(storage) transaction<Alloc>{alloc};
+                    stack_tx_ptr->version = transaction_base::get_clock();
                     
                     func(*stack_tx_ptr);
                     
@@ -132,22 +121,11 @@ LSTM_DETAIL_BEGIN
                         
                     break;
                 } catch(const tx_retry&) {
-                    try {
-                        stack_tx_ptr->cleanup();
-                    } catch(...) {
-                        tls_tx = nullptr;
-                        stack_tx_ptr->~transaction();
-                        throw;
-                    }
-                    stack_tx_ptr->~transaction();
+                    stack_tx_ptr->cleanup();
                 } catch(...) {
                     tls_tx = nullptr;
                     
-                    try {
-                        stack_tx_ptr->cleanup();
-                    } catch(...) {
-                        std::terminate(); // two exceptions at once, no way to recover
-                    }
+                    stack_tx_ptr->cleanup();
                     stack_tx_ptr->~transaction();
                     throw;
                 }

@@ -45,6 +45,7 @@ LSTM_BEGIN
     
     namespace detail {
         struct atomic_fn;
+        struct transaction_base;
         struct var_base;
     }
     
