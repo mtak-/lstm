@@ -22,21 +22,21 @@ int lstm::test::transaction_tester::run_tests() {
         CHECK(tx.write_set.size() == 0u);
         CHECK(tx.read_set.size() == 0u);
     }
-    
+
     // locking (private but important)
     {
         var<int> v{0};
         transaction<> tx{{}};
         tx.version = 0;
-        
+
         CHECK(v.version_lock == 0u);
-    
+
         word version_buf;
         {
             version_buf = 0u;
             CHECK(tx.lock(version_buf, v) == true);
             CHECK(v.version_lock == 1u);
-    
+
             tx.unlock(v);
             CHECK(v.version_lock == 0u);
         }
@@ -44,11 +44,11 @@ int lstm::test::transaction_tester::run_tests() {
             version_buf = 0u;
             CHECK(tx.lock(version_buf, v) == true);
             CHECK(v.version_lock == 1u);
-    
+
             version_buf = 0u;
             CHECK(tx.lock(version_buf, v) == false);
             CHECK(v.version_lock == 1u);
-    
+
             tx.unlock(v);
             CHECK(v.version_lock == 0u);
         }
@@ -56,64 +56,64 @@ int lstm::test::transaction_tester::run_tests() {
             v.version_lock = 3000u;
             CHECK(tx.lock(version_buf, v) == false);
         }
-    
+
         CHECK(tx.read_set.size() == 0u);
     }
-    
+
     // loads
     {
         var<int> x{42};
         transaction<> tx0{{}};
         tx0.version = 0;
-    
+
         CHECK(tx0.load(x) == 42);
         CHECK(tx0.read_set.size() == 1u);
         CHECK(tx0.read_set.count(&x) == 1u);
-    
+
         ++x.unsafe();
-    
+
         CHECK(tx0.load(x) == 43);
         CHECK(tx0.read_set.size() == 1u);
         CHECK(tx0.read_set.count(&x) == 1u);
-    
+
         transaction<> tx1{{}};
         tx1.version = 0;
         CHECK(tx1.load(x) == 43);
         CHECK(tx1.read_set.size() == 1u);
         CHECK(tx1.read_set.count(&x) == 1u);
-    
+
         CHECK(tx0.load(x) == 43);
         CHECK(tx0.read_set.size() == 1u);
         CHECK(tx0.read_set.count(&x) == 1u);
     }
-    
+
     // stores
     {
         var<int> x{42};
         transaction<> tx0{{}};
         tx0.version = 0;
-    
+
         tx0.store(x, 43);
         CHECK(tx0.write_set.size() == 1u);
         CHECK(tx0.write_set.count(&x) == 1u);
-        CHECK(*static_cast<int*>(tx0.write_set.at(&x)) == 43);
-        CHECK(tx0.load(x) == 43);
-    
-        CHECK(x.unsafe() == 42);
+        CHECK(reinterpret_cast<int&>(tx0.write_set.at(&x)) == 43);
         
+        CHECK(tx0.load(x) == 43);
+        CHECK(x.unsafe() == 42);
+
         transaction<> tx1{{}};
         tx1.version = 0;
-        
+
         CHECK(tx1.load(x) == 42);
         tx1.store(x, 44);
         CHECK(tx1.write_set.size() == 1u);
         CHECK(tx1.write_set.count(&x) == 1u);
-        CHECK(*static_cast<int*>(tx1.write_set.at(&x)) == 44);
-        
+        CHECK(reinterpret_cast<int&>(tx1.write_set.at(&x)) == 44);
+
         CHECK(tx1.load(x) == 44);
         CHECK(tx0.load(x) == 43);
         CHECK(x.unsafe() == 42);
-        
+
         tx0.cleanup();
         tx1.cleanup();
     }
