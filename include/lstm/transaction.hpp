@@ -51,7 +51,7 @@ LSTM_BEGIN
 
             virtual void add_read_set(const detail::var_base& v) = 0;
             virtual void add_write_set(detail::var_base& v, void* ptr) = 0;
-            virtual std::pair<void*, bool> find_write_set(detail::var_base& v) noexcept = 0;
+            virtual std::pair<void*, bool> find_write_set(const detail::var_base& v) noexcept = 0;
 
         public:
             transaction_base(const transaction_base&) = delete;
@@ -60,9 +60,9 @@ LSTM_BEGIN
             transaction_base& operator=(transaction_base&&) = delete;
 
             template<typename T,
-                LSTM_REQUIRES_(var_type_switch<T>() != var_type::word_sized)>
+                LSTM_REQUIRES_(!std::is_trivially_copyable<T>())>
             T load(const var<T>& v) {
-                auto write_ptr_success = find_write_set(const_cast<var<T>&>(v));
+                auto write_ptr_success = find_write_set(v);
                 if (!write_ptr_success.second) {
                     word read_version = 0;
                     if (lock(read_version, v)) {
@@ -77,51 +77,37 @@ LSTM_BEGIN
                         return result;
                     }
                 } else if (read_valid(v)) // TODO: does this if check improve or hurt speed?
-                    return *static_cast<T*>(write_ptr_success.first);
+                    return var<T>::load(write_ptr_success.first);
                 throw tx_retry{};
             }
 
             template<typename T,
-                LSTM_REQUIRES_(var_type_switch<T>() == var_type::word_sized)>
+                LSTM_REQUIRES_(std::is_trivially_copyable<T>())>
             T load(const var<T>& v) {
-                auto write_ptr_success = find_write_set(const_cast<var<T>&>(v));
+                auto write_ptr_success = find_write_set(v);
                 if (!write_ptr_success.second) {
                     auto v0 = v.version_lock.load(LSTM_ACQUIRE);
                     if (v0 <= version && !(v0 & 1)) {
-                        auto result = reinterpret_cast<const std::atomic<T>&>(v.value).load(LSTM_RELAXED);
+                        auto result = var<T>::load(v.value);
                         if (v.version_lock.load(LSTM_ACQ_REL) == v0) {
                             add_read_set(v);
                             return result;
                         }
                     }
                 } else if (read_valid(v)) // TODO: does this if check improve or hurt speed?
-                    return reinterpret_cast<T&>(write_ptr_success.first);
+                    return var<T>::load(write_ptr_success.first);
                 throw tx_retry{};
             }
 
             template<typename T, typename U,
                 LSTM_REQUIRES_(std::is_assignable<T&, U&&>() &&
-                               std::is_constructible<T, U&&>() &&
-                               var_type_switch<T>() != var_type::word_sized)>
+                               std::is_constructible<T, U&&>())>
             void store(var<T>& v, U&& u) __attribute__((noinline)){
                 auto write_ptr_success = find_write_set(v);
                 if (!write_ptr_success.second)
-                    add_write_set(v, (void*)v.allocate_construct((U&&)u));
+                    add_write_set(v, v.allocate_construct((U&&)u));
                 else
-                    *static_cast<T*>(write_ptr_success.first) = (U&&)u;
-
-                // TODO: where is this best placed???, or is it best removed altogether?
-                if (!read_valid(v)) throw tx_retry{};
-            }
-
-            template<typename T, typename U,
-                LSTM_REQUIRES_(var_type_switch<T>() == var_type::word_sized)>
-            void store(var<T>& v, U&& u) __attribute__((noinline)){
-                auto write_ptr_success = find_write_set(v);
-                if (!write_ptr_success.second)
-                    add_write_set(v, (void*)v.allocate_construct((U&&)u));
-                else
-                    *static_cast<T*>(write_ptr_success.first) = (U&&)u;
+                    v.load(write_ptr_success.first) = (U&&)u;
 
                 // TODO: where is this best placed???, or is it best removed altogether?
                 if (!read_valid(v)) throw tx_retry{};
@@ -212,7 +198,7 @@ LSTM_BEGIN
         void add_write_set(detail::var_base& v, void* ptr) override final
         { write_set.emplace(std::addressof(v), ptr); }
 
-        std::pair<void*, bool> find_write_set(detail::var_base& v) noexcept override final {
+        std::pair<void*, bool> find_write_set(const detail::var_base& v) noexcept override final {
             auto iter = write_set.find(std::addressof(v));
             return iter != std::end(write_set)
               ? std::make_pair(iter->second, true)

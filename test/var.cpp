@@ -48,62 +48,62 @@ int main() {
     }
 
     // reference tests
-    {
-        struct foo {
-            char bar[30];
-        };
-        foo y; y.bar[0] = 42;
-        var<foo&> x{y};
-        NOEXCEPT_CHECK(x.unsafe().bar[0] == 42);
-
-        NOEXCEPT_CHECK(++x.unsafe().bar[0] == 43);
-        NOEXCEPT_CHECK(y.bar[0] == 43);
-
-        static_assert(Same<foo&, decltype(x.unsafe())>, "");
-        static_assert(Same<foo&, decltype(std::move(x).unsafe())>, "");
-    }
-    {
-        struct foo {
-            char bar[30];
-        };
-        foo y; y.bar[0] = 42;
-        const var<foo&> x{y};
-        NOEXCEPT_CHECK(x.unsafe().bar[0] == 42);
-
-        NOEXCEPT_CHECK(++x.unsafe().bar[0] == 43);
-        NOEXCEPT_CHECK(y.bar[0] == 43);
-
-        static_assert(Same<foo&, decltype(x.unsafe())>, "");
-        static_assert(Same<foo&, decltype(std::move(x).unsafe())>, "");
-    }
-    {
-        struct foo {
-            char bar[30];
-        };
-        foo y; y.bar[0] = 42;
-        var<const foo&> x{y};
-        NOEXCEPT_CHECK(x.unsafe().bar[0] == 42);
-
-        NOEXCEPT_CHECK(++y.bar[0] == 43);
-        NOEXCEPT_CHECK(x.unsafe().bar[0] == 43);
-
-        static_assert(Same<const foo&, decltype(x.unsafe())>, "");
-        static_assert(Same<const foo&, decltype(std::move(x).unsafe())>, "");
-    }
-    {
-        struct foo {
-            char bar[30];
-        };
-        foo y; y.bar[0] = 42;
-        const var<const foo&> x{y};
-        NOEXCEPT_CHECK(x.unsafe().bar[0] == 42);
-
-        NOEXCEPT_CHECK(++y.bar[0] == 43);
-        NOEXCEPT_CHECK(x.unsafe().bar[0] == 43);
-
-        static_assert(Same<const foo&, decltype(x.unsafe())>, "");
-        static_assert(Same<const foo&, decltype(std::move(x).unsafe())>, "");
-    }
+    // {
+    //     struct foo {
+    //         char bar[30];
+    //     };
+    //     foo y; y.bar[0] = 42;
+    //     var<foo&> x{y};
+    //     NOEXCEPT_CHECK(x.unsafe().bar[0] == 42);
+    //
+    //     NOEXCEPT_CHECK(++x.unsafe().bar[0] == 43);
+    //     NOEXCEPT_CHECK(y.bar[0] == 43);
+    //
+    //     static_assert(Same<foo&, decltype(x.unsafe())>, "");
+    //     static_assert(Same<foo&, decltype(std::move(x).unsafe())>, "");
+    // }
+    // {
+    //     struct foo {
+    //         char bar[30];
+    //     };
+    //     foo y; y.bar[0] = 42;
+    //     const var<foo&> x{y};
+    //     NOEXCEPT_CHECK(x.unsafe().bar[0] == 42);
+    //
+    //     NOEXCEPT_CHECK(++x.unsafe().bar[0] == 43);
+    //     NOEXCEPT_CHECK(y.bar[0] == 43);
+    //
+    //     static_assert(Same<foo&, decltype(x.unsafe())>, "");
+    //     static_assert(Same<foo&, decltype(std::move(x).unsafe())>, "");
+    // }
+    // {
+    //     struct foo {
+    //         char bar[30];
+    //     };
+    //     foo y; y.bar[0] = 42;
+    //     var<const foo&> x{y};
+    //     NOEXCEPT_CHECK(x.unsafe().bar[0] == 42);
+    //
+    //     NOEXCEPT_CHECK(++y.bar[0] == 43);
+    //     NOEXCEPT_CHECK(x.unsafe().bar[0] == 43);
+    //
+    //     static_assert(Same<const foo&, decltype(x.unsafe())>, "");
+    //     static_assert(Same<const foo&, decltype(std::move(x).unsafe())>, "");
+    // }
+    // {
+    //     struct foo {
+    //         char bar[30];
+    //     };
+    //     foo y; y.bar[0] = 42;
+    //     const var<const foo&> x{y};
+    //     NOEXCEPT_CHECK(x.unsafe().bar[0] == 42);
+    //
+    //     NOEXCEPT_CHECK(++y.bar[0] == 43);
+    //     NOEXCEPT_CHECK(x.unsafe().bar[0] == 43);
+    //
+    //     static_assert(Same<const foo&, decltype(x.unsafe())>, "");
+    //     static_assert(Same<const foo&, decltype(std::move(x).unsafe())>, "");
+    // }
 
     // allocators
     {
@@ -168,10 +168,10 @@ int main() {
     static_assert(std::is_destructible<lstm::var<const int>>{}, "");
 
     // ref
-    static_assert(std::is_constructible<lstm::var<int&>, int&>{}, "");
-    static_assert(!std::is_constructible<lstm::var<int&>, const int&>{}, "");
-    static_assert(std::is_constructible<lstm::var<const int&>, int&>{}, "");
-    static_assert(std::is_constructible<lstm::var<const int&>, const int&>{}, "");
+    // static_assert(std::is_constructible<lstm::var<int&>, int&>{}, "");
+    // static_assert(!std::is_constructible<lstm::var<int&>, const int&>{}, "");
+    // static_assert(std::is_constructible<lstm::var<const int&>, int&>{}, "");
+    // static_assert(std::is_constructible<lstm::var<const int&>, const int&>{}, "");
     // static_assert(!std::is_constructible<lstm::var<int&&>, int&&>{}, "");
 
     return test_result();
