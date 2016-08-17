@@ -5,48 +5,53 @@
 
 #include <atomic>
 
+LSTM_BEGIN
+    // slowest to fastest
+    enum class var_type {
+        locking,
+        trivial,
+        atomic,
+    };
+LSTM_END
+
 LSTM_DETAIL_BEGIN
+    using var_storage = void*;
+
     struct var_base {
     protected:
         template<typename> friend struct ::lstm::transaction;
         friend struct ::lstm::detail::transaction_base;
         friend test::transaction_tester;
         
-        inline var_base() noexcept
-            : version_lock{0}
-        {}
+        inline var_base() noexcept : version_lock{0} {}
         
-        virtual void destroy_deallocate(void* ptr) noexcept = 0;
+        virtual void destroy_deallocate(var_storage ptr) noexcept = 0;
         
         mutable std::atomic<word> version_lock;
-        void* value;
-    };
-    
-    enum class var_type {
-        value,
-        atomic,
-        lvalue_ref
+        var_storage value;
     };
     
     template<typename T>
     constexpr var_type var_type_switch() noexcept {
-        if (std::is_lvalue_reference<T>{}) return var_type::lvalue_ref;
-        
         if (sizeof(T) <= sizeof(word) && alignof(T) <= alignof(word) &&
                 std::is_trivially_copyable<T>{}())
             return var_type::atomic;
         
-        return var_type::value;
+        return var_type::locking;
     }
     
     template<typename T, typename Alloc, var_type = var_type_switch<T>()>
     struct var_alloc_policy;
     
     template<typename T, typename Alloc>
-    struct var_alloc_policy<T, Alloc, var_type::value>
+    struct var_alloc_policy<T, Alloc, var_type::locking>
         : private Alloc
         , var_base
     {
+        static constexpr bool trivial = std::is_trivially_copyable<T>{}();
+        static constexpr bool atomic = false;
+        static constexpr var_type type = trivial ? var_type::locking : var_type::trivial;
+    protected:
         template<typename> friend struct ::lstm::transaction;
         friend struct ::lstm::detail::transaction_base;
         using alloc_traits = std::allocator_traits<Alloc>;
@@ -60,7 +65,7 @@ LSTM_DETAIL_BEGIN
         {}
         
         template<typename... Us>
-        constexpr void* allocate_construct(Us&&... us)
+        constexpr var_storage allocate_construct(Us&&... us)
             noexcept(noexcept(alloc_traits::allocate(alloc(), 1)) &&
                      noexcept(alloc_traits::construct(alloc(), (T*)nullptr, (Us&&)us...)))
         {
@@ -69,19 +74,23 @@ LSTM_DETAIL_BEGIN
             return ptr;
         }
         
-        void destroy_deallocate(void* void_ptr) noexcept override final {
-            auto ptr = &load(void_ptr);
+        void destroy_deallocate(var_storage s) noexcept override final {
+            auto ptr = &load(s);
             alloc_traits::destroy(alloc(), ptr);
             alloc_traits::deallocate(alloc(), ptr, 1);
         }
         
-        static T& load(void*& v) noexcept { return *static_cast<T*>(v); }
-        static const T& load(void* const& v)  noexcept { return *static_cast<const T*>(v); }
+        static T& load(var_storage& v) noexcept { return *static_cast<T*>(v); }
+        static const T& load(const var_storage& v)  noexcept { return *static_cast<const T*>(v); }
     };
     template<typename T, typename Alloc>
     struct var_alloc_policy<T, Alloc, var_type::atomic>
         : var_base
     {
+        static constexpr bool trivial = true;
+        static constexpr bool atomic = true;
+        static constexpr var_type type = var_type::atomic;
+    protected:
         template<typename> friend struct ::lstm::transaction;
         friend struct ::lstm::detail::transaction_base;
         
@@ -89,17 +98,21 @@ LSTM_DETAIL_BEGIN
         constexpr var_alloc_policy(const Alloc&) noexcept {}
         
         template<typename... Us>
-        constexpr void* allocate_construct(Us&&... us) noexcept(noexcept(T((Us&&)us...)))
-        { return reinterpret_cast<void*>(T((Us&&)us...)); }
+        constexpr var_storage allocate_construct(Us&&... us) noexcept(noexcept(T((Us&&)us...)))
+        { return reinterpret_cast<var_storage>(T((Us&&)us...)); }
         
-        void destroy_deallocate(void* void_ptr) noexcept override final
-        { load(void_ptr).~T(); }
+        void destroy_deallocate(var_storage s) noexcept override final
+        { load(s).~T(); }
         
-        static T& load(void*& v) noexcept { return reinterpret_cast<T&>(v); }
-        static const T& load(void* const& v) noexcept
+        static T& load(var_storage& v) noexcept { return reinterpret_cast<T&>(v); }
+        static const T& load(const var_storage& v) noexcept
         { return reinterpret_cast<const T&>(v); }
     };
     
+    
+    /***********************************************************************************************
+     * var_impl
+     **********************************************************************************************/
     template<typename T, typename Alloc>
     struct var_impl
         : var_alloc_policy<T, Alloc>
@@ -113,18 +126,18 @@ LSTM_DETAIL_BEGIN
                            !std::is_same<uncvref<U>, uncvref<Alloc>>())>
         constexpr var_impl(U&& u, Us&&... us)
             noexcept(noexcept(base::allocate_construct((U&&)u, (Us&&)us...)))
-        { var_base::value = (void*)base::allocate_construct((U&&)u, (Us&&)us...); }
+        { var_base::value = base::allocate_construct((U&&)u, (Us&&)us...); }
         
         LSTM_REQUIRES(std::is_constructible<T>())
         constexpr var_impl() noexcept(noexcept(base::allocate_construct()))
-        { var_base::value = (void*)base::allocate_construct(); }
+        { var_base::value = base::allocate_construct(); }
         
         template<typename... Us,
             LSTM_REQUIRES_(std::is_constructible<T, Us&&...>())>
         constexpr var_impl(const Alloc& in_alloc, Us&&... us)
             noexcept(noexcept(base::allocate_construct((Us&&)us...)))
             : var_alloc_policy<T, Alloc>{in_alloc}
-        { var_base::value = (void*)base::allocate_construct((Us&&)us...); }
+        { var_base::value = base::allocate_construct((Us&&)us...); }
         
         T& unsafe() & noexcept { return base::load(var_base::value); }
         T&& unsafe() && noexcept { return std::move(base::load(var_base::value)); }

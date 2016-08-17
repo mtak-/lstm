@@ -23,26 +23,27 @@ LSTM_BEGIN
 
             transaction_base() noexcept = default;
             ~transaction_base() noexcept = default;
+            
+            static inline bool locked(word version) noexcept { return version & 1; }
+            static inline word as_locked(word version) noexcept { return version | 1; }
 
             bool lock(word& version_buf, const detail::var_base& v) const noexcept {
-                // TODO: this feels wrong, especially since reads call this...
-                // reader writer style lock might be more appropriate, but that'd probly starve
-                // writes
                 while (version_buf <= version &&
                     !v.version_lock.compare_exchange_weak(version_buf,
-                                                          version_buf | 1,
+                                                          as_locked(version_buf),
                                                           LSTM_RELEASE)); // TODO: is this correct?
-                return version_buf <= version && !(version_buf & 1);
+                return version_buf <= version && !locked(version_buf);
             }
 
             static void unlock(const word read_version, const detail::var_base& v) noexcept {
-                assert((v.version_lock.load(LSTM_RELAXED) & 1) == 1);
-                assert((read_version & 1) == 0);
+                assert(locked(v.version_lock.load(LSTM_RELAXED)));
+                assert(!locked(read_version));
                 v.version_lock.store(read_version, LSTM_RELEASE);
             }
 
             static void unlock(const detail::var_base& v) noexcept {
-                assert((v.version_lock.load(LSTM_RELAXED) & 1) == 1);
+                assert(locked(v.version_lock.load(LSTM_RELAXED)));
+                assert(v.version_lock.load(LSTM_RELAXED) + 1 <= version);
                 v.version_lock.fetch_sub(1, LSTM_RELEASE);
             }
 
@@ -50,21 +51,23 @@ LSTM_BEGIN
             { return v.version_lock.load(LSTM_ACQUIRE) <= version; }
 
             virtual void add_read_set(const detail::var_base& v) = 0;
-            virtual void add_write_set(detail::var_base& v, void* ptr) = 0;
-            virtual std::pair<void*, bool> find_write_set(const detail::var_base& v) noexcept = 0;
+            virtual void add_write_set(detail::var_base& v, var_storage ptr) = 0;
+            virtual std::pair<var_storage, bool> find_write_set(const detail::var_base& v) noexcept = 0;
 
         public:
             transaction_base(const transaction_base&) = delete;
             transaction_base(transaction_base&&) = delete;
             transaction_base& operator=(const transaction_base&) = delete;
             transaction_base& operator=(transaction_base&&) = delete;
-
+            
+            // non trivial loads, require locking the var<T> before copying it
             template<typename T,
-                LSTM_REQUIRES_(!std::is_trivially_copyable<T>())>
+                LSTM_REQUIRES_(!var<T>::trivial)>
             T load(const var<T>& v) {
                 auto write_ptr_success = find_write_set(v);
                 if (!write_ptr_success.second) {
                     word read_version = 0;
+                    // TODO: this feels wrong, especially since reads call this...
                     if (lock(read_version, v)) {
                         // if copying T causes a lock to be taken out on T, then this line will
                         // abort the transaction or cause a stack overflow.
@@ -80,14 +83,15 @@ LSTM_BEGIN
                     return var<T>::load(write_ptr_success.first);
                 throw tx_retry{};
             }
-
+            
+            // trivial loads are fast :)
             template<typename T,
-                LSTM_REQUIRES_(std::is_trivially_copyable<T>())>
+                LSTM_REQUIRES_(var<T>::trivial)>
             T load(const var<T>& v) {
                 auto write_ptr_success = find_write_set(v);
                 if (!write_ptr_success.second) {
                     auto v0 = v.version_lock.load(LSTM_ACQUIRE);
-                    if (v0 <= version && !(v0 & 1)) {
+                    if (v0 <= version && !locked(v0)) {
                         auto result = var<T>::load(v.value);
                         if (v.version_lock.load(LSTM_ACQ_REL) == v0) {
                             add_read_set(v);
@@ -132,7 +136,7 @@ LSTM_BEGIN
         friend test::transaction_tester;
 
         std::set<const detail::var_base*, std::less<>, Alloc> read_set;
-        std::map<detail::var_base*, void*, std::less<>, Alloc> write_set;
+        std::map<detail::var_base*, detail::var_storage, std::less<>, Alloc> write_set;
 
         transaction(const Alloc& alloc) // TODO: noexcept ?
             : read_set(alloc)
@@ -195,10 +199,11 @@ LSTM_BEGIN
         void add_read_set(const detail::var_base& v) override final
         { read_set.emplace(std::addressof(v)); }
 
-        void add_write_set(detail::var_base& v, void* ptr) override final
+        void add_write_set(detail::var_base& v, detail::var_storage ptr) override final
         { write_set.emplace(std::addressof(v), ptr); }
 
-        std::pair<void*, bool> find_write_set(const detail::var_base& v) noexcept override final {
+        std::pair<detail::var_storage, bool>
+        find_write_set(const detail::var_base& v) noexcept override final {
             auto iter = write_set.find(std::addressof(v));
             return iter != std::end(write_set)
               ? std::make_pair(iter->second, true)
