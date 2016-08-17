@@ -40,17 +40,14 @@ LSTM_DETAIL_BEGIN
         return var_type::locking;
     }
     
-    template<typename T, typename Alloc, var_type = var_type_switch<T>()>
-    struct var_alloc_policy;
-    
-    template<typename T, typename Alloc>
-    struct var_alloc_policy<T, Alloc, var_type::locking>
+    template<typename T, typename Alloc, var_type Var_type = var_type_switch<T>()>
+    struct var_alloc_policy
         : private Alloc
         , var_base
     {
         static constexpr bool trivial = std::is_trivially_copyable<T>{}();
         static constexpr bool atomic = false;
-        static constexpr var_type type = trivial ? var_type::locking : var_type::trivial;
+        static constexpr var_type type = Var_type;
     protected:
         template<typename> friend struct ::lstm::transaction;
         friend struct ::lstm::detail::transaction_base;

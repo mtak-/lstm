@@ -19,7 +19,7 @@ LSTM_BEGIN
             static std::atomic<word> clock;
             static inline word get_clock() noexcept { return clock<>.load(LSTM_ACQUIRE); }
 
-            word version;
+            word read_version;
 
             transaction_base() noexcept = default;
             ~transaction_base() noexcept = default;
@@ -28,27 +28,26 @@ LSTM_BEGIN
             static inline word as_locked(word version) noexcept { return version | 1; }
 
             bool lock(word& version_buf, const detail::var_base& v) const noexcept {
-                while (version_buf <= version &&
+                while (version_buf <= read_version &&
                     !v.version_lock.compare_exchange_weak(version_buf,
                                                           as_locked(version_buf),
                                                           LSTM_RELEASE)); // TODO: is this correct?
-                return version_buf <= version && !locked(version_buf);
+                return version_buf <= read_version && !locked(version_buf);
             }
 
-            static void unlock(const word read_version, const detail::var_base& v) noexcept {
+            static void unlock(const word version_to_set, const detail::var_base& v) noexcept {
                 assert(locked(v.version_lock.load(LSTM_RELAXED)));
-                assert(!locked(read_version));
-                v.version_lock.store(read_version, LSTM_RELEASE);
+                assert(!locked(version_to_set));
+                v.version_lock.store(version_to_set, LSTM_RELEASE);
             }
 
             static void unlock(const detail::var_base& v) noexcept {
                 assert(locked(v.version_lock.load(LSTM_RELAXED)));
-                assert(v.version_lock.load(LSTM_RELAXED) + 1 <= version);
                 v.version_lock.fetch_sub(1, LSTM_RELEASE);
             }
 
             bool read_valid(const detail::var_base& v) const noexcept
-            { return v.version_lock.load(LSTM_ACQUIRE) <= version; }
+            { return v.version_lock.load(LSTM_ACQUIRE) <= read_version; }
 
             virtual void add_read_set(const detail::var_base& v) = 0;
             virtual void add_write_set(detail::var_base& v, var_storage ptr) = 0;
@@ -66,15 +65,15 @@ LSTM_BEGIN
             T load(const var<T>& v) {
                 auto write_ptr_success = find_write_set(v);
                 if (!write_ptr_success.second) {
-                    word read_version = 0;
+                    word version_buf = 0;
                     // TODO: this feels wrong, especially since reads call this...
-                    if (lock(read_version, v)) {
+                    if (lock(version_buf, v)) {
                         // if copying T causes a lock to be taken out on T, then this line will
                         // abort the transaction or cause a stack overflow.
                         // this is ok, because it is certainly a bug in the client code
                         // (me thinks..)
                         auto result = v.unsafe();
-                        unlock(read_version, v);
+                        unlock(version_buf, v);
 
                         add_read_set(v);
                         return result;
@@ -91,7 +90,7 @@ LSTM_BEGIN
                 auto write_ptr_success = find_write_set(v);
                 if (!write_ptr_success.second) {
                     auto v0 = v.version_lock.load(LSTM_ACQUIRE);
-                    if (v0 <= version && !locked(v0)) {
+                    if (v0 <= read_version && !locked(v0)) {
                         auto result = var<T>::load(v.value);
                         if (v.version_lock.load(LSTM_ACQ_REL) == v0) {
                             add_read_set(v);
@@ -147,11 +146,11 @@ LSTM_BEGIN
 
         void commit_lock_writes() {
             auto write_begin = std::begin(write_set);
-            word write_version;
+            word version_buf;
             for (auto iter = write_begin; iter != std::end(write_set); ++iter) {
-                write_version = 0;
+                version_buf = 0;
                 // TODO: only care what version the var is, if it's also a read
-                if (!lock(write_version, *iter->first)) {
+                if (!lock(version_buf, *iter->first)) {
                     for (; write_begin != iter; ++write_begin)
                         unlock(*write_begin->first);
                     throw tx_retry{};

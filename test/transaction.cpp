@@ -27,7 +27,7 @@ int lstm::test::transaction_tester::run_tests() {
     {
         var<int> v{0};
         transaction<> tx{{}};
-        tx.version = 0;
+        tx.read_version = 0;
 
         CHECK(v.version_lock == 0u);
 
@@ -64,7 +64,7 @@ int lstm::test::transaction_tester::run_tests() {
     {
         var<int> x{42};
         transaction<> tx0{{}};
-        tx0.version = 0;
+        tx0.read_version = 0;
 
         CHECK(tx0.load(x) == 42);
         CHECK(tx0.read_set.size() == 1u);
@@ -77,7 +77,7 @@ int lstm::test::transaction_tester::run_tests() {
         CHECK(tx0.read_set.count(&x) == 1u);
 
         transaction<> tx1{{}};
-        tx1.version = 0;
+        tx1.read_version = 0;
         CHECK(tx1.load(x) == 43);
         CHECK(tx1.read_set.size() == 1u);
         CHECK(tx1.read_set.count(&x) == 1u);
@@ -91,7 +91,7 @@ int lstm::test::transaction_tester::run_tests() {
     {
         var<int> x{42};
         transaction<> tx0{{}};
-        tx0.version = 0;
+        tx0.read_version = 0;
 
         tx0.store(x, 43);
         CHECK(tx0.write_set.size() == 1u);
@@ -102,7 +102,7 @@ int lstm::test::transaction_tester::run_tests() {
         CHECK(x.unsafe() == 42);
 
         transaction<> tx1{{}};
-        tx1.version = 0;
+        tx1.read_version = 0;
 
         CHECK(tx1.load(x) == 42);
         tx1.store(x, 44);

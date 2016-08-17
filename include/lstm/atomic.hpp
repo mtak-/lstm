@@ -69,7 +69,7 @@ LSTM_DETAIL_BEGIN
             new(storage) transaction<Alloc>{alloc};
             while(true) {
                 try {
-                    stack_tx_ptr->version = transaction_base::get_clock();
+                    stack_tx_ptr->read_version = transaction_base::get_clock();
                     
                     decltype(auto) result = func(*stack_tx_ptr);
                     
@@ -110,7 +110,7 @@ LSTM_DETAIL_BEGIN
             new(storage) transaction<Alloc>{alloc};
             while(true) {
                 try {
-                    stack_tx_ptr->version = transaction_base::get_clock();
+                    stack_tx_ptr->read_version = transaction_base::get_clock();
                     
                     func(*stack_tx_ptr);
                     
