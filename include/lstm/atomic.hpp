@@ -69,18 +69,16 @@ LSTM_DETAIL_BEGIN
             new(storage) transaction<Alloc>{alloc};
             while(true) {
                 try {
-                    stack_tx_ptr->read_version = transaction_base::get_clock();
-                    
                     decltype(auto) result = func(*stack_tx_ptr);
                     
                     stack_tx_ptr->commit();
-                    stack_tx_ptr->cleanup();
                     stack_tx_ptr->~transaction();
                     tls_tx = nullptr;
                         
                     return result;
                 } catch(const tx_retry&) {
-                    stack_tx_ptr->cleanup();
+                    stack_tx_ptr->cleanup_retry();
+                    stack_tx_ptr->read_version = transaction_base::get_clock();
                 } catch(...) {
                     tls_tx = nullptr;
                     
@@ -110,18 +108,16 @@ LSTM_DETAIL_BEGIN
             new(storage) transaction<Alloc>{alloc};
             while(true) {
                 try {
-                    stack_tx_ptr->read_version = transaction_base::get_clock();
-                    
                     func(*stack_tx_ptr);
                     
                     stack_tx_ptr->commit();
-                    stack_tx_ptr->cleanup();
                     stack_tx_ptr->~transaction();
                     tls_tx = nullptr;
                         
                     break;
                 } catch(const tx_retry&) {
-                    stack_tx_ptr->cleanup();
+                    stack_tx_ptr->cleanup_retry();
+                    stack_tx_ptr->read_version = transaction_base::get_clock();
                 } catch(...) {
                     tls_tx = nullptr;
                     
