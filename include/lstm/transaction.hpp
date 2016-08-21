@@ -5,18 +5,67 @@
 
 #include <atomic>
 #include <cassert>
+#include <iostream>
 #include <vector>
 
 LSTM_BEGIN
     namespace detail {
-        struct write_set_storage {
-            detail::var_base* var;
-            detail::var_storage pending_write;
+        struct read_set_value_type {
+        private:
+            const var_base* _src_var;
+            
+        public:
+            inline constexpr read_set_value_type(const var_base& in_src_var) noexcept
+                : _src_var(&in_src_var)
+            {}
+                
+            inline constexpr const var_base& src_var() const noexcept { return *_src_var; }
+            
+            inline constexpr bool is_src_var(const var_base& rhs) const noexcept
+            { return _src_var == &rhs; }
+            
+            inline constexpr bool operator<(const read_set_value_type& rhs) const noexcept
+            { return _src_var == rhs._src_var; }
+        };
+        
+        struct write_set_value_type {
+        private:
+            var_base* _dest_var;
+            var_storage _pending_write;
+            
+        public:
+            inline constexpr
+            write_set_value_type(var_base& in_dest_var, var_storage in_pending_write) noexcept
+                : _dest_var(&in_dest_var)
+                , _pending_write(std::move(in_pending_write))
+            {}
+                
+            inline constexpr var_base& dest_var() const noexcept { return *_dest_var; }
+            inline constexpr var_storage& pending_write() noexcept { return _pending_write; }
+            inline constexpr const var_storage& pending_write() const noexcept
+            { return _pending_write; }
+            
+            inline constexpr bool is_dest_var(const var_base& rhs) const noexcept
+            { return _dest_var == &rhs; }
+            
+            inline constexpr bool operator<(const write_set_value_type& rhs) const noexcept
+            { return _dest_var < rhs._dest_var; }
         };
         
         struct write_set_lookup {
-            var_storage storage;
-            bool success;
+        private:
+            var_storage* _pending_write;
+            
+        public:
+            inline constexpr write_set_lookup(std::nullptr_t) noexcept : _pending_write{nullptr} {}
+            
+            inline constexpr
+            write_set_lookup(var_storage& in_pending_write) noexcept
+                : _pending_write{&in_pending_write}
+            {}
+                
+            inline constexpr bool success() const noexcept { return _pending_write != nullptr; }
+            inline constexpr var_storage& pending_write() const noexcept { return *_pending_write; }
         };
         
         struct transaction_base {
@@ -30,9 +79,7 @@ LSTM_BEGIN
 
             word read_version;
 
-            inline transaction_base() noexcept
-                : read_version(get_clock())
-            {}
+            inline transaction_base() noexcept : read_version(get_clock()) {}
             
             static inline bool locked(word version) noexcept { return version & 1; }
             static inline word as_locked(word version) noexcept { return version | 1; }
@@ -74,61 +121,61 @@ LSTM_BEGIN
             // non trivial loads, require locking the var<T> before copying it
             template<typename T,
                 LSTM_REQUIRES_(!var<T>::trivial)>
-            T load(const var<T>& v) {
-                write_set_lookup lookup = find_write_set(v);
-                if (!lookup.success) {
+            T load(const var<T>& src_var) {
+                write_set_lookup lookup = find_write_set(src_var);
+                if (!lookup.success()) {
                     word version_buf = 0;
                     // TODO: this feels wrong, especially since reads call this...
-                    if (lock(version_buf, v)) {
+                    if (lock(version_buf, src_var)) {
                         // if copying T causes a lock to be taken out on T, then this line will
                         // abort the transaction or cause a stack overflow.
                         // this is ok, because it is certainly a bug in the client code
                         // (me thinks..)
-                        auto result = v.unsafe();
-                        unlock(version_buf, v);
+                        T result = src_var.unsafe();
+                        unlock(version_buf, src_var);
 
-                        add_read_set(v);
+                        add_read_set(src_var);
                         return result;
                     }
-                } else if (read_valid(v)) // TODO: does this if check improve or hurt speed?
-                    return var<T>::load(lookup.storage);
+                } else if (read_valid(src_var)) // TODO: does this if check improve or hurt speed?
+                    return var<T>::load(lookup.pending_write());
                 throw tx_retry{};
             }
             
             // trivial loads are fast :)
             template<typename T,
                 LSTM_REQUIRES_(var<T>::trivial)>
-            T load(const var<T>& v) {
-                write_set_lookup lookup = find_write_set(v);
-                if (!lookup.success) {
+            T load(const var<T>& src_var) {
+                write_set_lookup lookup = find_write_set(src_var);
+                if (!lookup.success()) {
                     // TODO: is this synchronization correct?
                     // or does it thrash the cache too much?
-                    auto v0 = v.version_lock.load(LSTM_ACQUIRE);
-                    if (v0 <= read_version && !locked(v0)) {
-                        auto result = var<T>::load(v.storage);
+                    auto src_version = src_var.version_lock.load(LSTM_ACQUIRE);
+                    if (src_version <= read_version && !locked(src_version)) {
+                        T result = var<T>::load(src_var.storage);
                         
-                        if (v.version_lock.load(LSTM_ACQUIRE) == v0) {
-                            add_read_set(v);
+                        if (src_var.version_lock.load(LSTM_ACQUIRE) == src_version) {
+                            add_read_set(src_var);
                             return result;
                         }
                     }
-                } else if (read_valid(v)) // TODO: does this if check improve or hurt speed?
-                    return var<T>::load(lookup.storage);
+                } else if (read_valid(src_var)) // TODO: does this if check improve or hurt speed?
+                    return var<T>::load(lookup.pending_write());
                 throw tx_retry{};
             }
 
             template<typename T, typename U,
                 LSTM_REQUIRES_(std::is_assignable<T&, U&&>() &&
                                std::is_constructible<T, U&&>())>
-            void store(var<T>& v, U&& u) {
-                write_set_lookup lookup = find_write_set(v);
-                if (!lookup.success)
-                    add_write_set(v, v.allocate_construct((U&&)u));
+            void store(var<T>& dest_var, U&& u) {
+                write_set_lookup lookup = find_write_set(dest_var);
+                if (!lookup.success())
+                    add_write_set(dest_var, dest_var.allocate_construct((U&&)u));
                 else
-                    v.load(lookup.storage) = (U&&)u;
+                    dest_var.load(lookup.pending_write()) = (U&&)u;
 
                 // TODO: where is this best placed???, or is it best removed altogether?
-                if (!read_valid(v)) throw tx_retry{};
+                if (!read_valid(dest_var)) throw tx_retry{};
             }
 
             // TODO: reading/writing an rvalue probably never makes sense?
@@ -145,16 +192,21 @@ LSTM_BEGIN
 
     template<typename Alloc>
     struct transaction : detail::transaction_base {
-    private:
-        using alloc_traits = std::allocator_traits<Alloc>;
-        using read_alloc = typename alloc_traits::template rebind_alloc<const detail::var_base*>;
-        using write_alloc = typename alloc_traits::template rebind_alloc<detail::write_set_storage>;
         friend detail::atomic_fn;
         friend test::transaction_tester;
+    private:
+        using alloc_traits = std::allocator_traits<Alloc>;
+        using read_alloc = typename alloc_traits
+                                ::template rebind_alloc<detail::read_set_value_type>;
+        using write_alloc = typename alloc_traits
+                                ::template rebind_alloc<detail::write_set_value_type>;
+        using read_set_t = std::vector<detail::read_set_value_type, read_alloc>;
+        using write_set_t = std::vector<detail::write_set_value_type, write_alloc>;
+        using read_set_const_iter = typename read_set_t::const_iterator;
 
         // TODO: make some container choices
-        std::vector<const detail::var_base*, read_alloc> read_set;
-        std::vector<detail::write_set_storage, write_alloc> write_set;
+        read_set_t read_set;
+        write_set_t write_set;
 
         inline transaction(const Alloc& alloc) noexcept
             : read_set(alloc)
@@ -162,37 +214,44 @@ LSTM_BEGIN
         {}
 
         void commit_lock_writes() {
+            // pretty sure write needs to be sorted
+            // in order to have lockfreedom on trivial types?
             auto write_begin = std::begin(write_set);
+            auto write_end = std::end(write_set);
+            std::sort(write_begin, write_end);
+            
             word version_buf;
-            for (auto iter = write_begin; iter != std::end(write_set); ++iter) {
+            for (auto write_iter = write_begin; write_iter != write_end; ++write_iter) {
                 version_buf = 0;
                 // TODO: only care what version the var is, if it's also a read
-                if (!lock(version_buf, *iter->var)) {
-                    for (; write_begin != iter; ++write_begin)
-                        unlock(*write_begin->var);
+                if (!lock(version_buf, write_iter->dest_var())) {
+                    for (; write_begin != write_iter; ++write_begin)
+                        unlock(write_begin->dest_var());
                     throw tx_retry{};
                 }
-                // FIXME: weird to have this here
-                read_set.erase(std::find(std::begin(read_set), std::end(read_set), iter->var));
+                
+                auto read_iter = read_set_find(write_iter->dest_var());
+                if (read_iter != std::end(read_set))
+                    read_set.erase(read_iter);
             }
         }
 
         void commit_validate_reads() {
             // reads do not need to be locked to be validated
-            for (auto& var : read_set) {
-                if (!read_valid(*var)) {
-                    for (auto& var_val : write_set)
-                        unlock(*var_val.var);
+            for (auto& read_set_vaue : read_set) {
+                if (!read_valid(read_set_vaue.src_var())) {
+                    for (auto& write_set_value : write_set)
+                        unlock(write_set_value.dest_var());
                     throw tx_retry{};
                 }
             }
         }
 
         void commit_publish(const word write_version) noexcept {
-            for (auto& var_val : write_set) {
-                var_val.var->destroy_deallocate(var_val.var->storage);
-                var_val.var->storage = var_val.pending_write;
-                unlock(write_version, *var_val.var);
+            for (auto& write_set_value : write_set) {
+                write_set_value.dest_var().destroy_deallocate(write_set_value.dest_var().storage);
+                write_set_value.dest_var().storage = std::move(write_set_value.pending_write());
+                unlock(write_version, write_set_value.dest_var());
             }
 
             write_set.clear();
@@ -205,52 +264,48 @@ LSTM_BEGIN
             auto write_version = clock<>.fetch_add(2, LSTM_RELEASE) + 2;
             commit_validate_reads();
             commit_publish(write_version);
-            cleanup_retry(); // destructor will handle the deallocation...
+            cleanup();
         }
 
-        void cleanup_retry() noexcept {
+        void cleanup() noexcept {
             // TODO: destroy only???
-            for (auto& var_val : write_set)
-                var_val.var->destroy_deallocate(var_val.pending_write);
+            for (auto& write_set_value : write_set)
+                write_set_value.dest_var().destroy_deallocate(write_set_value.pending_write());
             write_set.clear();
+            read_set.clear();
+        }
+        
+        read_set_const_iter read_set_find(const detail::var_base& src_var) const noexcept {
+            return std::find_if(
+                    std::begin(read_set),
+                    std::end(read_set),
+                    [&src_var](const detail::read_set_value_type& rhs) noexcept -> bool
+                    { return rhs.is_src_var(src_var); });
         }
 
-        // TODO: make this have a reason for being
-        inline void cleanup() noexcept {
-            cleanup_retry();
+        void add_read_set(const detail::var_base& src_var) override final {
+            if (read_set_find(src_var) == std::end(read_set))
+                read_set.emplace_back(src_var);
         }
 
-        void add_read_set(const detail::var_base& v) override final {
-            const auto ptr_v = std::addressof(v);
-            const auto end = std::end(read_set);
-            const auto iter = std::find(std::begin(read_set), end, ptr_v);
-            if (iter == end)
-                read_set.push_back({ptr_v});
+        void add_write_set(detail::var_base& dest_var,
+                           detail::var_storage pending_write) override final {
+            // up to caller to ensure dest_var is not already in the write_set
+            assert(!find_write_set(dest_var).success());
+            write_set.emplace_back(dest_var, std::move(pending_write));
         }
 
-        void add_write_set(detail::var_base& v, detail::var_storage ptr) override final {
-            const auto ptr_v = std::addressof(v);
+        detail::write_set_lookup
+        find_write_set(const detail::var_base& dest_var) noexcept override final {
             const auto end = std::end(write_set);
             const auto iter = std::find_if(
                 std::begin(write_set),
                 end,
-                [&ptr_v](const detail::write_set_storage& rhs) noexcept -> bool
-                { return ptr_v == rhs.pending_write; });
-            if (iter == end)
-                write_set.push_back({std::addressof(v), ptr});
-        }
-
-        detail::write_set_lookup find_write_set(const detail::var_base& v) noexcept override final {
-            const auto ptr_v = std::addressof(v);
-            const auto end = std::end(write_set);
-            const auto iter = std::find_if(
-                std::begin(write_set),
-                end,
-                [&ptr_v](const detail::write_set_storage& rhs) noexcept -> bool
-                { return ptr_v == rhs.pending_write; });
+                [&dest_var](const detail::write_set_value_type& rhs) noexcept -> bool
+                { return rhs.is_dest_var(dest_var); });
             return iter != end
-                ? detail::write_set_lookup{iter->pending_write, true}
-                : detail::write_set_lookup{{}, false};
+                ? detail::write_set_lookup{iter->pending_write()}
+                : detail::write_set_lookup{nullptr};
         }
     };
 LSTM_END

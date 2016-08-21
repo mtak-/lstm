@@ -77,7 +77,7 @@ LSTM_DETAIL_BEGIN
                         
                     return result;
                 } catch(const tx_retry&) {
-                    stack_tx_ptr->cleanup_retry();
+                    stack_tx_ptr->cleanup();
                     stack_tx_ptr->read_version = transaction_base::get_clock();
                 } catch(...) {
                     tls_tx = nullptr;
@@ -116,7 +116,7 @@ LSTM_DETAIL_BEGIN
                         
                     break;
                 } catch(const tx_retry&) {
-                    stack_tx_ptr->cleanup_retry();
+                    stack_tx_ptr->cleanup();
                     stack_tx_ptr->read_version = transaction_base::get_clock();
                 } catch(...) {
                     tls_tx = nullptr;

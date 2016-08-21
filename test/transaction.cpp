@@ -68,23 +68,23 @@ int lstm::test::transaction_tester::run_tests() {
     //
     //     CHECK(tx0.load(x) == 42);
     //     CHECK(tx0.read_set.size() == 1u);
-    //     CHECK(tx0.read_set.count(&x) == 1u);
+    //     CHECK(std::count(std::begin(tx0.read_set), std::end(tx0.read_set), &x) == 1u);
     //
     //     ++x.unsafe();
     //
     //     CHECK(tx0.load(x) == 43);
     //     CHECK(tx0.read_set.size() == 1u);
-    //     CHECK(tx0.read_set.count(&x) == 1u);
+    //     CHECK(std::count(std::begin(tx0.read_set), std::end(tx0.read_set), &x) == 1u);
     //
     //     transaction<> tx1{{}};
     //     tx1.read_version = 0;
     //     CHECK(tx1.load(x) == 43);
     //     CHECK(tx1.read_set.size() == 1u);
-    //     CHECK(tx1.read_set.count(&x) == 1u);
+    //     CHECK(std::count(std::begin(tx1.read_set), std::end(tx1.read_set), &x) == 1u);
     //
     //     CHECK(tx0.load(x) == 43);
     //     CHECK(tx0.read_set.size() == 1u);
-    //     CHECK(tx0.read_set.count(&x) == 1u);
+    //     CHECK(std::count(std::begin(tx0.read_set), std::end(tx0.read_set), &x) == 1u);
     // }
     //
     // // stores
@@ -95,8 +95,8 @@ int lstm::test::transaction_tester::run_tests() {
     //
     //     tx0.store(x, 43);
     //     CHECK(tx0.write_set.size() == 1u);
-    //     CHECK(tx0.write_set.count(&x) == 1u);
-    //     CHECK(reinterpret_cast<int&>(tx0.write_set.at(&x)) == 43);
+    //     CHECK(std::count_if(std::begin(tx0.write_set), std::end(tx0.write_set), [&] (auto&& ws) { return ws.var == &x; }) == 1u);
+    //     CHECK(reinterpret_cast<int&>(tx0.write_set[0].pending_write) == 43);
     //
     //     CHECK(tx0.load(x) == 43);
     //     CHECK(x.unsafe() == 42);
@@ -107,10 +107,19 @@ int lstm::test::transaction_tester::run_tests() {
     //     CHECK(tx1.load(x) == 42);
     //     tx1.store(x, 44);
     //     CHECK(tx1.write_set.size() == 1u);
-    //     CHECK(tx1.write_set.count(&x) == 1u);
-    //     CHECK(reinterpret_cast<int&>(tx1.write_set.at(&x)) == 44);
+    //     CHECK(std::count_if(std::begin(tx1.write_set), std::end(tx1.write_set), [&] (auto&& ws) { return ws.var == &x; }) == 1u);
+    //     CHECK(reinterpret_cast<int&>(tx1.write_set[0].pending_write) == 44);
     //
     //     CHECK(tx1.load(x) == 44);
+    //     CHECK(tx0.load(x) == 43);
+    //     CHECK(x.unsafe() == 42);
+    //
+    //     tx1.store(x, 45);
+    //     CHECK(tx1.write_set.size() == 1u);
+    //     CHECK(std::count_if(std::begin(tx1.write_set), std::end(tx1.write_set), [&] (auto&& ws) { return ws.var == &x; }) == 1u);
+    //     CHECK(reinterpret_cast<int&>(tx1.write_set[0].pending_write) == 45);
+    //
+    //     CHECK(tx1.load(x) == 45);
     //     CHECK(tx0.load(x) == 43);
     //     CHECK(x.unsafe() == 42);
     //
