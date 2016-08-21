@@ -8,7 +8,7 @@ using lstm::atomic;
 using lstm::var;
 
 struct philosopher {
-    int food{1};
+    int food{300000};
 };
 
 struct fork {
@@ -22,11 +22,14 @@ auto get_loop(philosopher& p, fork& f0, fork& f1) {
                 if (!tx.load(f0.in_use) && !tx.load(f1.in_use)) {
                     tx.store(f0.in_use, true);
                     tx.store(f1.in_use, true);
-                    --p.food;
-                    tx.store(f0.in_use, false);
-                    tx.store(f1.in_use, false);
-                }
+                } else
+                    lstm::retry();
             });
+            
+            --p.food;
+            
+            f0.in_use.unsafe() = false;
+            f1.in_use.unsafe() = false;
         }
     };
 }

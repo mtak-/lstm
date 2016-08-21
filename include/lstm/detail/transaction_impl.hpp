@@ -83,7 +83,7 @@ LSTM_DETAIL_BEGIN
                 if (!lock(version_buf, write_iter->dest_var())) {
                     for (; write_begin != write_iter; ++write_begin)
                         unlock(write_begin->dest_var());
-                    throw tx_retry{};
+                    retry();
                 }
                 
                 auto read_iter = read_set_find(write_iter->dest_var());
@@ -98,7 +98,7 @@ LSTM_DETAIL_BEGIN
                 if (!read_valid(read_set_vaue.src_var())) {
                     for (auto& write_set_value : write_set)
                         unlock(write_set_value.dest_var());
-                    throw tx_retry{};
+                    retry();
                 }
             }
         }

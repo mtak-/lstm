@@ -7,6 +7,8 @@
 #include <cassert>
 
 LSTM_BEGIN
+    [[noreturn]] inline void retry() { throw detail::tx_retry{}; }
+
     struct transaction {
     protected:
         friend detail::atomic_fn;
@@ -80,7 +82,7 @@ LSTM_BEGIN
                 }
             } else if (read_valid(src_var)) // TODO: does this if check improve or hurt speed?
                 return var<T>::load(lookup.pending_write());
-            throw tx_retry{};
+            retry();
         }
         
         // trivial loads are fast :)
@@ -102,7 +104,7 @@ LSTM_BEGIN
                 }
             } else if (read_valid(src_var)) // TODO: does this if check improve or hurt speed?
                 return var<T>::load(lookup.pending_write());
-            throw tx_retry{};
+            retry();
         }
 
         template<typename T, typename U,
@@ -116,7 +118,7 @@ LSTM_BEGIN
                 dest_var.load(lookup.pending_write()) = (U&&)u;
 
             // TODO: where is this best placed???, or is it best removed altogether?
-            if (!read_valid(dest_var)) throw tx_retry{};
+            if (!read_valid(dest_var)) retry();
         }
 
         // TODO: reading/writing an rvalue probably never makes sense?

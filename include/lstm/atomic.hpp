@@ -67,6 +67,9 @@ LSTM_DETAIL_BEGIN
             new(storage) transaction_impl<Alloc>{alloc};
             while(true) {
                 try {
+                    assert(stack_tx_ptr->read_set.size() == 0);
+                    assert(stack_tx_ptr->write_set.size() == 0);
+                    
                     decltype(auto) result = func(*stack_tx_ptr);
                     
                     stack_tx_ptr->commit();
@@ -106,6 +109,9 @@ LSTM_DETAIL_BEGIN
             new(storage) transaction_impl<Alloc>{alloc};
             while(true) {
                 try {
+                    assert(stack_tx_ptr->read_set.size() == 0);
+                    assert(stack_tx_ptr->write_set.size() == 0);
+                    
                     func(*stack_tx_ptr);
                     
                     stack_tx_ptr->commit();

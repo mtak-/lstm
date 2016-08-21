@@ -42,7 +42,7 @@ LSTM_DETAIL_BEGIN
     struct var_base;
     template<typename Alloc>
     struct transaction_impl;
-    struct write_set_lookup;
+    struct tx_retry {};
     
     struct write_set_lookup {
     private:
@@ -69,8 +69,6 @@ LSTM_BEGIN
     struct var;
     
     struct transaction;
-    
-    struct tx_retry {};
     
     template<typename T>
     using uncvref = std::remove_cv_t<std::remove_reference_t<T>>;
