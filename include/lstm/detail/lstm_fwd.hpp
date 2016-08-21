@@ -36,6 +36,31 @@
         >::type = 0>                                                                               \
     /**/
 
+LSTM_DETAIL_BEGIN
+    using var_storage = void*;
+    struct atomic_fn;
+    struct var_base;
+    template<typename Alloc>
+    struct transaction_impl;
+    struct write_set_lookup;
+    
+    struct write_set_lookup {
+    private:
+        var_storage* _pending_write;
+        
+    public:
+        inline constexpr write_set_lookup(std::nullptr_t) noexcept : _pending_write{nullptr} {}
+        
+        inline constexpr
+        write_set_lookup(var_storage& in_pending_write) noexcept
+            : _pending_write{&in_pending_write}
+        {}
+            
+        inline constexpr bool success() const noexcept { return _pending_write != nullptr; }
+        inline constexpr var_storage& pending_write() const noexcept { return *_pending_write; }
+    };
+LSTM_DETAIL_END
+
 LSTM_BEGIN
     // TODO verify lockfreeness of this on each platform
     using word = std::uintptr_t;
@@ -43,30 +68,12 @@ LSTM_BEGIN
     template<typename T, typename Alloc = std::allocator<std::remove_reference_t<T>>>
     struct var;
     
-    namespace detail {
-        struct atomic_fn;
-        struct transaction_base;
-        struct var_base;
-    }
-    
-    template<typename Alloc = std::allocator<detail::var_base*>>
     struct transaction;
     
     struct tx_retry {};
     
     template<typename T>
     using uncvref = std::remove_cv_t<std::remove_reference_t<T>>;
-    
-    namespace detail {
-        template<typename T>
-        struct is_var_ : std::false_type {};
-        
-        template<typename T>
-        struct is_var_<var<T>> : std::true_type {};
-    }
-    
-    template<typename T>
-    using is_var = detail::is_var_<uncvref<T>>;
     
     template<typename... Bs>
     using and_ = std::is_same<

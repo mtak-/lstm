@@ -15,12 +15,10 @@ LSTM_BEGIN
 LSTM_END
 
 LSTM_DETAIL_BEGIN
-    using var_storage = void*;
-
     struct var_base {
     protected:
-        template<typename> friend struct ::lstm::transaction;
-        friend struct ::lstm::detail::transaction_base;
+        template<typename> friend struct ::lstm::detail::transaction_impl;
+        friend struct ::lstm::transaction;
         friend test::transaction_tester;
         
         inline var_base() noexcept : version_lock{0} {}
@@ -50,8 +48,8 @@ LSTM_DETAIL_BEGIN
         static constexpr bool atomic = false;
         static constexpr var_type type = Var_type;
     protected:
-        template<typename> friend struct ::lstm::transaction;
-        friend struct ::lstm::detail::transaction_base;
+        template<typename> friend struct ::lstm::detail::transaction_impl;
+        friend struct ::lstm::transaction;
         using alloc_traits = std::allocator_traits<Alloc>;
         constexpr Alloc& alloc() noexcept { return static_cast<Alloc&>(*this); }
         
@@ -90,8 +88,8 @@ LSTM_DETAIL_BEGIN
         static constexpr bool atomic = true;
         static constexpr var_type type = var_type::atomic;
     protected:
-        template<typename> friend struct ::lstm::transaction;
-        friend struct ::lstm::detail::transaction_base;
+        template<typename> friend struct ::lstm::detail::transaction_impl;
+        friend struct ::lstm::transaction;
         
         constexpr var_alloc_policy() noexcept = default;
         constexpr var_alloc_policy(const Alloc&) noexcept {}
