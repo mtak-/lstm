@@ -35,13 +35,13 @@ LSTM_DETAIL_BEGIN
     private:
         // TODO: Alloc: see transaction.hpp
 #ifdef LSTM_THREAD_LOCAL
-        static inline ::lstm::transaction*& tls_transaction() noexcept {
-            static LSTM_THREAD_LOCAL ::lstm::transaction* tx = nullptr;
+        static inline transaction*& tls_transaction() noexcept {
+            static LSTM_THREAD_LOCAL transaction* tx = nullptr;
             return tx;
         }
 #else
     #error "TODO: pthreads implementation of thread locals"
-        static inline ::lstm::transaction*& tls_transaction() noexcept {
+        static inline transaction*& tls_transaction() noexcept {
             // TODO: this
         }
 #endif
@@ -77,7 +77,7 @@ LSTM_DETAIL_BEGIN
                     tls_tx = nullptr;
                         
                     return result;
-                } catch(const tx_retry&) {
+                } catch(const _tx_retry&) {
                     stack_tx_ptr->cleanup();
                     stack_tx_ptr->read_version = transaction::get_clock();
                 } catch(...) {
@@ -119,7 +119,7 @@ LSTM_DETAIL_BEGIN
                     tls_tx = nullptr;
                         
                     break;
-                } catch(const tx_retry&) {
+                } catch(const _tx_retry&) {
                     stack_tx_ptr->cleanup();
                     stack_tx_ptr->read_version = transaction::get_clock();
                 } catch(...) {

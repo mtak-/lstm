@@ -59,6 +59,7 @@ LSTM_DETAIL_BEGIN
         using read_set_t = std::vector<read_set_value_type, read_alloc>;
         using write_set_t = std::vector<write_set_value_type, write_alloc>;
         using read_set_const_iter = typename read_set_t::const_iterator;
+        using write_set_iter = typename write_set_t::iterator;
 
         // TODO: make some container choices
         read_set_t read_set;
@@ -68,6 +69,11 @@ LSTM_DETAIL_BEGIN
             : read_set(alloc)
             , write_set(alloc)
         {}
+            
+        static void unlock_write_set(write_set_iter begin, write_set_iter end) noexcept {
+            for (; begin != end; ++begin)
+                unlock(begin->dest_var());
+        }
 
         void commit_lock_writes() {
             // pretty sure write needs to be sorted
@@ -81,12 +87,12 @@ LSTM_DETAIL_BEGIN
                 version_buf = 0;
                 // TODO: only care what version the var is, if it's also a read
                 if (!lock(version_buf, write_iter->dest_var())) {
-                    for (; write_begin != write_iter; ++write_begin)
-                        unlock(write_begin->dest_var());
-                    retry();
+                    unlock_write_set(std::move(write_begin), std::move(write_iter));
+                    detail::internal_retry();
                 }
                 
-                auto read_iter = read_set_find(write_iter->dest_var());
+                // TODO: weird to have this here
+                auto read_iter = find_read_set(write_iter->dest_var());
                 if (read_iter != std::end(read_set))
                     read_set.erase(read_iter);
             }
@@ -96,9 +102,8 @@ LSTM_DETAIL_BEGIN
             // reads do not need to be locked to be validated
             for (auto& read_set_vaue : read_set) {
                 if (!read_valid(read_set_vaue.src_var())) {
-                    for (auto& write_set_value : write_set)
-                        unlock(write_set_value.dest_var());
-                    retry();
+                    unlock_write_set(std::begin(write_set), std::end(write_set));
+                    detail::internal_retry();
                 }
             }
         }
@@ -109,8 +114,6 @@ LSTM_DETAIL_BEGIN
                 write_set_value.dest_var().storage = std::move(write_set_value.pending_write());
                 unlock(write_version, write_set_value.dest_var());
             }
-
-            write_set.clear();
         }
 
         void commit() {
@@ -119,8 +122,10 @@ LSTM_DETAIL_BEGIN
             commit_lock_writes();
             auto write_version = clock<>.fetch_add(2, LSTM_RELEASE) + 2;
             commit_validate_reads();
+            
             commit_publish(write_version);
-            cleanup();
+            
+            LSTM_SUCC_TX();
         }
 
         void cleanup() noexcept {
@@ -131,7 +136,7 @@ LSTM_DETAIL_BEGIN
             read_set.clear();
         }
         
-        read_set_const_iter read_set_find(const var_base& src_var) const noexcept {
+        read_set_const_iter find_read_set(const var_base& src_var) const noexcept {
             return std::find_if(
                     std::begin(read_set),
                     std::end(read_set),
@@ -140,7 +145,7 @@ LSTM_DETAIL_BEGIN
         }
 
         void add_read_set(const var_base& src_var) override final {
-            if (read_set_find(src_var) == std::end(read_set))
+            if (find_read_set(src_var) == std::end(read_set))
                 read_set.emplace_back(src_var);
         }
 

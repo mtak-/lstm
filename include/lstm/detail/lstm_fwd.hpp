@@ -35,14 +35,32 @@
             int                                                                                    \
         >::type = 0>                                                                               \
     /**/
+    
+#ifdef LSTM_LOG_TRANSACTIONS
+    #include <lstm/detail/transaction_log.hpp>
+    
+    #define LSTM_INTERNAL_FAIL_TX() lstm::detail::transaction_log::get().add_internal_failure()
+    #define LSTM_USER_FAIL_TX() lstm::detail::transaction_log::get().add_user_failure()
+    #define LSTM_SUCC_TX() lstm::detail::transaction_log::get().add_success()
+#else
+    #define LSTM_INTERNAL_FAIL_TX() /**/
+    #define LSTM_USER_FAIL_TX() /**/
+    #define LSTM_SUCC_TX() /**/
+#endif /* LSTM_LOG_TRANSACTIONS */
 
 LSTM_DETAIL_BEGIN
     using var_storage = void*;
+    
     struct atomic_fn;
     struct var_base;
-    template<typename Alloc>
-    struct transaction_impl;
-    struct tx_retry {};
+    
+    template<typename Alloc> struct transaction_impl;
+    
+    struct _tx_retry {};
+    [[noreturn]] inline void internal_retry() {
+        LSTM_INTERNAL_FAIL_TX();
+        throw detail::_tx_retry{};
+    }
     
     struct write_set_lookup {
     private:

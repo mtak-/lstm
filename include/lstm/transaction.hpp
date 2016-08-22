@@ -7,7 +7,10 @@
 #include <cassert>
 
 LSTM_BEGIN
-    [[noreturn]] inline void retry() { throw detail::tx_retry{}; }
+    [[noreturn]] inline void retry() {
+        LSTM_USER_FAIL_TX();
+        throw detail::_tx_retry{};
+    }
 
     struct transaction {
     protected:
@@ -82,7 +85,7 @@ LSTM_BEGIN
                 }
             } else if (read_valid(src_var)) // TODO: does this if check improve or hurt speed?
                 return var<T>::load(lookup.pending_write());
-            retry();
+            detail::internal_retry();
         }
         
         // trivial loads are fast :)
@@ -91,8 +94,7 @@ LSTM_BEGIN
         T load(const var<T>& src_var) {
             detail::write_set_lookup lookup = find_write_set(src_var);
             if (!lookup.success()) {
-                // TODO: is this synchronization correct?
-                // or does it thrash the cache too much?
+                // TODO: is this synchronization correct/optimal?
                 auto src_version = src_var.version_lock.load(LSTM_ACQUIRE);
                 if (src_version <= read_version && !locked(src_version)) {
                     T result = var<T>::load(src_var.storage);
@@ -104,7 +106,7 @@ LSTM_BEGIN
                 }
             } else if (read_valid(src_var)) // TODO: does this if check improve or hurt speed?
                 return var<T>::load(lookup.pending_write());
-            retry();
+            detail::internal_retry();
         }
 
         template<typename T, typename U,
@@ -118,7 +120,7 @@ LSTM_BEGIN
                 dest_var.load(lookup.pending_write()) = (U&&)u;
 
             // TODO: where is this best placed???, or is it best removed altogether?
-            if (!read_valid(dest_var)) retry();
+            if (!read_valid(dest_var)) detail::internal_retry();
         }
 
         // TODO: reading/writing an rvalue probably never makes sense?
