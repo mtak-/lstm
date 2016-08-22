@@ -1,6 +1,11 @@
+#ifndef LSTM_LOG_TRANSACTIONS
+#define LSTM_LOG_TRANSACTIONS
+#endif
+
 #include <lstm/lstm.hpp>
 
 #include "simple_test.hpp"
+#include "thread_manager.hpp"
 
 #include <thread>
 
@@ -38,20 +43,18 @@ auto get_loop(philosopher& p, fork& f0, fork& f1) {
 }
 
 int main() {
+    thread_manager manager;
     for (std::size_t i = 0; i < repeat_count; ++i) {
         philosopher phil, sami, eric, aimy, joey;
         fork forks[5];
         
-        std::thread ts[]{
-            std::thread{get_loop(phil, forks[0], forks[1])},
-            std::thread{get_loop(sami, forks[1], forks[2])},
-            std::thread{get_loop(eric, forks[2], forks[3])},
-            std::thread{get_loop(aimy, forks[3], forks[4])},
-            std::thread{get_loop(joey, forks[4], forks[0])}
-        };
+        manager.queue_thread(get_loop(phil, forks[0], forks[1]));
+        manager.queue_thread(get_loop(sami, forks[1], forks[2]));
+        manager.queue_thread(get_loop(eric, forks[2], forks[3]));
+        manager.queue_thread(get_loop(aimy, forks[3], forks[4]));
+        manager.queue_thread(get_loop(joey, forks[4], forks[0]));
             
-        for (auto& t : ts)
-            t.join();
+        manager.run();
             
         for(auto& fork : forks)
             CHECK(fork.in_use.unsafe() == false);
@@ -68,7 +71,7 @@ int main() {
         CHECK(log.total_successes() == food_size * log.thread_count());
         CHECK(log.total_failures() <= food_size * (log.thread_count() - 1u));
         
-        std::cout << log.results() << std::endl;
+        std::cout << log.results();
         assert(log.total_failures() <= food_size * (log.thread_count() - 1));
         
         log.clear();
