@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1)
 
-project(FCC_TUPLE CXX)
+project(LSTM CXX)
 
 enable_testing()
 include(CTest)
