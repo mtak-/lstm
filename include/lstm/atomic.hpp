@@ -47,6 +47,8 @@ LSTM_DETAIL_BEGIN
 #endif
         
     public:
+        bool in_transaction() const noexcept { return tls_transaction() != nullptr; }
+        
         template<typename Func, typename Alloc,
             LSTM_REQUIRES_(is_transact_function<Func>()
                 && !is_void_transact_function<Func>())>
@@ -138,6 +140,8 @@ LSTM_BEGIN
     template<typename Func, typename Alloc = std::allocator<detail::var_base*>>
     detail::result_type<Func> atomic(Func func, const Alloc& alloc = {})
     { return detail::atomic_fn{}(std::move(func), alloc); }
+    
+    bool in_transaction() noexcept { return detail::atomic_fn{}.in_transaction(); }
 LSTM_END
 
 #endif /* LSTM_ATOMIC_HPP */

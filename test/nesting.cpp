@@ -1,13 +1,16 @@
 #include <lstm/lstm.hpp>
 
 #include "simple_test.hpp"
+#include "thread_manager.hpp"
 
 #include <cassert>
 #include <thread>
 #include <vector>
 
 void push(lstm::var<std::vector<int>>& x, int val) {
-    lstm::atomic([&](auto& tx) {
+    CHECK(lstm::in_transaction());
+    
+    lstm::atomic([&](lstm::transaction& tx) {
         auto var = tx.load(x);
         var.push_back(val);
         tx.store(x, std::move(var));
@@ -15,7 +18,9 @@ void push(lstm::var<std::vector<int>>& x, int val) {
 }
 
 void pop(lstm::var<std::vector<int>>& x) {
-    lstm::atomic([&](auto& tx) {
+    CHECK(lstm::in_transaction());
+    
+    lstm::atomic([&](lstm::transaction& tx) {
         auto var = tx.load(x);
         var.pop_back();
         tx.store(x, std::move(var));
@@ -39,15 +44,17 @@ auto get_loop(lstm::var<std::vector<int>>& x) {
 }
 
 int main() {
-    lstm::var<std::vector<int>> x{};
-
-    std::vector<std::thread> threads;
-    for (int i = 0; i < 5; ++i)
-        threads.emplace_back(get_loop(x));
+    thread_manager manager;
     
-    for (auto& thread : threads)
-        thread.join();
+    lstm::var<std::vector<int>> x{};
+    
+    for (int i = 0; i < 5; ++i)
+        manager.queue_thread(get_loop(x));
+    manager.run();
+    
     CHECK(x.unsafe().empty());
+    
+    LSTM_LOG_DUMP();
     
     return test_result();
 }
