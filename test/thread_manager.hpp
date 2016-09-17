@@ -16,6 +16,7 @@ public:
             while(!_run.load(LSTM_ACQUIRE));
             f();
         });
+        LSTM_LOG_REGISTER_THREAD_ID(threads.back().get_id());
     }
     
     void join_threads() {
