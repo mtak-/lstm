@@ -1,6 +1,6 @@
 # lstm
 
-`lstm` is an implementation of Software Transactional Memory using an object based Transactional Locking II model (i.e. there's actually some spinlocking in the commit phase). It fully supports nested transactions (merges them into just 1 transaction), RAII, Allocators, and exceptions (unless thrown from a destructor). It currently requires a reasonably `C++14` compliant compiler and STL, and either `__thread` or `thread_local`.
+`lstm` is an implementation of Software Transactional Memory using the Transactional Locking II model (i.e. there's actually some spinlocking in the commit phase). It fully supports nested transactions (merges them into just 1 transaction), RAII, Allocators, and exceptions (unless thrown from a destructor). It currently requires a reasonably `C++14` compliant compiler and STL, and either `__thread` or `thread_local`.
 
 ## Brief description of the interface
 - declare variable as shared: `lstm::var<Type> my_var(/*params*/);`
