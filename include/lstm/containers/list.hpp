@@ -3,6 +3,8 @@
 
 #include <lstm/lstm.hpp>
 
+#error "TODO: the list.hpp header is not functional"
+
 LSTM_BEGIN
     namespace detail {
         template<typename T>
