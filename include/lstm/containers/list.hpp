@@ -3,12 +3,13 @@
 
 #include <lstm/lstm.hpp>
 
+#error "TODO: lstm/containers/list.hpp is not a working implementation"
+
 LSTM_BEGIN
     namespace detail {
         template<typename T>
         struct _list_node {
             lstm::var<T> value;
-            lstm::var<void*> _prev;
             lstm::var<void*> _next;
         };
     }
@@ -21,26 +22,12 @@ LSTM_BEGIN
         lstm::var<word> _size{0};
         
         template<typename Transaction>
-        static node* prev(node& n, Transaction& tx)
-        { return reinterpret_cast<node*>(tx.load(n._prev)); }
-        
-        template<typename Transaction>
-        static const node* prev(const node& n, Transaction& tx)
-        { return reinterpret_cast<const node*>(tx.load(n._prev)); }
-        
-        template<typename Transaction>
         static node* next(node& n, Transaction& tx)
         { return reinterpret_cast<node*>(tx.load(n._next)); }
         
         template<typename Transaction>
         static const node* next(const node& n, Transaction& tx)
         { return reinterpret_cast<const node*>(tx.load(n._next)); }
-        
-        static node*& unsafe_prev(node& n)
-        { return reinterpret_cast<node*&>(n._prev.unsafe()); }
-        
-        static const node*& unsafe_prev(const node& n)
-        { return reinterpret_cast<const node*&>(n._prev.unsafe()); }
         
         static node*& unsafe_next(node& n)
         { return reinterpret_cast<node*&>(n._next.unsafe()); }
@@ -61,26 +48,37 @@ LSTM_BEGIN
             }
         }
         
-        void clear() noexcept {
+        void clear() {
+            std::vector<node*> to_delete;
             lstm::atomic([&](auto& tx) {
+                to_delete.clear();
+                
                 auto node = tx.load(head);
-                tx.store(_size, 0);
-                while (node) {
-                    auto to_delete = node;
-                    node = next(*node, tx);
-                    delete to_delete;
+                
+                if (node) {
+                    while (node) {
+                        to_delete.push_back(node);
+                        auto next_node = next(*node, tx);
+                        tx.store(node->_next, nullptr);
+                        node = next_node;
+                    }
+                    tx.store(_size, 0);
+                    tx.store(head, nullptr);
                 }
             });
+            for (auto node_ptr : to_delete)
+                delete node_ptr;
         }
         
         template<typename... Us>
         void emplace_front(Us&&... us) noexcept(std::is_nothrow_constructible<T, Us&&...>{}) {
-            auto new_head = new node{{(Us&&)us...}};
+            auto new_head = (node*)malloc(sizeof(node));
+            new (&new_head->value) lstm::var<T>{(Us&&)us...};
+            new (&new_head->_next) lstm::var<void*>(nullptr);
+            
             lstm::atomic([&](auto& tx) {
                 auto _head = tx.load(head);
                 unsafe_next(*new_head) = _head;
-                if (_head)
-                    tx.store(_head->_prev, new_head);
                 tx.store(_size, tx.load(_size) + 1);
                 tx.store(head, new_head);
             });
