@@ -141,7 +141,7 @@ LSTM_BEGIN
     detail::result_type<Func> atomic(Func func, const Alloc& alloc = {})
     { return detail::atomic_fn{}(std::move(func), alloc); }
     
-    bool in_transaction() noexcept { return detail::atomic_fn{}.in_transaction(); }
+    inline bool in_transaction() noexcept { return detail::atomic_fn{}.in_transaction(); }
 LSTM_END
 
 #endif /* LSTM_ATOMIC_HPP */

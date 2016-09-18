@@ -9,3 +9,6 @@ add_test(test.dining_philosophers dining_philosophers)
 
 add_executable(nesting nesting.cpp)
 add_test(test.nesting nesting)
+
+add_executable(transfer_funds transfer_funds.cpp)
+add_test(test.transfer_funds transfer_funds)

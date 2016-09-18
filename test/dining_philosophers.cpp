@@ -3,8 +3,6 @@
 #include "simple_test.hpp"
 #include "thread_manager.hpp"
 
-#include <thread>
-
 using lstm::atomic;
 using lstm::var;
 
