@@ -21,7 +21,10 @@ LSTM_DETAIL_BEGIN
         friend struct ::lstm::transaction;
         friend test::transaction_tester;
         
-        inline var_base() noexcept : version_lock{0} {}
+        inline var_base() noexcept
+            : version_lock{0}
+        {}
+        virtual ~var_base() noexcept = default;
         
         virtual void destroy_deallocate(var_storage storage) noexcept = 0;
         
@@ -104,44 +107,6 @@ LSTM_DETAIL_BEGIN
         static T& load(var_storage& storage) noexcept { return reinterpret_cast<T&>(storage); }
         static const T& load(const var_storage& storage) noexcept
         { return reinterpret_cast<const T&>(storage); }
-    };
-    
-    
-    /***********************************************************************************************
-     * var_impl
-     **********************************************************************************************/
-    template<typename T, typename Alloc>
-    struct var_impl
-        : var_alloc_policy<T, Alloc>
-    {
-    private:
-        using base = var_alloc_policy<T, Alloc>;
-        
-    public:
-        template<typename U, typename... Us,
-            LSTM_REQUIRES_(std::is_constructible<T, U&&, Us&&...>() &&
-                           !std::is_same<uncvref<U>, uncvref<Alloc>>())>
-        constexpr var_impl(U&& u, Us&&... us)
-            noexcept(noexcept(base::allocate_construct((U&&)u, (Us&&)us...)))
-        { var_base::storage = base::allocate_construct((U&&)u, (Us&&)us...); }
-        
-        LSTM_REQUIRES(std::is_constructible<T>())
-        constexpr var_impl() noexcept(noexcept(base::allocate_construct()))
-        { var_base::storage = base::allocate_construct(); }
-        
-        template<typename... Us,
-            LSTM_REQUIRES_(std::is_constructible<T, Us&&...>())>
-        constexpr var_impl(const Alloc& in_alloc, Us&&... us)
-            noexcept(noexcept(base::allocate_construct((Us&&)us...)))
-            : var_alloc_policy<T, Alloc>{in_alloc}
-        { var_base::storage = base::allocate_construct((Us&&)us...); }
-        
-        T& unsafe() & noexcept { return base::load(var_base::storage); }
-        T&& unsafe() && noexcept { return std::move(base::load(var_base::storage)); }
-        const T& unsafe() const & noexcept { return base::load(var_base::storage); }
-        const T&& unsafe() const && noexcept { return std::move(base::load(var_base::storage)); }
-        
-        ~var_impl() noexcept { base::destroy_deallocate(var_base::storage); }
     };
 LSTM_DETAIL_END
 
