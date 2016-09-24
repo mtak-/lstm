@@ -41,18 +41,20 @@ LSTM_DETAIL_BEGIN
         static inline transaction*& tls_transaction() noexcept { /* TODO: this */ }
 #endif /* LSTM_THREAD_LOCAL */
         
-        template<typename Func, typename Tx,
+        template<typename Func, typename Tx, typename ScopeGuard,
             LSTM_REQUIRES_(is_void_transact_function<Func>())>
-        void try_transact(Func& func, Tx& tx) const {
+        void try_transact(Func& func, Tx& tx, ScopeGuard guard) const {
             func(tx);
             tx.commit();
+            guard.release();
         }
         
-        template<typename Func, typename Tx,
+        template<typename Func, typename Tx, typename ScopeGuard,
             LSTM_REQUIRES_(!is_void_transact_function<Func>())>
-        transact_result<Func> try_transact(Func& func, Tx& tx) const {
+        transact_result<Func> try_transact(Func& func, Tx& tx, ScopeGuard guard) const {
             decltype(auto) result = func(tx);
             tx.commit();
+            guard.release();
             return static_cast<transact_result<Func>>(result);
         }
         
@@ -75,13 +77,9 @@ LSTM_DETAIL_BEGIN
                     assert(tx.read_set.size() == 0);
                     assert(tx.write_set.size() == 0);
                     
-                    return try_transact(func, tx);
+                    return try_transact(func, tx, make_scope_guard([&] { tx.cleanup(); }));
                 } catch(const _tx_retry&) {
-                    tx.cleanup();
                     tx.read_version = transaction::get_clock();
-                } catch(...) {
-                    tx.cleanup();
-                    throw;
                 }
             }
         }
