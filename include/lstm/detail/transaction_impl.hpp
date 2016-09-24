@@ -117,11 +117,13 @@ LSTM_DETAIL_BEGIN
         }
         
         void commit_slow_path() {
+            static constexpr word max_version = (word(1) << (sizeof(word) * 8 - 2));
+            
             commit_lock_writes();
             auto write_version = clock<>.fetch_add(2, LSTM_RELEASE) + 2;
             
             // TODO: handle the wrap?
-            assert(write_version < (word(1) << (sizeof(word) * 8 - 2)));
+            assert(write_version < max_version - 1);
             
             commit_validate_reads();
             

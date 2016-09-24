@@ -8,6 +8,7 @@
 using lstm::var;
 
 int main() {
+    CHECK(std::atomic<int>{0}.is_lock_free());
     // value tests
     {
         var<int> x;
