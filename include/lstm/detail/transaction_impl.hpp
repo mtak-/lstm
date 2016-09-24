@@ -115,16 +115,22 @@ LSTM_DETAIL_BEGIN
                 unlock(write_version, write_set_value.dest_var());
             }
         }
-
-        void commit() {
-            if (write_set.empty())
-                return;
+        
+        void commit_slow_path() {
             commit_lock_writes();
             auto write_version = clock<>.fetch_add(2, LSTM_RELEASE) + 2;
+            
+            // TODO: handle the wrap?
+            assert(write_version < (word(1) << (sizeof(word) * 8 - 2)));
+            
             commit_validate_reads();
             
             commit_publish(write_version);
-            
+        }
+
+        void commit() {
+            if (!write_set.empty())
+                commit_slow_path();
             LSTM_SUCC_TX();
         }
 
