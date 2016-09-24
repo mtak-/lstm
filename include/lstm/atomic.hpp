@@ -3,6 +3,7 @@
 
 #include <lstm/transaction.hpp>
 
+#include <lstm/detail/scope_guard.hpp>
 #include <lstm/detail/thread_local.hpp>
 
 LSTM_DETAIL_BEGIN
@@ -13,27 +14,23 @@ LSTM_DETAIL_BEGIN
     struct is_void_transact_function : std::false_type {};
     
     template<typename Func>
-    struct is_void_transact_function<
-        Func,
-        std::enable_if_t<
-            std::is_void<decltype(std::declval<const Func&>()(std::declval<transaction&>()))>{}>>
+    using transact_result = decltype(std::declval<const Func&>()(std::declval<transaction&>()));
+    
+    template<typename Func>
+    struct is_void_transact_function<Func, std::enable_if_t<std::is_void<transact_result<Func>>{}>>
         : std::true_type {};
         
     template<typename Func, typename = void>
     struct is_transact_function : std::false_type {};
     
     template<typename Func>
-    struct is_transact_function<
-        Func,
-        void_<decltype(std::declval<const Func&>()(std::declval<transaction&>()))>>
-        : std::true_type {};
-        
-    template<typename Func>
-    using result_type = decltype(std::declval<Func>()(std::declval<transaction&>()));
+    struct is_transact_function<Func, void_<transact_result<Func>>> : std::true_type {};
+    
+    template<typename T>
+    using uninitialized = std::aligned_storage_t<sizeof(T), alignof(T)>;
 
     struct atomic_fn {
     private:
-        // TODO: Alloc: see transaction.hpp
 #ifdef LSTM_THREAD_LOCAL
         static inline transaction*& tls_transaction() noexcept {
             static LSTM_THREAD_LOCAL transaction* tx = nullptr;
@@ -41,94 +38,49 @@ LSTM_DETAIL_BEGIN
         }
 #else
     #error "TODO: pthreads implementation of thread locals"
-        static inline transaction*& tls_transaction() noexcept {
-            // TODO: this
+        static inline transaction*& tls_transaction() noexcept { /* TODO: this */ }
+#endif /* LSTM_THREAD_LOCAL */
+        
+        template<typename Func, typename Tx,
+            LSTM_REQUIRES_(is_void_transact_function<Func>())>
+        void try_transact(Func& func, Tx& tx) const {
+            func(tx);
+            tx.commit();
         }
-#endif
+        
+        template<typename Func, typename Tx,
+            LSTM_REQUIRES_(!is_void_transact_function<Func>())>
+        transact_result<Func> try_transact(Func& func, Tx& tx) const {
+            decltype(auto) result = func(tx);
+            tx.commit();
+            return static_cast<transact_result<Func>>(result);
+        }
         
     public:
         bool in_transaction() const noexcept { return tls_transaction() != nullptr; }
         
-        template<typename Func, typename Alloc,
-            LSTM_REQUIRES_(is_transact_function<Func>()
-                && !is_void_transact_function<Func>())>
-        result_type<Func> operator()(Func func, const Alloc& alloc) const {
+        template<typename Func, typename Alloc>
+        transact_result<Func> operator()(Func func, const Alloc& alloc) const {
             auto& tls_tx = tls_transaction();
             // this thread is already in a transaction
-            if (tls_tx) {
-                auto stack_tx_ptr = tls_tx;
-                return func(*stack_tx_ptr);
-            }
+            if (tls_tx)
+                return func(*tls_tx);
             
-            static constexpr auto tx_size = sizeof(transaction_impl<Alloc>);
-            alignas(transaction_impl<Alloc>) char storage[tx_size];
+            transaction_impl<Alloc> tx{alloc};
+            tls_tx = &tx;
             
-            auto stack_tx_ptr = reinterpret_cast<transaction_impl<Alloc>*>(storage);
-            tls_tx = stack_tx_ptr;
-            
-            new(storage) transaction_impl<Alloc>{alloc};
+            const auto disable_active_transaction = make_scope_guard([&] { tls_tx = nullptr; });
             while(true) {
                 try {
-                    assert(stack_tx_ptr->read_set.size() == 0);
-                    assert(stack_tx_ptr->write_set.size() == 0);
+                    assert(tx.read_set.size() == 0);
+                    assert(tx.write_set.size() == 0);
                     
-                    decltype(auto) result = func(*stack_tx_ptr);
-                    
-                    stack_tx_ptr->commit();
-                    stack_tx_ptr->~transaction_impl();
-                    tls_tx = nullptr;
-                        
-                    return result;
+                    return try_transact(func, tx);
                 } catch(const _tx_retry&) {
-                    stack_tx_ptr->cleanup();
-                    stack_tx_ptr->read_version = transaction::get_clock();
+                    tx.cleanup();
+                    tx.read_version = transaction::get_clock();
                 } catch(...) {
-                    tls_tx = nullptr;
-                    
-                    stack_tx_ptr->cleanup();
-                    stack_tx_ptr->~transaction_impl();
-                    throw;
-                }
-            }
-        }
-        
-        template<typename Func, typename Alloc,
-            LSTM_REQUIRES_(is_void_transact_function<Func>())>
-        void operator()(Func func, const Alloc& alloc) const {
-            auto& tls_tx = tls_transaction();
-            if (tls_tx) {
-                // this thread is already in a transaction
-                auto stack_tx_ptr = tls_tx;
-                return func(*stack_tx_ptr);
-            }
-            
-            static constexpr auto tx_size = sizeof(transaction_impl<Alloc>);
-            alignas(transaction_impl<Alloc>) char storage[tx_size];
-            
-            auto stack_tx_ptr = reinterpret_cast<transaction_impl<Alloc>*>(storage);
-            tls_tx = stack_tx_ptr;
-            
-            new(storage) transaction_impl<Alloc>{alloc};
-            while(true) {
-                try {
-                    assert(stack_tx_ptr->read_set.size() == 0);
-                    assert(stack_tx_ptr->write_set.size() == 0);
-                    
-                    func(*stack_tx_ptr);
-                    
-                    stack_tx_ptr->commit();
-                    stack_tx_ptr->~transaction_impl();
-                    tls_tx = nullptr;
-                        
-                    break;
-                } catch(const _tx_retry&) {
-                    stack_tx_ptr->cleanup();
-                    stack_tx_ptr->read_version = transaction::get_clock();
-                } catch(...) {
-                    tls_tx = nullptr;
-                    
-                    stack_tx_ptr->cleanup();
-                    stack_tx_ptr->~transaction_impl();
+                    tx.cleanup();
                     throw;
                 }
             }
@@ -137,8 +89,9 @@ LSTM_DETAIL_BEGIN
 LSTM_DETAIL_END
 
 LSTM_BEGIN
-    template<typename Func, typename Alloc = std::allocator<detail::var_base*>>
-    detail::result_type<Func> atomic(Func func, const Alloc& alloc = {})
+    template<typename Func, typename Alloc = std::allocator<detail::var_base*>,
+        LSTM_REQUIRES_(detail::is_transact_function<Func>())>
+    detail::transact_result<Func> atomic(Func func, const Alloc& alloc = {})
     { return detail::atomic_fn{}(std::move(func), alloc); }
     
     inline bool in_transaction() noexcept { return detail::atomic_fn{}.in_transaction(); }
