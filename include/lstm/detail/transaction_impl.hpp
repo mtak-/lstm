@@ -65,8 +65,9 @@ LSTM_DETAIL_BEGIN
         read_set_t read_set;
         write_set_t write_set;
 
-        inline transaction_impl(const Alloc& alloc) noexcept
-            : read_set(alloc)
+        inline transaction_impl(transaction_domain* domain, const Alloc& alloc) noexcept
+            : transaction(domain)
+            , read_set(alloc)
             , write_set(alloc)
         {}
             
@@ -85,7 +86,7 @@ LSTM_DETAIL_BEGIN
             word version_buf;
             for (auto write_iter = write_begin; write_iter != write_end; ++write_iter) {
                 version_buf = 0;
-                // TODO: only care what version the var is, if it's also a read
+                // TODO: only care what version the var is, if it's also a read?
                 if (!lock(version_buf, write_iter->dest_var())) {
                     unlock_write_set(std::move(write_begin), std::move(write_iter));
                     detail::internal_retry();
@@ -117,13 +118,8 @@ LSTM_DETAIL_BEGIN
         }
         
         void commit_slow_path() {
-            static constexpr word max_version = (word(1) << (sizeof(word) * 8 - 2));
-            
             commit_lock_writes();
-            auto write_version = clock<>.fetch_add(2, LSTM_RELEASE) + 2;
-            
-            // TODO: handle the wrap?
-            assert(write_version < max_version - 1);
+            auto write_version = domain().bump_clock();
             
             commit_validate_reads();
             

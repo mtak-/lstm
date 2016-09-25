@@ -2,6 +2,7 @@
 #define LSTM_TRANSACTION_HPP
 
 #include <lstm/detail/var_detail.hpp>
+#include <lstm/transaction_domain.hpp>
 
 #include <atomic>
 #include <cassert>
@@ -16,13 +17,21 @@ LSTM_BEGIN
     protected:
         friend detail::atomic_fn;
         friend test::transaction_tester;
-
-        template<std::nullptr_t = nullptr> static std::atomic<word> clock;
-        static inline word get_clock() noexcept { return clock<>.load(LSTM_ACQUIRE); }
-
+        
+        transaction_domain* _domain;
         word read_version;
+        
+        inline transaction_domain& domain() noexcept
+        { return _domain == nullptr ? default_domain() : *_domain; }
+        
+        inline const transaction_domain& domain() const noexcept
+        { return _domain == nullptr ? default_domain() : *_domain; }
+        
+        inline void reset_read_version() noexcept { read_version = domain().get_clock(); }
 
-        inline transaction() noexcept : read_version(get_clock()) {}
+        inline transaction(transaction_domain* in_domain) noexcept
+            : _domain(in_domain)
+        { reset_read_version(); }
         
         static inline bool locked(word version) noexcept { return version & 1; }
         static inline word as_locked(word version) noexcept { return version | 1; }
@@ -130,8 +139,6 @@ LSTM_BEGIN
         template<typename T>
         void store(var<T>&& v) = delete;
     };
-
-    template<std::nullptr_t> std::atomic<word> transaction::clock{0};
 LSTM_END
 
 #endif /* LSTM_TRANSACTION_HPP */

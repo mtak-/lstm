@@ -19,9 +19,9 @@ int lstm::test::transaction_tester::run_tests() {
     using tx_t = detail::transaction_impl<std::allocator<int>>;
     // init
     {
-        CHECK(transaction::clock<> == 0u);
-        tx_t tx{{}};
-        CHECK(transaction::clock<> == 0u);
+        CHECK(default_domain().get_clock() == 0u);
+        tx_t tx{nullptr, {}};
+        CHECK(tx.domain().get_clock() == 0u);
         CHECK(tx.write_set.size() == 0u);
         CHECK(tx.read_set.size() == 0u);
     }
@@ -29,7 +29,7 @@ int lstm::test::transaction_tester::run_tests() {
     // locking (private but important)
     {
         var<int> v{0};
-        tx_t tx{{}};
+        tx_t tx{nullptr, {}};
         tx.read_version = 0;
     
         CHECK(v.version_lock == 0u);
@@ -66,7 +66,7 @@ int lstm::test::transaction_tester::run_tests() {
     // loads
     {
         var<int> x{42};
-        tx_t tx0{{}};
+        tx_t tx0{nullptr, {}};
         tx0.read_version = 0;
     
         CHECK(tx0.load(x) == 42);
@@ -79,7 +79,7 @@ int lstm::test::transaction_tester::run_tests() {
         CHECK(tx0.read_set.size() == 1u);
         CHECK(tx0.find_read_set(x) != std::end(tx0.read_set));
     
-        tx_t tx1{{}};
+        tx_t tx1{nullptr, {}};
         tx1.read_version = 0;
         CHECK(tx1.load(x) == 43);
         CHECK(tx1.read_set.size() == 1u);
@@ -96,7 +96,7 @@ int lstm::test::transaction_tester::run_tests() {
     // stores
     {
         var<int> x{42};
-        tx_t tx0{{}};
+        tx_t tx0{nullptr, {}};
         tx0.read_version = 0;
     
         tx0.store(x, 43);
@@ -107,7 +107,7 @@ int lstm::test::transaction_tester::run_tests() {
         CHECK(tx0.load(x) == 43);
         CHECK(x.unsafe() == 42);
     
-        tx_t tx1{{}};
+        tx_t tx1{nullptr, {}};
         tx1.read_version = 0;
     
         CHECK(tx1.load(x) == 42);

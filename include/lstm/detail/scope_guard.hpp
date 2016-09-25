@@ -4,30 +4,33 @@
 #include <lstm/detail/lstm_fwd.hpp>
 
 LSTM_DETAIL_BEGIN
-    template<typename F>
+    template<typename Func>
     struct scope_guard {
+        static_assert(noexcept(std::declval<Func&>()()), "");
     private:
-        F f;
+        Func func;
         bool engaged;
         
     public:
-        scope_guard(F f_in)
-            : f(std::move(f_in))
+        scope_guard(Func func_in) noexcept(std::is_nothrow_move_constructible<Func>{})
+            : func(std::move(func_in))
             , engaged(true)
         {}
         
-        scope_guard(scope_guard&& rhs)
-            : f(std::move(rhs.f))
+        scope_guard(scope_guard&& rhs) noexcept(std::is_nothrow_move_constructible<Func>{})
+            : func(std::move(rhs.func))
             , engaged(rhs.engaged)
         { rhs.engaged = false; }
         
-        ~scope_guard() { if (engaged) f(); }
+        ~scope_guard() noexcept { if (engaged) func(); }
         
-        void release() { engaged = false; }
+        void release() noexcept { engaged = false; }
     };
     
-    template<typename F>
-    scope_guard<uncvref<F>> make_scope_guard(F&& f) { return {(F&&)f}; }
+    template<typename Func>
+    scope_guard<uncvref<Func>> make_scope_guard(Func&& func)
+        noexcept(noexcept(scope_guard<uncvref<Func>>{(Func&&)func}))
+    { return {(Func&&)func}; }
 LSTM_DETAIL_END
 
 #endif /* LSTM_SCOPE_GUARD_HPP */

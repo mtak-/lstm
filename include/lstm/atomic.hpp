@@ -7,28 +7,6 @@
 #include <lstm/detail/thread_local.hpp>
 
 LSTM_DETAIL_BEGIN
-    template<typename...>
-    using void_ = void;
-
-    template<typename Func, typename = void>
-    struct is_void_transact_function : std::false_type {};
-    
-    template<typename Func>
-    using transact_result = decltype(std::declval<const Func&>()(std::declval<transaction&>()));
-    
-    template<typename Func>
-    struct is_void_transact_function<Func, std::enable_if_t<std::is_void<transact_result<Func>>{}>>
-        : std::true_type {};
-        
-    template<typename Func, typename = void>
-    struct is_transact_function : std::false_type {};
-    
-    template<typename Func>
-    struct is_transact_function<Func, void_<transact_result<Func>>> : std::true_type {};
-    
-    template<typename T>
-    using uninitialized = std::aligned_storage_t<sizeof(T), alignof(T)>;
-
     struct atomic_fn {
     private:
 #ifdef LSTM_THREAD_LOCAL
@@ -40,10 +18,12 @@ LSTM_DETAIL_BEGIN
     #error "TODO: pthreads implementation of thread locals"
         static inline transaction*& tls_transaction() noexcept { /* TODO: this */ }
 #endif /* LSTM_THREAD_LOCAL */
+
+        static inline void reset_active_transaction() noexcept { tls_transaction() = nullptr; }
         
         template<typename Func, typename Tx, typename ScopeGuard,
             LSTM_REQUIRES_(is_void_transact_function<Func>())>
-        void try_transact(Func& func, Tx& tx, ScopeGuard guard) const {
+        static void try_transact(Func& func, Tx& tx, ScopeGuard guard) {
             func(tx);
             tx.commit();
             guard.release();
@@ -51,46 +31,53 @@ LSTM_DETAIL_BEGIN
         
         template<typename Func, typename Tx, typename ScopeGuard,
             LSTM_REQUIRES_(!is_void_transact_function<Func>())>
-        transact_result<Func> try_transact(Func& func, Tx& tx, ScopeGuard guard) const {
+        static transact_result<Func> try_transact(Func& func, Tx& tx, ScopeGuard guard) {
             decltype(auto) result = func(tx);
             tx.commit();
             guard.release();
-            return static_cast<transact_result<Func>>(result);
+            return static_cast<transact_result<Func>&&>(result);
         }
         
-    public:
-        bool in_transaction() const noexcept { return tls_transaction() != nullptr; }
-        
         template<typename Func, typename Alloc>
-        transact_result<Func> operator()(Func func, const Alloc& alloc) const {
-            auto& tls_tx = tls_transaction();
-            // this thread is already in a transaction
-            if (tls_tx)
-                return func(*tls_tx);
+        static transact_result<Func> atomic_slow_path(Func func,
+                                                      transaction_domain* domain,
+                                                      const Alloc& alloc) {
+            transaction_impl<Alloc> tx{domain, alloc};
+            tls_transaction() = &tx;
             
-            transaction_impl<Alloc> tx{alloc};
-            tls_tx = &tx;
-            
-            const auto disable_active_transaction = make_scope_guard([&] { tls_tx = nullptr; });
+            const auto tls_guard = make_scope_guard([]() noexcept
+                                                    { atomic_fn::reset_active_transaction(); });
             while(true) {
                 try {
                     assert(tx.read_set.size() == 0);
                     assert(tx.write_set.size() == 0);
                     
-                    return try_transact(func, tx, make_scope_guard([&] { tx.cleanup(); }));
-                } catch(const _tx_retry&) {
-                    tx.read_version = transaction::get_clock();
-                }
+                    return atomic_fn::try_transact(func, tx, make_scope_guard([&]() noexcept
+                                                                              { tx.cleanup(); }));
+                } catch(const _tx_retry&) { tx.reset_read_version(); }
             }
+        }
+        
+    public:
+        inline bool in_transaction() const noexcept { return tls_transaction() != nullptr; }
+        
+        template<typename Func, typename Alloc = std::allocator<detail::var_base*>,
+            LSTM_REQUIRES_(detail::is_transact_function<Func>())>
+        transact_result<Func> operator()(Func func,
+                                         transaction_domain* domain = nullptr,
+                                         const Alloc& alloc = {}) const {
+            auto tls_tx = tls_transaction();
+            if (tls_tx) return std::move(func)(*tls_tx); // TODO: which domain should this use???
+            
+            return atomic_fn::atomic_slow_path(std::move(func), domain, alloc);
         }
     };
 LSTM_DETAIL_END
 
 LSTM_BEGIN
-    template<typename Func, typename Alloc = std::allocator<detail::var_base*>,
-        LSTM_REQUIRES_(detail::is_transact_function<Func>())>
-    detail::transact_result<Func> atomic(Func func, const Alloc& alloc = {})
-    { return detail::atomic_fn{}(std::move(func), alloc); }
+    template<typename T> struct static_const { static constexpr const T value{}; };
+    template<typename T> constexpr T static_const<T>::value;
+    namespace { constexpr auto&& atomic = static_const<detail::atomic_fn>::value; }
     
     inline bool in_transaction() noexcept { return detail::atomic_fn{}.in_transaction(); }
 LSTM_END

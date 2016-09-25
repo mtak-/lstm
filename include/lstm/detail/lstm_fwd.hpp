@@ -108,6 +108,30 @@ LSTM_BEGIN
         std::integer_sequence<bool, true, Bs::value...>>;
 LSTM_END
 
+LSTM_DETAIL_BEGIN
+    template<typename...>
+    using void_ = void;
+
+    template<typename Func>
+    using transact_result = decltype(std::declval<const Func&>()(std::declval<transaction&>()));
+
+    template<typename Func, typename = void>
+    struct is_void_transact_function : std::false_type {};
+
+    template<typename Func>
+    struct is_void_transact_function<Func, std::enable_if_t<std::is_void<transact_result<Func>>{}>>
+        : std::true_type {};
+        
+    template<typename Func, typename = void>
+    struct is_transact_function : std::false_type {};
+
+    template<typename Func>
+    struct is_transact_function<Func, void_<transact_result<Func>>> : std::true_type {};
+
+    template<typename T>
+    using uninitialized = std::aligned_storage_t<sizeof(T), alignof(T)>;
+LSTM_DETAIL_END
+
 LSTM_TEST_BEGIN
     struct transaction_tester;
 LSTM_TEST_END
