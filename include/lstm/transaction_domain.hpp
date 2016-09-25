@@ -31,8 +31,7 @@ LSTM_BEGIN
     
     namespace detail {
         // inline
-        template<std::nullptr_t = nullptr>
-        transaction_domain _default_domain{};
+        template<std::nullptr_t = nullptr> transaction_domain _default_domain{};
     }
     
     inline transaction_domain& default_domain() noexcept { return detail::_default_domain<>; }

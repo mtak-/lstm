@@ -17,19 +17,17 @@ LSTM_END
 LSTM_DETAIL_BEGIN
     struct var_base {
     protected:
-        template<typename> friend struct ::lstm::detail::transaction_impl;
-        friend struct ::lstm::transaction;
-        friend test::transaction_tester;
+        mutable std::atomic<word> version_lock;
+        var_storage storage;
         
-        inline var_base() noexcept
-            : version_lock{0}
-        {}
+        inline var_base() noexcept : version_lock{0} {}
         virtual ~var_base() noexcept = default;
         
         virtual void destroy_deallocate(var_storage storage) noexcept = 0;
-        
-        mutable std::atomic<word> version_lock;
-        var_storage storage;
+    
+        template<typename> friend struct ::lstm::detail::transaction_impl;
+        friend struct ::lstm::transaction;
+        friend test::transaction_tester;
     };
     
     template<typename T>
