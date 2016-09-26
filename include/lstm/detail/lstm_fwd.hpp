@@ -92,12 +92,13 @@ LSTM_DETAIL_END
 
 LSTM_BEGIN
     // TODO verify lockfreeness of this on each platform
-    using word = std::uintptr_t;
+    using word = std::intptr_t;
     
     template<typename T, typename Alloc = std::allocator<std::remove_reference_t<T>>>
     struct var;
     
     struct transaction;
+    struct transaction_domain;
     
     template<typename T>
     using uncvref = std::remove_cv_t<std::remove_reference_t<T>>;
