@@ -5,11 +5,14 @@
 
 LSTM_BEGIN
     namespace detail {
-        template<typename T>
+        template<typename Alloc, typename T>
+        using rebind_to = typename std::allocator_traits<Alloc>::template rebind_alloc<T>;
+        
+        template<typename T, typename Alloc>
         struct _list_node {
-            lstm::var<T> value;
-            lstm::var<void*> _prev;
-            lstm::var<void*> _next;
+            lstm::var<T, rebind_to<Alloc, T>> value;
+            lstm::var<void*, rebind_to<Alloc, void*>> _prev;
+            lstm::var<void*, rebind_to<Alloc, void*>> _next;
             
             template<typename... Us,
                 LSTM_REQUIRES_(sizeof...(Us) != 1)>
@@ -18,57 +21,69 @@ LSTM_BEGIN
             {}
             
             template<typename U,
-                LSTM_REQUIRES_(!std::is_same<uncvref<U>, _list_node<T>>{})>
+                LSTM_REQUIRES_(!std::is_same<uncvref<U>, _list_node<T, Alloc>>{})>
             _list_node(U&& u) noexcept(std::is_nothrow_constructible<T, U&&>{})
                 : value((U&&)u)
             {}
         };
     }
     
-    template<typename T>
-    struct list {
+    template<typename T, typename Alloc_ = std::allocator<T>>
+    struct list
+        : private detail::rebind_to<Alloc_, detail::_list_node<T, Alloc_>>
+    {
     private:
-        using node = detail::_list_node<T>;
-        lstm::var<node*> head{nullptr};
+        using node_t = detail::_list_node<T, Alloc_>;
+        using Alloc = detail::rebind_to<Alloc_, node_t>;
+        using alloc_traits = std::allocator_traits<Alloc>;
+        
+        lstm::var<node_t*> head{nullptr};
         lstm::var<word> _size{0};
         
-        template<typename Transaction>
-        static node* prev(node& n, Transaction& tx)
-        { return reinterpret_cast<node*>(tx.load(n._prev)); }
+        Alloc& alloc() noexcept { return *this; }
         
         template<typename Transaction>
-        static const node* prev(const node& n, Transaction& tx)
-        { return reinterpret_cast<const node*>(tx.load(n._prev)); }
+        static node_t* prev(node_t& n, Transaction& tx)
+        { return reinterpret_cast<node_t*>(tx.load(n._prev)); }
         
         template<typename Transaction>
-        static node* next(node& n, Transaction& tx)
-        { return reinterpret_cast<node*>(tx.load(n._next)); }
+        static const node_t* prev(const node_t& n, Transaction& tx)
+        { return reinterpret_cast<const node_t*>(tx.load(n._prev)); }
         
         template<typename Transaction>
-        static const node* next(const node& n, Transaction& tx)
-        { return reinterpret_cast<const node*>(tx.load(n._next)); }
+        static node_t* next(node_t& n, Transaction& tx)
+        { return reinterpret_cast<node_t*>(tx.load(n._next)); }
         
-        static node*& unsafe_prev(node& n)
-        { return reinterpret_cast<node*&>(n._prev.unsafe()); }
+        template<typename Transaction>
+        static const node_t* next(const node_t& n, Transaction& tx)
+        { return reinterpret_cast<const node_t*>(tx.load(n._next)); }
         
-        static const node*& unsafe_prev(const node& n)
-        { return reinterpret_cast<const node*&>(n._prev.unsafe()); }
+        static node_t*& unsafe_prev(node_t& n) noexcept
+        { return reinterpret_cast<node_t*&>(n._prev.unsafe()); }
         
-        static node*& unsafe_next(node& n)
-        { return reinterpret_cast<node*&>(n._next.unsafe()); }
+        static const node_t*& unsafe_prev(const node_t& n) noexcept
+        { return reinterpret_cast<const node_t*&>(n._prev.unsafe()); }
         
-        static const node*& unsafe_next(const node& n)
-        { return reinterpret_cast<const node*&>(n._next.unsafe()); }
+        static node_t*& unsafe_next(node_t& n) noexcept
+        { return reinterpret_cast<node_t*&>(n._next.unsafe()); }
+        
+        static const node_t*& unsafe_next(const node_t& n) noexcept
+        { return reinterpret_cast<const node_t*&>(n._next.unsafe()); }
         
     public:
-        constexpr list() = default;
+        constexpr list() noexcept(std::is_nothrow_default_constructible<Alloc>{}) = default;
+        constexpr list(const Alloc_& alloc)
+            noexcept(std::is_nothrow_constructible<Alloc, const Alloc_&>{})
+            : Alloc(alloc)
+        {}
         
         ~list() {
             auto node = head.unsafe();
             _size.unsafe() = 0;
             while (node) {
                 auto next_ = unsafe_next(*node);
-                delete node;
+                alloc_traits::destroy(alloc(), node);
+                alloc_traits::deallocate(alloc(), node, 1);
                 node = next_;
             }
         }
@@ -83,7 +98,7 @@ LSTM_BEGIN
             lstm::atomic([&](auto& tx) {
                 while (node) {
                     auto next_ = next(*node, tx);
-                    tx.delete_(node);
+                    tx.delete_(node, alloc());
                     node = next_;
                 }
             });
@@ -91,7 +106,8 @@ LSTM_BEGIN
         
         template<typename... Us>
         void emplace_front(Us&&... us) noexcept(std::is_nothrow_constructible<T, Us&&...>{}) {
-            auto new_head = new node{(Us&&)us...};
+            auto new_head = alloc_traits::allocate(alloc(), 1);
+            new (new_head) node_t((Us&&)us...);
             lstm::atomic([&](auto& tx) {
                 auto _head = tx.load(head);
                 unsafe_next(*new_head) = _head;

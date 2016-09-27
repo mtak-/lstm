@@ -1,5 +1,6 @@
 #include <lstm/lstm.hpp>
 
+#include "debug_alloc.hpp"
 #include "simple_test.hpp"
 #include "thread_manager.hpp"
 
@@ -7,7 +8,7 @@
 #include <thread>
 #include <vector>
 
-void push(lstm::var<std::vector<int>>& x, int val) {
+void push(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x, int val) {
     CHECK(lstm::in_transaction());
     
     lstm::atomic([&](lstm::transaction& tx) {
@@ -17,7 +18,7 @@ void push(lstm::var<std::vector<int>>& x, int val) {
     });
 }
 
-void pop(lstm::var<std::vector<int>>& x) {
+void pop(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x) {
     CHECK(lstm::in_transaction());
     
     lstm::atomic([&](lstm::transaction& tx) {
@@ -27,32 +28,33 @@ void pop(lstm::var<std::vector<int>>& x) {
     });
 }
 
-auto get_loop(lstm::var<std::vector<int>>& x) {
+auto get_loop(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x) {
     return [&] {
-        for (int i = 0; i < 100000; ++i) {
-            lstm::atomic([&](auto& tx) {
-                auto var = tx.load(x);
-                if (var.empty())
-                    push(x, 5);
-                else {
-                    CHECK(var.size() == 1u);
-                    pop(x);
-                }
-            });
-        }
+        lstm::atomic([&](auto& tx) {
+            auto var = tx.load(x);
+            if (var.empty())
+                push(x, 5);
+            else {
+                CHECK(var.size() == 1u);
+                pop(x);
+            }
+        });
     };
 }
 
 int main() {
-    thread_manager manager;
-    
-    lstm::var<std::vector<int>> x{};
-    
-    for (int i = 0; i < 5; ++i)
-        manager.queue_thread(get_loop(x));
-    manager.run();
-    
-    CHECK(x.unsafe().empty());
+    {
+        thread_manager manager;
+        
+        lstm::var<std::vector<int>, debug_alloc<std::vector<int>>> x{};
+        
+        for (int i = 0; i < 5; ++i)
+            manager.queue_loop_n(get_loop(x), 100000);
+        manager.run();
+        
+        CHECK(x.unsafe().empty());
+    }
+    CHECK(debug_live_allocations<> == 0);
     
     LSTM_LOG_DUMP();
     

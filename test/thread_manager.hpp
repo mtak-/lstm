@@ -19,6 +19,16 @@ public:
         LSTM_LOG_REGISTER_THREAD_ID(threads.back().get_id());
     }
     
+    template<typename F>
+    void queue_loop_n(F&& f, const int n) {
+        threads.emplace_back([this, f = (F&&)f, n]{
+            while(!_run.load(LSTM_ACQUIRE));
+            for (int i = 0; i < n; ++i)
+                f();
+        });
+        LSTM_LOG_REGISTER_THREAD_ID(threads.back().get_id());
+    }
+    
     void join_threads() {
         for (auto& thread : threads)
             thread.join();

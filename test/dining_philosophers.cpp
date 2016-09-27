@@ -1,5 +1,6 @@
 #include <lstm/lstm.hpp>
 
+#include "debug_alloc.hpp"
 #include "simple_test.hpp"
 #include "thread_manager.hpp"
 
@@ -14,7 +15,7 @@ struct philosopher {
 };
 
 struct fork {
-    var<bool> in_use{false};
+    var<bool, debug_alloc<bool>> in_use{false};
 };
 
 auto get_loop(philosopher& p, fork& f0, fork& f1) {
@@ -58,6 +59,7 @@ int main() {
         CHECK(eric.food == 0u);
         CHECK(aimy.food == 0u);
         CHECK(joey.food == 0u);
+        CHECK(debug_live_allocations<> == 0);
         
         LSTM_LOG_DUMP();
         LSTM_LOG_CLEAR();

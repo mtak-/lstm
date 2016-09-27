@@ -78,6 +78,9 @@ LSTM_DETAIL_BEGIN
                                          transaction_domain* domain = nullptr,
                                          const Alloc& alloc = {}) const {
             auto tls_tx = tls_transaction();
+            static_assert(!noexcept(func(*tls_tx)),
+                "functions passed to atomic must not be marked noexcept");
+            
             if (tls_tx) return std::move(func)(*tls_tx); // TODO: which domain should this use???
             
             return atomic_fn::atomic_slow_path(std::move(func), domain, alloc);

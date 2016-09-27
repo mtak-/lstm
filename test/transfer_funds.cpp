@@ -1,13 +1,14 @@
 #include <lstm/lstm.hpp>
 
+#include "debug_alloc.hpp"
 #include "simple_test.hpp"
 #include "thread_manager.hpp"
 
 using lstm::atomic;
 using lstm::var;
 
-static var<int> account0{300};
-static var<int> account1{300};
+static var<int, debug_alloc<int>> account0{300};
+static var<int, debug_alloc<int>> account1{300};
 
 int main() {
     thread_manager manager;
@@ -34,6 +35,7 @@ int main() {
     
     CHECK(account0.unsafe() == 320);
     CHECK(account1.unsafe() == 280);
+    CHECK(debug_live_allocations<> == 0);
     
     LSTM_LOG_DUMP();
     

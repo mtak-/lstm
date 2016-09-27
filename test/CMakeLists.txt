@@ -17,3 +17,7 @@ add_test(test.nesting nesting)
 add_executable(transfer_funds transfer_funds.cpp)
 target_link_libraries(transfer_funds urcu-signal)
 add_test(test.transfer_funds transfer_funds)
+
+add_executable(list list.cpp)
+target_link_libraries(list urcu-signal)
+add_test(test.list list)

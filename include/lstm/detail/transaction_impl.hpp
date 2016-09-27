@@ -120,11 +120,12 @@ LSTM_DETAIL_BEGIN
                 write_set_value.dest_var().storage = std::move(write_set_value.pending_write());
                 unlock(write_version, write_set_value.dest_var());
             }
-            if (!deleter_set.empty()) {
-                synchronize_rcu();
-                for (auto& dler : deleter_set)
-                    (*static_cast<deleter_base*>(static_cast<a_deleter_type*>((void*)&dler)))();
-            }
+        }
+        
+        void commit_reclaim() noexcept {
+            synchronize_rcu();
+            for (auto& dler : deleter_set)
+                (*static_cast<deleter_base*>(static_cast<a_deleter_type*>((void*)&dler)))();
         }
         
         void commit_slow_path() {
@@ -139,6 +140,8 @@ LSTM_DETAIL_BEGIN
         void commit() {
             if (!write_set.empty())
                 commit_slow_path();
+            if (!deleter_set.empty())
+                commit_reclaim();
             LSTM_SUCC_TX();
         }
 
@@ -182,7 +185,6 @@ LSTM_DETAIL_BEGIN
         }
         
         deleter_storage& delete_set_push_back_storage() override final {
-            deleter_set.reserve(deleter_set.size() + 1);
             deleter_set.emplace_back();
             return deleter_set.back();
         }

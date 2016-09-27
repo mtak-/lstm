@@ -100,9 +100,9 @@ LSTM_BEGIN
         transaction& operator=(transaction&&) = delete;
         
         // non trivial loads, require locking the var<T> before copying it
-        template<typename T,
-            LSTM_REQUIRES_(!var<T>::trivial)>
-        T load(const var<T>& src_var) {
+        template<typename T, typename Alloc,
+            LSTM_REQUIRES_(!var<T, Alloc>::trivial)>
+        T load(const var<T, Alloc>& src_var) {
             detail::write_set_lookup lookup = find_write_set(src_var);
             if (!lookup.success()) {
                 word version_buf = 0;
@@ -124,9 +124,9 @@ LSTM_BEGIN
         }
         
         // trivial loads are fast :)
-        template<typename T,
-            LSTM_REQUIRES_(var<T>::trivial)>
-        T load(const var<T>& src_var) {
+        template<typename T, typename Alloc,
+            LSTM_REQUIRES_(var<T, Alloc>::trivial)>
+        T load(const var<T, Alloc>& src_var) {
             detail::write_set_lookup lookup = find_write_set(src_var);
             if (!lookup.success()) {
                 // TODO: is this synchronization correct/optimal?
@@ -144,10 +144,10 @@ LSTM_BEGIN
             detail::internal_retry();
         }
 
-        template<typename T, typename U,
+        template<typename T, typename Alloc, typename U,
             LSTM_REQUIRES_(std::is_assignable<T&, U&&>() &&
                            std::is_constructible<T, U&&>())>
-        void store(var<T>& dest_var, U&& u) {
+        void store(var<T, Alloc>& dest_var, U&& u) {
             detail::write_set_lookup lookup = find_write_set(dest_var);
             if (!lookup.success())
                 add_write_set(dest_var, dest_var.allocate_construct((U&&)u));
@@ -159,7 +159,7 @@ LSTM_BEGIN
         }
 
         template<typename T, typename Alloc = std::allocator<T>>
-        void delete_(T* dest_var, const Alloc alloc = {}) {
+        void delete_(T* dest_var, const Alloc& alloc = {}) {
             static_assert(sizeof(detail::deleter<T, Alloc>) == sizeof(detail::deleter_storage));
             static_assert(alignof(detail::deleter<T, Alloc>) == alignof(detail::deleter_storage));
             static_assert(std::is_trivially_destructible<detail::deleter<T, Alloc>>{});
