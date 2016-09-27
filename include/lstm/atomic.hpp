@@ -6,11 +6,15 @@
 #include <lstm/detail/scope_guard.hpp>
 #include <lstm/detail/thread_local.hpp>
 
+#include <lstm/detail/rcu_helper.hpp>
+
 LSTM_DETAIL_BEGIN
     struct atomic_fn {
     private:
 #ifdef LSTM_THREAD_LOCAL
         static inline transaction*& tls_transaction() noexcept {
+            static bool rcu_initialized = startup_rcu();
+            static LSTM_THREAD_LOCAL rcu_thread_registerer registerer{};
             static LSTM_THREAD_LOCAL transaction* tx = nullptr;
             return tx;
         }
@@ -23,18 +27,25 @@ LSTM_DETAIL_BEGIN
         
         template<typename Func, typename Tx, typename ScopeGuard,
             LSTM_REQUIRES_(is_void_transact_function<Func>())>
-        static void try_transact(Func& func, Tx& tx, ScopeGuard guard) {
-            func(tx);
+        static void try_transact(Func& func, Tx& tx, ScopeGuard scope_guard) {
+            {
+                rcu_lock_guard rcu_guard;
+                func(tx);
+            }
             tx.commit();
-            guard.release();
+            scope_guard.release();
         }
         
         template<typename Func, typename Tx, typename ScopeGuard,
             LSTM_REQUIRES_(!is_void_transact_function<Func>())>
-        static transact_result<Func> try_transact(Func& func, Tx& tx, ScopeGuard guard) {
+        static transact_result<Func> try_transact(Func& func, Tx& tx, ScopeGuard scope_guard) {
+            rcu_lock_guard rcu_guard;
             decltype(auto) result = func(tx);
+            rcu_guard.release();
+            rcu_read_unlock();
+            
             tx.commit();
-            guard.release();
+            scope_guard.release();
             return static_cast<transact_result<Func>&&>(result);
         }
         

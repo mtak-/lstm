@@ -7,6 +7,30 @@
 #include <atomic>
 #include <cassert>
 
+LSTM_DETAIL_BEGIN
+    struct deleter_base { virtual void operator()() noexcept = 0; };
+    
+    template<typename T, typename Alloc>
+    struct deleter : deleter_base, private Alloc {
+    private:
+        T* ptr; // TODO: probly move this into base class?
+        Alloc& alloc() { return *this; }
+        
+        using alloc_traits = std::allocator_traits<Alloc>;
+        
+    public:
+        deleter(T* ptr_in, const Alloc& alloc) : Alloc(alloc), ptr(ptr_in) {}
+        
+        void operator()() noexcept override final {
+            alloc_traits::destroy(alloc(), ptr);
+            alloc_traits::deallocate(alloc(), ptr, 1);
+        }
+    };
+    
+    using a_deleter_type = deleter<word, std::allocator<word>>;
+    using deleter_storage = uninitialized<a_deleter_type>;
+LSTM_DETAIL_END
+
 LSTM_BEGIN
     [[noreturn]] inline void retry() {
         LSTM_USER_FAIL_TX();
@@ -65,6 +89,8 @@ LSTM_BEGIN
         
         virtual detail::write_set_lookup
         find_write_set(const detail::var_base& dest_var) noexcept = 0;
+        
+        virtual detail::deleter_storage& delete_set_push_back_storage() = 0;
 
     public:
         // transactions can only be passed by non-const lvalue reference
@@ -130,6 +156,16 @@ LSTM_BEGIN
 
             // TODO: where is this best placed???, or is it best removed altogether?
             if (!read_valid(dest_var)) detail::internal_retry();
+        }
+
+        template<typename T, typename Alloc = std::allocator<T>>
+        void delete_(T* dest_var, const Alloc alloc = {}) {
+            static_assert(sizeof(detail::deleter<T, Alloc>) == sizeof(detail::deleter_storage));
+            static_assert(alignof(detail::deleter<T, Alloc>) == alignof(detail::deleter_storage));
+            static_assert(std::is_trivially_destructible<detail::deleter<T, Alloc>>{});
+            
+            detail::deleter_storage& storage = delete_set_push_back_storage();
+            new (&storage) detail::deleter<T, Alloc>(dest_var, alloc);
         }
 
         // TODO: reading/writing an rvalue probably never makes sense?

@@ -3,6 +3,8 @@
 
 #include <lstm/transaction.hpp>
 
+#include <urcu.h>
+
 #include <vector>
 
 LSTM_DETAIL_BEGIN
@@ -58,17 +60,20 @@ LSTM_DETAIL_BEGIN
         using write_alloc = typename alloc_traits::template rebind_alloc<write_set_value_type>;
         using read_set_t = std::vector<read_set_value_type, read_alloc>;
         using write_set_t = std::vector<write_set_value_type, write_alloc>;
+        using deleter_set_t = std::vector<deleter_storage>;
         using read_set_const_iter = typename read_set_t::const_iterator;
         using write_set_iter = typename write_set_t::iterator;
 
         // TODO: make some container choices
         read_set_t read_set;
         write_set_t write_set;
+        deleter_set_t deleter_set;
 
         inline transaction_impl(transaction_domain* domain, const Alloc& alloc) noexcept
             : transaction(domain)
             , read_set(alloc)
             , write_set(alloc)
+            , deleter_set(alloc)
         {}
             
         static void unlock_write_set(write_set_iter begin, write_set_iter end) noexcept {
@@ -115,6 +120,11 @@ LSTM_DETAIL_BEGIN
                 write_set_value.dest_var().storage = std::move(write_set_value.pending_write());
                 unlock(write_version, write_set_value.dest_var());
             }
+            if (!deleter_set.empty()) {
+                synchronize_rcu();
+                for (auto& dler : deleter_set)
+                    (*static_cast<deleter_base*>(static_cast<a_deleter_type*>((void*)&dler)))();
+            }
         }
         
         void commit_slow_path() {
@@ -138,6 +148,7 @@ LSTM_DETAIL_BEGIN
                 write_set_value.dest_var().destroy_deallocate(write_set_value.pending_write());
             write_set.clear();
             read_set.clear();
+            deleter_set.clear();
         }
         
         read_set_const_iter find_read_set(const var_base& src_var) const noexcept {
@@ -168,6 +179,12 @@ LSTM_DETAIL_BEGIN
             return iter != end
                 ? write_set_lookup{iter->pending_write()}
                 : write_set_lookup{nullptr};
+        }
+        
+        deleter_storage& delete_set_push_back_storage() override final {
+            deleter_set.reserve(deleter_set.size() + 1);
+            deleter_set.emplace_back();
+            return deleter_set.back();
         }
     };
 LSTM_DETAIL_END

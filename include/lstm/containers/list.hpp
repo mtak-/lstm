@@ -3,8 +3,6 @@
 
 #include <lstm/lstm.hpp>
 
-#error "TODO: the list.hpp header is not functional"
-
 LSTM_BEGIN
     namespace detail {
         template<typename T>
@@ -12,6 +10,18 @@ LSTM_BEGIN
             lstm::var<T> value;
             lstm::var<void*> _prev;
             lstm::var<void*> _next;
+            
+            template<typename... Us,
+                LSTM_REQUIRES_(sizeof...(Us) != 1)>
+            _list_node(Us&&... us) noexcept(std::is_nothrow_constructible<T, Us&&...>{})
+                : value((Us&&)us...)
+            {}
+            
+            template<typename U,
+                LSTM_REQUIRES_(!std::is_same<uncvref<U>, _list_node<T>>{})>
+            _list_node(U&& u) noexcept(std::is_nothrow_constructible<T, U&&>{})
+                : value((U&&)u)
+            {}
         };
     }
     
@@ -57,27 +67,31 @@ LSTM_BEGIN
             auto node = head.unsafe();
             _size.unsafe() = 0;
             while (node) {
-                auto to_delete = node;
-                node = unsafe_next(*node);
-                delete to_delete;
+                auto next_ = unsafe_next(*node);
+                delete node;
+                node = next_;
             }
         }
         
         void clear() noexcept {
-            lstm::atomic([&](auto& tx) {
-                auto node = tx.load(head);
+            auto* node = lstm::atomic([&](auto& tx) {
                 tx.store(_size, 0);
+                auto result = tx.load(head);
+                tx.store(head, nullptr);
+                return result;
+            });
+            lstm::atomic([&](auto& tx) {
                 while (node) {
-                    auto to_delete = node;
-                    node = next(*node, tx);
-                    delete to_delete;
+                    auto next_ = next(*node, tx);
+                    tx.delete_(node);
+                    node = next_;
                 }
             });
         }
         
         template<typename... Us>
         void emplace_front(Us&&... us) noexcept(std::is_nothrow_constructible<T, Us&&...>{}) {
-            auto new_head = new node{{(Us&&)us...}};
+            auto new_head = new node{(Us&&)us...};
             lstm::atomic([&](auto& tx) {
                 auto _head = tx.load(head);
                 unsafe_next(*new_head) = _head;
