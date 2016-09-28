@@ -1,21 +1,18 @@
 #include <lstm/containers/list.hpp>
 
+#ifdef NDEBUG
+#undef NDEBUG
 #include "debug_alloc.hpp"
+#define NDEBUG
+#else
+#include "debug_alloc.hpp"
+#endif
 #include "simple_test.hpp"
 #include "thread_manager.hpp"
 
 int main() {
-    // {
-    //     int* i = new int(5);
-    //     ++debug_live_allocations<>;
-    //     debug_alloc<int> alloc;
-    //     lstm::atomic([&](auto& tx) { tx.delete_(i, alloc); });
-    //
-    //     CHECK(debug_live_allocations<> == 0);
-    // }
-    // return test_result();
-    static constexpr int iter_count = 10000;
-    for(int loop = 0; loop < 100; ++loop) {
+    static constexpr int iter_count = 1000;
+    for(int loop = 0; loop < 200; ++loop) {
         {
             lstm::list<int, debug_alloc<int>> ints;
             thread_manager manager;
@@ -35,13 +32,14 @@ int main() {
                       << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
                       << "ms"
                       << std::endl;
+                      
+            ints.clear();
+            CHECK(ints.size() == 0);
+            CHECK(debug_live_allocations<> == 0);
     
             LSTM_LOG_DUMP();
             LSTM_LOG_CLEAR();
         }
-        CHECK(debug_live_allocations<> == 0);
-        if (debug_live_allocations<> != 0)
-            return -1;
     }
     
     return test_result();

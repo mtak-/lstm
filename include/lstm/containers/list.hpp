@@ -111,8 +111,9 @@ LSTM_BEGIN
             lstm::atomic([&](auto& tx) {
                 auto _head = tx.load(head);
                 unsafe_next(*new_head) = _head;
-                if (_head)
-                    tx.store(_head->_prev, new_head);
+                // TODO: segfaults if this is uncommented
+                // if (_head)
+                //     tx.store(_head->_prev, (void*)new_head);
                 tx.store(_size, tx.load(_size) + 1);
                 tx.store(head, new_head);
             });

@@ -17,7 +17,7 @@ include_directories(include /usr/local/include)
 link_directories(/usr/local/lib)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1z -ftemplate-backtrace-limit=0")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DURCU_INLINE_SMALL_FUNCTIONS -DRCU_SIGNAL")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DURCU_INLINE_SMALL_FUNCTIONS -DRCU_MB")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Wno-unused-variable")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-c99-extensions")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -DLSTM_LOG_TRANSACTIONS -fsanitize=address")
