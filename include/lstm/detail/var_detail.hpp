@@ -19,12 +19,17 @@ LSTM_DETAIL_BEGIN
     protected:
         mutable std::atomic<word> version_lock;
         var_storage storage;
+        var_type kind;
         
-        inline var_base() noexcept : version_lock{0} {}
+        inline var_base(const var_type in_kind) noexcept
+            : version_lock{0}
+            , kind{in_kind}
+        {}
+        
         virtual ~var_base() noexcept = default;
         
         virtual void destroy_deallocate(var_storage storage) noexcept = 0;
-    
+        
         template<typename> friend struct ::lstm::detail::transaction_impl;
         friend struct ::lstm::transaction;
         friend test::transaction_tester;
@@ -55,10 +60,15 @@ LSTM_DETAIL_BEGIN
         constexpr Alloc& alloc() noexcept { return static_cast<Alloc&>(*this); }
         
         constexpr var_alloc_policy()
-            noexcept(std::is_nothrow_default_constructible<Alloc>{}) = default;
+            noexcept(std::is_nothrow_default_constructible<Alloc>{})
+            : Alloc()
+            , var_base{type}
+        {}
+        
         constexpr var_alloc_policy(const Alloc& alloc)
             noexcept(std::is_nothrow_constructible<Alloc, const Alloc&>{})
             : Alloc(alloc)
+            , var_base{type}
         {}
         
         template<typename... Us>
@@ -92,11 +102,12 @@ LSTM_DETAIL_BEGIN
         template<typename> friend struct ::lstm::detail::transaction_impl;
         friend struct ::lstm::transaction;
         
-        constexpr var_alloc_policy() noexcept = default;
-        constexpr var_alloc_policy(const Alloc&) noexcept {}
+        constexpr var_alloc_policy() noexcept : var_base{type} {}
+        constexpr var_alloc_policy(const Alloc&) noexcept : var_base{type} {}
         
         template<typename... Us>
-        var_storage allocate_construct(Us&&... us) noexcept(noexcept(T((Us&&)us...)))
+        var_storage allocate_construct(Us&&... us)
+            noexcept(std::is_nothrow_constructible<T, Us&&...>{})
         { return reinterpret_cast<var_storage>(T((Us&&)us...)); }
         
         void destroy_deallocate(var_storage s) noexcept override final

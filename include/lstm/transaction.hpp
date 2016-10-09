@@ -14,12 +14,15 @@ LSTM_DETAIL_BEGIN
     struct deleter : deleter_base, private Alloc {
     private:
         T* ptr; // TODO: probly move this into base class?
-        Alloc& alloc() { return *this; }
+        Alloc& alloc() noexcept { return *this; }
         
         using alloc_traits = std::allocator_traits<Alloc>;
         
     public:
-        deleter(T* ptr_in, const Alloc& alloc) : Alloc(alloc), ptr(ptr_in) {}
+        deleter(T* ptr_in, const Alloc& alloc) noexcept(std::is_nothrow_copy_constructible<Alloc>{})
+            : Alloc(alloc)
+            , ptr(ptr_in)
+        {}
         
         void operator()() noexcept override final {
             alloc_traits::destroy(alloc(), ptr);
@@ -99,22 +102,15 @@ LSTM_BEGIN
         transaction& operator=(const transaction&) = delete;
         transaction& operator=(transaction&&) = delete;
         
-        // non trivial loads, require locking the var<T> before copying it
         template<typename T, typename Alloc,
             LSTM_REQUIRES_(!var<T, Alloc>::trivial)>
-        T load(const var<T, Alloc>& src_var) {
+        const T& load(const var<T, Alloc>& src_var) {
             detail::write_set_lookup lookup = find_write_set(src_var);
             if (!lookup.success()) {
-                word version_buf = 0;
-                // TODO: this feels wrong, especially since reads call this...
-                if (lock(version_buf, src_var)) {
-                    // if copying T causes a lock to be taken out on T, then this line will
-                    // abort the transaction or cause a stack overflow.
-                    // this is ok, because it is certainly a bug in the client code
-                    // (me thinks..)
-                    T result = src_var.unsafe();
-                    unlock(version_buf, src_var);
-
+                // TODO: is this synchronization correct/optimal?
+                auto src_version = src_var.version_lock.load(LSTM_ACQUIRE);
+                if (src_version <= read_version && !locked(src_version)) {
+                    const T& result = var<T>::load(src_var.storage);
                     add_read_set(src_var);
                     return result;
                 }
@@ -134,7 +130,7 @@ LSTM_BEGIN
                 if (src_version <= read_version && !locked(src_version)) {
                     T result = var<T>::load(src_var.storage);
                     
-                    if (src_var.version_lock.load(LSTM_ACQUIRE) == src_version) {
+                    if (src_var.version_lock.load(LSTM_RELEASE) == src_version) {
                         add_read_set(src_var);
                         return result;
                     }

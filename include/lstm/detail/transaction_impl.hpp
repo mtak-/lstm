@@ -8,6 +8,17 @@
 #include <vector>
 
 LSTM_DETAIL_BEGIN
+    struct write_set_deleter {
+        var_base* var_ptr;
+        var_storage storage;
+        
+        inline constexpr write_set_deleter(var_base* const in_var_ptr,
+                                           const var_storage in_storage) noexcept
+            : var_ptr(in_var_ptr)
+            , storage(in_storage)
+        {}
+    };
+
     struct read_set_value_type {
     private:
         const var_base* _src_var;
@@ -114,34 +125,40 @@ LSTM_DETAIL_BEGIN
             }
         }
 
-        void commit_publish(const word write_version) noexcept {
+        void commit_publish(const word write_version,
+                            std::vector<write_set_deleter>& write_set_deleters) noexcept {
             for (auto& write_set_value : write_set) {
-                write_set_value.dest_var().destroy_deallocate(write_set_value.dest_var().storage);
+                if (write_set_value.dest_var().kind != var_type::atomic)
+                    write_set_deleters.emplace_back(&write_set_value.dest_var(),
+                                                    write_set_value.dest_var().storage);
                 write_set_value.dest_var().storage = std::move(write_set_value.pending_write());
                 unlock(write_version, write_set_value.dest_var());
             }
         }
         
-        void commit_reclaim() noexcept {
+        void commit_reclaim(const std::vector<write_set_deleter>& write_set_deleters) noexcept {
             synchronize_rcu();
             for (auto& dler : deleter_set)
                 (*static_cast<deleter_base*>(static_cast<a_deleter_type*>((void*)&dler)))();
+            for (auto& dler : write_set_deleters)
+                dler.var_ptr->destroy_deallocate(dler.storage);
         }
         
-        void commit_slow_path() {
+        void commit_slow_path(std::vector<write_set_deleter>& write_set_deleters) {
             commit_lock_writes();
             auto write_version = domain().bump_clock();
             
             commit_validate_reads();
             
-            commit_publish(write_version);
+            commit_publish(write_version, write_set_deleters);
         }
 
         void commit() {
+            std::vector<write_set_deleter> write_set_deleters;
             if (!write_set.empty())
-                commit_slow_path();
-            if (!deleter_set.empty())
-                commit_reclaim();
+                commit_slow_path(write_set_deleters);
+            if (!deleter_set.empty() || !write_set_deleters.empty())
+                commit_reclaim(write_set_deleters);
             LSTM_SUCC_TX();
         }
 

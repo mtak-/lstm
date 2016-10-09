@@ -31,7 +31,7 @@ void pop(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x) {
 auto get_loop(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x) {
     return [&] {
         lstm::atomic([&](auto& tx) {
-            auto var = tx.load(x);
+            auto& var = tx.load(x);
             if (var.empty())
                 push(x, 5);
             else {
