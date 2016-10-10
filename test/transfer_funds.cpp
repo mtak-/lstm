@@ -1,32 +1,38 @@
-#include <lstm/lstm.hpp>
+#include <lstm/easy_var.hpp>
 
 #include "debug_alloc.hpp"
 #include "simple_test.hpp"
 #include "thread_manager.hpp"
 
 using lstm::atomic;
-using lstm::var;
+using lstm::easy_var;
 
-static var<int, debug_alloc<int>> account0{300};
-static var<int, debug_alloc<int>> account1{300};
+static easy_var<int, debug_alloc<int>> account0{300};
+static easy_var<int, debug_alloc<int>> account1{300};
 
 int main() {
     thread_manager manager;
     
     manager.queue_thread([] {
         for (int i = 0; i < 1000000; ++i) {
-            lstm::atomic([](auto& tx) {
-                tx.store(account0, tx.load(account0) + 20);
-                tx.store(account1, tx.load(account1) - 20);
+            lstm::atomic([] {
+                if (account1 >= 20) {
+                    account0 += 20;
+                    account1 -= 20;
+                } else
+                    lstm::retry();
             });
         }
     });
     
     manager.queue_thread([] {
         for (int i = 0; i < 666666; ++i) {
-            lstm::atomic([](auto& tx) {
-                tx.store(account1, tx.load(account1) + 30);
-                tx.store(account0, tx.load(account0) - 30);
+            lstm::atomic([] {
+                if (account0 >= 30) {
+                    account1 += 30;
+                    account0 -= 30;
+                } else
+                    lstm::retry();
             });
         }
     });
