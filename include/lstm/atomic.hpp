@@ -25,12 +25,28 @@ LSTM_DETAIL_BEGIN
 
         static inline void reset_active_transaction() noexcept { tls_transaction() = nullptr; }
         
+        template<typename Func, typename Tx,
+            LSTM_REQUIRES_(callable_with_tx<Func, Tx&>())>
+        static decltype(auto) call(Func& func, Tx& tx) {
+            static_assert(!noexcept(func(tx)),
+                "functions passed to atomic must not be marked noexcept");
+            return func(tx);
+        }
+        
+        template<typename Func, typename Tx,
+            LSTM_REQUIRES_(!callable_with_tx<Func, Tx&>())>
+        static decltype(auto) call(Func& func, Tx&) {
+            static_assert(!noexcept(func()),
+                "functions passed to atomic must not be marked noexcept");
+            return func();
+        }
+        
         template<typename Func, typename Tx, typename ScopeGuard,
             LSTM_REQUIRES_(is_void_transact_function<Func>())>
         static void try_transact(Func& func, Tx& tx, ScopeGuard scope_guard) {
             {
                 rcu_lock_guard rcu_guard;
-                func(tx);
+                call(func, tx);
             }
             tx.commit();
             scope_guard.release();
@@ -40,7 +56,7 @@ LSTM_DETAIL_BEGIN
             LSTM_REQUIRES_(!is_void_transact_function<Func>())>
         static transact_result<Func> try_transact(Func& func, Tx& tx, ScopeGuard scope_guard) {
             rcu_lock_guard rcu_guard;
-            decltype(auto) result = func(tx);
+            decltype(auto) result = call(func, tx);
             rcu_guard.release();
             rcu_read_unlock();
             
@@ -78,10 +94,8 @@ LSTM_DETAIL_BEGIN
                                          transaction_domain* domain = nullptr,
                                          const Alloc& alloc = {}) const {
             auto tls_tx = tls_transaction();
-            static_assert(!noexcept(func(*tls_tx)),
-                "functions passed to atomic must not be marked noexcept");
             
-            if (tls_tx) return std::move(func)(*tls_tx); // TODO: which domain should this use???
+            if (tls_tx) return call(func, *tls_tx); // TODO: which domain should this use???
             
             return atomic_fn::atomic_slow_path(std::move(func), domain, alloc);
         }

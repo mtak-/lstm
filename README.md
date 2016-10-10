@@ -5,7 +5,7 @@
 ## Brief description of the interface
 - declare variable as shared: `lstm::var<Type> my_var(/*params*/);`
 - start a transaction (or access the current transaction): `lstm::atomic([&](auto& tx) { /* code here */ });`
-- load a variable from within a transaction: `auto my_var_val = tx.load(my_var);`
+- load a variable from within a transaction: `const auto& my_var_val = tx.load(my_var);`
 - store a variable from within a transaction: `tx.store(my_var, my_var_new_val);`
 - unsafe access to a shared variable: `auto my_var_val = my_var.unsafe();`
 - detect if inside of a transaction: `assert(lstm::in_transaction())`
