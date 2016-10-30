@@ -2,16 +2,18 @@
 #define LSTM_DETAIL_TRANSACTION_IMPL_HPP
 
 #include <lstm/transaction.hpp>
+#include <lstm/detail/small_pod_vector.hpp>
 
 #include <urcu.h>
 
-#include <vector>
+#include <algorithm>
 
 LSTM_DETAIL_BEGIN
     struct write_set_deleter {
         var_base* var_ptr;
         var_storage storage;
         
+        inline write_set_deleter() noexcept = default;
         inline constexpr write_set_deleter(var_base* const in_var_ptr,
                                            const var_storage in_storage) noexcept
             : var_ptr(in_var_ptr)
@@ -24,6 +26,7 @@ LSTM_DETAIL_BEGIN
         const var_base* _src_var;
         
     public:
+        inline read_set_value_type() noexcept = default;
         inline constexpr read_set_value_type(const var_base& in_src_var) noexcept
             : _src_var(&in_src_var)
         {}
@@ -43,6 +46,8 @@ LSTM_DETAIL_BEGIN
         var_storage _pending_write;
         
     public:
+        inline write_set_value_type() noexcept = default;
+        
         inline constexpr
         write_set_value_type(var_base& in_dest_var, var_storage in_pending_write) noexcept
             : _dest_var(&in_dest_var)
@@ -69,9 +74,12 @@ LSTM_DETAIL_BEGIN
         using alloc_traits = std::allocator_traits<Alloc>;
         using read_alloc = typename alloc_traits::template rebind_alloc<read_set_value_type>;
         using write_alloc = typename alloc_traits::template rebind_alloc<write_set_value_type>;
-        using read_set_t = std::vector<read_set_value_type, read_alloc>;
-        using write_set_t = std::vector<write_set_value_type, write_alloc>;
-        using deleter_set_t = std::vector<deleter_storage>;
+        using deleter_alloc = typename alloc_traits::template rebind_alloc<deleter_storage>;
+        using write_deleter_alloc = typename alloc_traits::template rebind_alloc<write_set_deleter>;
+        using read_set_t = small_pod_vector<read_set_value_type, 4, read_alloc>;
+        using write_set_t = small_pod_vector<write_set_value_type, 4, write_alloc>;
+        using deleter_set_t = small_pod_vector<deleter_storage, 4, deleter_alloc>;
+        using write_set_deleters_t = small_pod_vector<write_set_deleter, 4, write_deleter_alloc>;
         using read_set_const_iter = typename read_set_t::const_iterator;
         using write_set_iter = typename write_set_t::iterator;
 
@@ -111,7 +119,7 @@ LSTM_DETAIL_BEGIN
                 // TODO: weird to have this here
                 auto read_iter = find_read_set(write_iter->dest_var());
                 if (read_iter != std::end(read_set))
-                    read_set.erase(read_iter);
+                    read_set.unordered_erase(read_iter);
             }
         }
 
@@ -126,7 +134,7 @@ LSTM_DETAIL_BEGIN
         }
 
         void commit_publish(const word write_version,
-                            std::vector<write_set_deleter>& write_set_deleters) noexcept {
+                            write_set_deleters_t& write_set_deleters) noexcept {
             for (auto& write_set_value : write_set) {
                 if (write_set_value.dest_var().kind != var_type::atomic)
                     write_set_deleters.emplace_back(&write_set_value.dest_var(),
@@ -136,7 +144,7 @@ LSTM_DETAIL_BEGIN
             }
         }
         
-        void commit_reclaim(const std::vector<write_set_deleter>& write_set_deleters) noexcept {
+        void commit_reclaim(const write_set_deleters_t& write_set_deleters) noexcept {
             synchronize_rcu();
             for (auto& dler : deleter_set)
                 (*static_cast<deleter_base*>(static_cast<a_deleter_type*>((void*)&dler)))();
@@ -144,7 +152,7 @@ LSTM_DETAIL_BEGIN
                 dler.var_ptr->destroy_deallocate(dler.storage);
         }
         
-        void commit_slow_path(std::vector<write_set_deleter>& write_set_deleters) {
+        void commit_slow_path(write_set_deleters_t& write_set_deleters) {
             commit_lock_writes();
             auto write_version = domain().bump_clock();
             
@@ -154,7 +162,7 @@ LSTM_DETAIL_BEGIN
         }
 
         void commit() {
-            std::vector<write_set_deleter> write_set_deleters;
+            write_set_deleters_t write_set_deleters;
             if (!write_set.empty())
                 commit_slow_path(write_set_deleters);
             if (!deleter_set.empty() || !write_set_deleters.empty())

@@ -2,6 +2,7 @@
 #define LSTM_TEST_THREAD_MANAGER_HPP
 
 #include <thread>
+#include <vector>
 
 // for tests only
 struct thread_manager {
