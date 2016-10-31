@@ -23,7 +23,8 @@ LSTM_DETAIL_BEGIN
             capacity_ = capacity_ * 2;
             auto newBegin = alloc_traits::allocate(alloc(), capacity_);
             assert(newBegin);
-            std::memcpy(newBegin, begin_, sizeof(T) * size());
+            if (newBegin != begin_)
+                std::memcpy(newBegin, begin_, sizeof(T) * size());
             end_ = newBegin + size();
             begin_ = newBegin;
             ::new (end_++) T((Us&&)us...);

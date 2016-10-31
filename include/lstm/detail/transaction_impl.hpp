@@ -85,7 +85,6 @@ LSTM_DETAIL_BEGIN
         using read_set_const_iter = typename read_set_t::const_iterator;
         using write_set_iter = typename write_set_t::iterator;
 
-        // TODO: make some container choices
         read_set_t read_set;
         write_set_t write_set;
         deleter_set_t deleter_set;
