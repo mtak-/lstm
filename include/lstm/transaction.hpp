@@ -107,14 +107,16 @@ LSTM_BEGIN
         const T& load(const var<T, Alloc>& src_var) {
             detail::write_set_lookup lookup = find_write_set(src_var);
             if (!lookup.success()) {
-                // TODO: is this synchronization correct/optimal?
+                // TODO: this is not optimal
                 auto src_version = src_var.version_lock.load(LSTM_ACQUIRE);
                 if (src_version <= read_version && !locked(src_version)) {
                     const T& result = var<T>::load(src_var.storage);
-                    add_read_set(src_var);
-                    return result;
+                    if (src_var.version_lock.load(LSTM_RELEASE) == src_version) {
+                        add_read_set(src_var);
+                        return result;
+                    }
                 }
-            } else if (read_valid(src_var)) // TODO: does this if check improve or hurt speed?
+            } else if (read_valid(src_var))
                 return var<T>::load(lookup.pending_write());
             detail::internal_retry();
         }
@@ -125,7 +127,7 @@ LSTM_BEGIN
         T load(const var<T, Alloc>& src_var) {
             detail::write_set_lookup lookup = find_write_set(src_var);
             if (!lookup.success()) {
-                // TODO: is this synchronization correct/optimal?
+                // TODO: this is not optimal
                 auto src_version = src_var.version_lock.load(LSTM_ACQUIRE);
                 if (src_version <= read_version && !locked(src_version)) {
                     T result = var<T>::load(src_var.storage);
@@ -135,7 +137,7 @@ LSTM_BEGIN
                         return result;
                     }
                 }
-            } else if (read_valid(src_var)) // TODO: does this if check improve or hurt speed?
+            } else if (read_valid(src_var))
                 return var<T>::load(lookup.pending_write());
             detail::internal_retry();
         }
