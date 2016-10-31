@@ -66,7 +66,7 @@ LSTM_DETAIL_BEGIN
         { return _dest_var < rhs._dest_var; }
     };
     
-    template<typename Alloc>
+    template<typename Alloc, std::size_t ReadSize, std::size_t WriteSize, std::size_t DeleteSize>
     struct transaction_impl : lstm::transaction {
         friend detail::atomic_fn;
         friend test::transaction_tester;
@@ -76,10 +76,12 @@ LSTM_DETAIL_BEGIN
         using write_alloc = typename alloc_traits::template rebind_alloc<write_set_value_type>;
         using deleter_alloc = typename alloc_traits::template rebind_alloc<deleter_storage>;
         using write_deleter_alloc = typename alloc_traits::template rebind_alloc<write_set_deleter>;
-        using read_set_t = small_pod_vector<read_set_value_type, 4, read_alloc>;
-        using write_set_t = small_pod_vector<write_set_value_type, 4, write_alloc>;
-        using deleter_set_t = small_pod_vector<deleter_storage, 4, deleter_alloc>;
-        using write_set_deleters_t = small_pod_vector<write_set_deleter, 4, write_deleter_alloc>;
+        using read_set_t = small_pod_vector<read_set_value_type, ReadSize, read_alloc>;
+        using write_set_t = small_pod_vector<write_set_value_type, WriteSize, write_alloc>;
+        using deleter_set_t = small_pod_vector<deleter_storage, DeleteSize, deleter_alloc>;
+        using write_set_deleters_t = small_pod_vector<write_set_deleter,
+                                                      WriteSize,
+                                                      write_deleter_alloc>;
         using read_set_const_iter = typename read_set_t::const_iterator;
         using write_set_iter = typename write_set_t::iterator;
 

@@ -65,7 +65,8 @@ LSTM_DETAIL_BEGIN
     struct atomic_fn;
     struct var_base;
     
-    template<typename Alloc> struct transaction_impl;
+    template<typename Alloc, std::size_t ReadSize, std::size_t WriteSize, std::size_t DeleteSize>
+    struct transaction_impl;
     
     struct _tx_retry {};
     [[noreturn]] inline void internal_retry() {

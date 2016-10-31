@@ -8,6 +8,14 @@
 
 #include <lstm/detail/rcu_helper.hpp>
 
+LSTM_BEGIN
+    // optional knobs
+    template<std::size_t MaxStackReadBuffSize = 4,
+             std::size_t MaxStackWriteBuffSize = 4,
+             std::size_t MaxStackDeleterBuffSize = 4>
+    struct knobs {};
+LSTM_END
+
 LSTM_DETAIL_BEGIN
     struct atomic_fn {
     private:
@@ -65,11 +73,13 @@ LSTM_DETAIL_BEGIN
             return static_cast<transact_result<Func>&&>(result);
         }
         
-        template<typename Func, typename Alloc>
+        template<typename Func, typename Alloc, std::size_t ReadSize, std::size_t WriteSize,
+            std::size_t DeleteSize>
         static transact_result<Func> atomic_slow_path(Func func,
                                                       transaction_domain* domain,
-                                                      const Alloc& alloc) {
-            transaction_impl<Alloc> tx{domain, alloc};
+                                                      const Alloc& alloc,
+                                                      knobs<ReadSize, WriteSize, DeleteSize>) {
+            transaction_impl<Alloc, ReadSize, WriteSize, DeleteSize> tx{domain, alloc};
             tls_transaction() = &tx;
             
             const auto tls_guard = make_scope_guard([]() noexcept
@@ -89,23 +99,30 @@ LSTM_DETAIL_BEGIN
         inline bool in_transaction() const noexcept { return tls_transaction() != nullptr; }
         
         template<typename Func, typename Alloc = std::allocator<detail::var_base*>,
+            std::size_t MaxStackReadBuffSize = 4,
+            std::size_t MaxStackWriteBuffSize = 4,
+            std::size_t MaxStackDeleterBuffSize = 4,
             LSTM_REQUIRES_(detail::is_transact_function<Func>())>
         transact_result<Func> operator()(Func func,
                                          transaction_domain* domain = nullptr,
-                                         const Alloc& alloc = {}) const {
+                                         const Alloc& alloc = {},
+                                         knobs<MaxStackWriteBuffSize,
+                                               MaxStackReadBuffSize,
+                                               MaxStackDeleterBuffSize> knobs = {}) const {
             auto tls_tx = tls_transaction();
             
             if (tls_tx) return call(func, *tls_tx); // TODO: which domain should this use???
             
-            return atomic_fn::atomic_slow_path(std::move(func), domain, alloc);
+            return atomic_fn::atomic_slow_path(std::move(func), domain, alloc, knobs);
         }
     };
+    
+    template<typename T> struct static_const { static constexpr const T value{}; };
+    template<typename T> constexpr T static_const<T>::value;
 LSTM_DETAIL_END
 
 LSTM_BEGIN
-    template<typename T> struct static_const { static constexpr const T value{}; };
-    template<typename T> constexpr T static_const<T>::value;
-    namespace { constexpr auto&& atomic = static_const<detail::atomic_fn>::value; }
+    namespace { constexpr auto&& atomic = detail::static_const<detail::atomic_fn>::value; }
     
     inline bool in_transaction() noexcept { return detail::atomic_fn{}.in_transaction(); }
 LSTM_END

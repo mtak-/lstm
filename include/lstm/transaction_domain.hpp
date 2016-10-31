@@ -23,7 +23,7 @@ LSTM_BEGIN
         
         static transaction_domain& default_domain() noexcept;
         
-        template<typename Alloc>
+        template<typename, std::size_t, std::size_t, std::size_t>
         friend struct lstm::detail::transaction_impl;
         
     public:

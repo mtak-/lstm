@@ -16,7 +16,7 @@ int main() {
 }
 
 int lstm::test::transaction_tester::run_tests() {
-    using tx_t = detail::transaction_impl<std::allocator<int>>;
+    using tx_t = detail::transaction_impl<std::allocator<int>, 4, 4, 4>;
     // init
     {
         CHECK(default_domain().get_clock() == 0u);

@@ -30,7 +30,8 @@ LSTM_DETAIL_BEGIN
         
         virtual void destroy_deallocate(var_storage storage) noexcept = 0;
         
-        template<typename> friend struct ::lstm::detail::transaction_impl;
+        template<typename, std::size_t, std::size_t, std::size_t>
+        friend struct ::lstm::detail::transaction_impl;
         friend struct ::lstm::transaction;
         friend test::transaction_tester;
     };
@@ -54,7 +55,8 @@ LSTM_DETAIL_BEGIN
         static constexpr bool atomic = false;
         static constexpr var_type type = Var_type;
     protected:
-        template<typename> friend struct ::lstm::detail::transaction_impl;
+        template<typename, std::size_t, std::size_t, std::size_t>
+        friend struct ::lstm::detail::transaction_impl;
         friend struct ::lstm::transaction;
         using alloc_traits = std::allocator_traits<Alloc>;
         constexpr Alloc& alloc() noexcept { return static_cast<Alloc&>(*this); }
@@ -99,7 +101,8 @@ LSTM_DETAIL_BEGIN
         static constexpr bool atomic = true;
         static constexpr var_type type = var_type::atomic;
     protected:
-        template<typename> friend struct ::lstm::detail::transaction_impl;
+        template<typename, std::size_t, std::size_t, std::size_t>
+        friend struct ::lstm::detail::transaction_impl;
         friend struct ::lstm::transaction;
         
         constexpr var_alloc_policy() noexcept : var_base{type} {}
