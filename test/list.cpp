@@ -11,7 +11,7 @@
 #include "thread_manager.hpp"
 
 int main() {
-    static constexpr int iter_count = 1000;
+    static constexpr int iter_count = 5000;
     for(int loop = 0; loop < 200; ++loop) {
         {
             lstm::list<int, debug_alloc<int>> ints;

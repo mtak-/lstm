@@ -14,7 +14,7 @@ int main() {
     thread_manager manager;
     
     manager.queue_thread([] {
-        for (int i = 0; i < 1000000; ++i) {
+        for (int i = 0; i < 5'000'000; ++i) {
             lstm::atomic([] {
                 if (account1 >= 20) {
                     account0 += 20;
@@ -26,7 +26,7 @@ int main() {
     });
     
     manager.queue_thread([] {
-        for (int i = 0; i < 666666; ++i) {
+        for (int i = 0; i < 666666 * 5 + 4; ++i) {
             lstm::atomic([] {
                 if (account0 >= 30) {
                     account1 += 30;
@@ -39,8 +39,8 @@ int main() {
     
     manager.run();
     
-    CHECK(account0.unsafe() == 320);
-    CHECK(account1.unsafe() == 280);
+    CHECK(account0.unsafe() == 280);
+    CHECK(account1.unsafe() == 320);
     CHECK(debug_live_allocations<> == 0);
     
     LSTM_LOG_DUMP();

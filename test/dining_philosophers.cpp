@@ -7,7 +7,7 @@
 using lstm::atomic;
 using lstm::var;
 
-static constexpr std::size_t food_size = 1000;
+static constexpr std::size_t food_size = 10000;
 static constexpr std::size_t repeat_count = 300;
 
 struct philosopher {

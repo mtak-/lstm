@@ -49,7 +49,7 @@ int main() {
         lstm::var<std::vector<int>, debug_alloc<std::vector<int>>> x{};
         
         for (int i = 0; i < 5; ++i)
-            manager.queue_loop_n(get_loop(x), 100000);
+            manager.queue_loop_n(get_loop(x), 500000);
         manager.run();
         
         CHECK(x.unsafe().empty());
