@@ -61,10 +61,10 @@ LSTM_DETAIL_BEGIN
         }
         
         void unordered_erase(T* const ptr) noexcept
-        { std::memcpy(ptr, --end_, sizeof(T)); }
+        { std::memmove(ptr, --end_, sizeof(T)); }
         
         void unordered_erase(const T* const ptr) noexcept
-        { std::memcpy((void*)ptr, --end_, sizeof(T)); }
+        { std::memmove((void*)ptr, --end_, sizeof(T)); }
             
         T* begin() noexcept { return begin_; }
         T* end() noexcept { return end_; }
