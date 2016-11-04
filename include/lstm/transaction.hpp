@@ -103,7 +103,7 @@ LSTM_BEGIN
         transaction& operator=(transaction&&) = delete;
         
         template<typename T, typename Alloc,
-            LSTM_REQUIRES_(!var<T, Alloc>::trivial)>
+            LSTM_REQUIRES_(!var<T, Alloc>::atomic)>
         const T& load(const var<T, Alloc>& src_var) {
             detail::write_set_lookup lookup = find_write_set(src_var);
             if (!lookup.success()) {
@@ -121,9 +121,8 @@ LSTM_BEGIN
             detail::internal_retry();
         }
         
-        // trivial loads are fast :)
         template<typename T, typename Alloc,
-            LSTM_REQUIRES_(var<T, Alloc>::trivial)>
+            LSTM_REQUIRES_(var<T, Alloc>::atomic)>
         T load(const var<T, Alloc>& src_var) {
             detail::write_set_lookup lookup = find_write_set(src_var);
             if (!lookup.success()) {
@@ -131,7 +130,6 @@ LSTM_BEGIN
                 auto src_version = src_var.version_lock.load(LSTM_ACQUIRE);
                 if (src_version <= read_version && !locked(src_version)) {
                     T result = var<T>::load(src_var.storage);
-                    
                     if (src_var.version_lock.load(LSTM_RELEASE) == src_version) {
                         add_read_set(src_var);
                         return result;

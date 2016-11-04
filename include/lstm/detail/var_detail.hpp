@@ -39,9 +39,9 @@ LSTM_DETAIL_BEGIN
     template<typename T>
     constexpr var_type var_type_switch() noexcept {
         if (sizeof(T) <= sizeof(word) && alignof(T) <= alignof(word) &&
-                std::is_trivially_copyable<T>{}())
+                std::is_trivially_copy_constructible<T>{}())
             return var_type::atomic;
-        else if (std::is_trivially_copyable<T>{}())
+        else if (std::is_trivially_copy_constructible<T>{}())
             return var_type::trivial;
         return var_type::locking;
     }
@@ -51,7 +51,7 @@ LSTM_DETAIL_BEGIN
         : private Alloc
         , var_base
     {
-        static constexpr bool trivial = std::is_trivially_copyable<T>{}();
+        static constexpr bool trivial = std::is_trivially_copy_constructible<T>{}();
         static constexpr bool atomic = false;
         static constexpr var_type type = Var_type;
     protected:

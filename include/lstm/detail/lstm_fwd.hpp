@@ -48,6 +48,7 @@
         #include <iostream>
         #define LSTM_LOG_DUMP() (std::cout << lstm::detail::transaction_log::get().results())
     #endif /* LSTM_LOG_DUMP */
+    #define LSTM_ALWAYS_INLINE inline
 #else
     #define LSTM_INTERNAL_FAIL_TX() /**/
     #define LSTM_USER_FAIL_TX() /**/
@@ -57,6 +58,7 @@
     #ifndef LSTM_LOG_DUMP
         #define LSTM_LOG_DUMP() /**/
     #endif /* LSTM_LOG_DUMP */
+    #define LSTM_ALWAYS_INLINE inline __attribute((always_inline))
 #endif /* LSTM_LOG_TRANSACTIONS */
 
 LSTM_DETAIL_BEGIN
@@ -69,7 +71,7 @@ LSTM_DETAIL_BEGIN
     struct transaction_impl;
     
     struct _tx_retry {};
-    [[noreturn]] inline void internal_retry() {
+    [[noreturn]] LSTM_ALWAYS_INLINE void internal_retry() {
         LSTM_INTERNAL_FAIL_TX();
         throw detail::_tx_retry{};
     }
