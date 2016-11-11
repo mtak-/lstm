@@ -56,6 +56,8 @@ LSTM_DETAIL_BEGIN
                 rcu_lock_guard rcu_guard;
                 call(func, tx);
             }
+            // TODO: release the tls transaction, this allows destructors of deleted objects
+            // to have a transaction
             tx.commit();
             scope_guard.release();
         }
@@ -68,6 +70,8 @@ LSTM_DETAIL_BEGIN
             rcu_guard.release();
             rcu_read_unlock();
             
+            // TODO: release the tls transaction, this allows destructors of deleted objects
+            // to have a transaction
             tx.commit();
             scope_guard.release();
             return static_cast<transact_result<Func>&&>(result);
@@ -116,13 +120,12 @@ LSTM_DETAIL_BEGIN
             return atomic_fn::atomic_slow_path(std::move(func), domain, alloc, knobs);
         }
     };
-    
-    template<typename T> struct static_const { static constexpr const T value{}; };
-    template<typename T> constexpr T static_const<T>::value;
+
+    template<typename T> constexpr const T static_const{};
 LSTM_DETAIL_END
 
 LSTM_BEGIN
-    namespace { constexpr auto&& atomic = detail::static_const<detail::atomic_fn>::value; }
+    namespace { constexpr auto&& atomic = detail::static_const<detail::atomic_fn>; }
     
     inline bool in_transaction() noexcept { return detail::atomic_fn{}.in_transaction(); }
 LSTM_END
