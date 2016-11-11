@@ -25,8 +25,7 @@ LSTM_DETAIL_BEGIN
         std::atomic<std::int_fast8_t> active;
         quiescence* next;
         
-        // TODO: wait/lock-free version of constructor/destructor
-        // then noexcept will be correct
+        // TODO: make actually noexcept
         quiescence() noexcept
             : active(0)
         {
@@ -35,8 +34,7 @@ LSTM_DETAIL_BEGIN
             quiescence_root<>.store(this, LSTM_RELAXED);
         }
         
-        // TODO: wait/lock-free version of constructor/destructor
-        // then noexcept will be correct
+        // TODO: make actually noexcept
         ~quiescence() noexcept {
             std::lock_guard<std::mutex> guard{quiescence_mut<>};
             quiescence* root_ptr = quiescence_root<>.load(LSTM_RELAXED);
