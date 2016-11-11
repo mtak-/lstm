@@ -95,13 +95,14 @@ LSTM_BEGIN
                 tx.store(head, nullptr);
                 return result;
             });
-            lstm::atomic([&](auto& tx) {
-                while (node) {
-                    auto next_ = next(*node, tx);
-                    tx.delete_(node, alloc());
-                    node = next_;
-                }
-            });
+            if (node)
+                lstm::atomic([&](auto& tx) {
+                    while (node) {
+                        auto next_ = next(*node, tx);
+                        tx.delete_(node, alloc());
+                        node = next_;
+                    }
+                });
         }
         
         template<typename... Us>
