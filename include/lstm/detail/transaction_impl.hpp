@@ -102,8 +102,6 @@ LSTM_DETAIL_BEGIN
         }
 
         void commit_lock_writes() {
-            // pretty sure write needs to be sorted
-            // in order to have lockfreedom on trivial types?
             auto write_begin = std::begin(write_set);
             auto write_end = std::end(write_set);
             std::sort(write_begin, write_end);
