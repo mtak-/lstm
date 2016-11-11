@@ -64,8 +64,7 @@ int main() {
         auto end = std::chrono::high_resolution_clock::now();
         
         lstm::atomic([&](auto& tx) {
-            auto my_x = tx.load(x);
-            assert(my_x == 2000);
+            assert(tx.load(x) == 2000);
         });
         
         std::cout << "LSTM: "
