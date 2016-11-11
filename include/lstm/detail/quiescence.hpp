@@ -73,7 +73,7 @@ LSTM_DETAIL_BEGIN
     }
     
     inline void flip_and_wait() noexcept {
-        grace_period<>.fetch_xor(1, LSTM_SEQ_CST);
+        grace_period<>.fetch_xor(2, LSTM_SEQ_CST);
         for (quiescence* q = quiescence_root<>.load(LSTM_ACQUIRE);
                 q != nullptr;
                 q = q->next) {
