@@ -21,8 +21,6 @@ LSTM_DETAIL_BEGIN
     private:
 #ifdef LSTM_THREAD_LOCAL
         static inline transaction*& tls_transaction() noexcept {
-            static bool rcu_initialized = startup_rcu();
-            static LSTM_THREAD_LOCAL rcu_thread_registerer registerer{};
             static LSTM_THREAD_LOCAL transaction* tx = nullptr;
             return tx;
         }
@@ -68,7 +66,7 @@ LSTM_DETAIL_BEGIN
             rcu_lock_guard rcu_guard;
             decltype(auto) result = call(func, tx);
             rcu_guard.release();
-            rcu_read_unlock();
+            access_unlock();
             
             // TODO: release the tls transaction, this allows destructors of deleted objects
             // to have a transaction

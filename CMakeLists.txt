@@ -13,13 +13,10 @@ write_compiler_detection_header(
   FEATURES cxx_thread_local
 )
 
-include_directories(include /usr/local/include)
-link_directories(/usr/local/lib)
+include_directories(include)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1z -ftemplate-backtrace-limit=0")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DURCU_INLINE_SMALL_FUNCTIONS -DRCU_MB")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Wno-unused-variable")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-c99-extensions")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -DLSTM_LOG_TRANSACTIONS -fsanitize=address")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
 

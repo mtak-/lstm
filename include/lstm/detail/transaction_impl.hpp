@@ -4,7 +4,7 @@
 #include <lstm/transaction.hpp>
 #include <lstm/detail/small_pod_vector.hpp>
 
-#include <urcu.h>
+#include <lstm/detail/quiescence.hpp>
 
 #include <algorithm>
 
@@ -144,7 +144,7 @@ LSTM_DETAIL_BEGIN
         }
         
         void commit_reclaim(const write_set_deleters_t& write_set_deleters) noexcept {
-            synchronize_rcu();
+            synchronize();
             for (auto& dler : deleter_set)
                 (*static_cast<deleter_base*>(static_cast<a_deleter_type*>((void*)&dler)))();
             for (auto& dler : write_set_deleters)
