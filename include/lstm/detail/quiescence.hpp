@@ -1,10 +1,9 @@
 #ifndef LSTM_DETAIL_QUIESCENCE_HPP
 #define LSTM_DETAIL_QUIESCENCE_HPP
 
+#include <lstm/detail/exponential_delay.hpp>
 #include <lstm/detail/fast_rw_mutex.hpp>
 #include <lstm/detail/thread_local.hpp>
-
-#include <thread>
 
 LSTM_DETAIL_BEGIN
     struct quiescence;
@@ -80,13 +79,14 @@ LSTM_DETAIL_BEGIN
         for (quiescence* q = quiescence_root<>.load(LSTM_ACQUIRE);
                 q != nullptr;
                 q = q->next) {
+            exponential_delay<100000, 10000000> exp_delay;
             while (check_grace_period(*q, gp, desired)) {
-                std::this_thread::sleep_for(std::chrono::nanoseconds(10));
+                exp_delay();
             }
         }
     }
     
-    // TODO: kill the CAS operation (speculative xor, might actually decrease grace period times)
+    // TODO: kill the CAS operation? (speculative xor, might actually decrease grace period times)
     // TODO: kill the thread fences?
     inline void synchronize() noexcept {
         std::atomic_thread_fence(LSTM_ACQUIRE);
