@@ -4,7 +4,7 @@
 #include <lstm/detail/fast_rw_mutex.hpp>
 #include <lstm/detail/thread_local.hpp>
 
-#include <algorithm>
+#include <thread>
 
 LSTM_DETAIL_BEGIN
     struct quiescence;
@@ -82,7 +82,7 @@ LSTM_DETAIL_BEGIN
                 q != nullptr;
                 q = q->next) {
             while (check_grace_period(*q, gp, desired)) {
-                __asm__ __volatile__ ("" ::: "memory");
+                std::this_thread::yield();
             }
         }
     }
