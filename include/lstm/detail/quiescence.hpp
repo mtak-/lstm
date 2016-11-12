@@ -81,7 +81,7 @@ LSTM_DETAIL_BEGIN
                 q != nullptr;
                 q = q->next) {
             while (check_grace_period(*q, gp, desired)) {
-                std::this_thread::yield();
+                std::this_thread::sleep_for(std::chrono::nanoseconds(10));
             }
         }
     }
