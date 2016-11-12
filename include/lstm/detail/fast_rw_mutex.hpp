@@ -1,7 +1,7 @@
 #ifndef LSTM_DETAIL_FAST_RW_MUTEX_HPP
 #define LSTM_DETAIL_FAST_RW_MUTEX_HPP
 
-#include <lstm/detail/lstm_fwd.hpp>
+#include <lstm/detail/exponential_delay.hpp>
 
 LSTM_DETAIL_BEGIN
     // this class is probly best for use in wait-free write side algorithms
@@ -16,7 +16,11 @@ LSTM_DETAIL_BEGIN
         void lock_shared() noexcept {
             word read_state = read_count.fetch_add(1, LSTM_ACQUIRE);
             if (read_state & write_bit) {
+                read_count.fetch_sub(1, LSTM_RELAXED);
+                
+                exponential_delay<100000, 10000000> exp_delay;
                 do {
+                    exp_delay();
                     read_state = 0;
                     while (!(read_state & write_bit)
                         && !read_count.compare_exchange_weak(read_state,
@@ -32,13 +36,22 @@ LSTM_DETAIL_BEGIN
         void unlock_shared() noexcept { read_count.fetch_sub(1, LSTM_RELEASE); }
         
         void lock() noexcept {
-            word zero = 0;
-            while (!read_count.compare_exchange_weak(zero, write_bit))
-                zero = 0;
+            word prev_read_count;
+            exponential_delay<100000, 10000000> exp_delay;
+            
+            while ((prev_read_count = read_count.fetch_or(write_bit, LSTM_RELAXED)) & write_bit)
+                exp_delay();
+            
+            exp_delay.reset();
+            
+            while (prev_read_count & ~write_bit) {
+                exp_delay();
+                prev_read_count = read_count.load(LSTM_RELAXED);
+            }
+            
+            std::atomic_thread_fence(LSTM_ACQUIRE);
         }
-        void unlock() noexcept {
-            read_count.store(0, LSTM_RELEASE);
-        }
+        void unlock() noexcept { read_count.store(0, LSTM_RELEASE); }
     };
 LSTM_DETAIL_END
 

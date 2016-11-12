@@ -19,6 +19,8 @@ LSTM_DETAIL_BEGIN
             ns <<= 1;
             if (ns > Max_ns) ns = Max_ns;
         }
+        
+        void reset() noexcept { ns = Min_ns; }
     };
 LSTM_DETAIL_END
 
