@@ -12,18 +12,21 @@ LSTM_DETAIL_BEGIN
         
     public:
         // TODO: optimal memory ordering
+        // TODO: compare_exchange_weak is overkill?
         void lock_shared() noexcept {
-            word read_state;
-            do {
-                read_state = 0;
-                while (!(read_state & write_bit)
-                    && !read_count.compare_exchange_weak(read_state,
-                                                         read_state + 1,
-                                                         LSTM_RELAXED,
-                                                         LSTM_RELAXED));
-                
-            } while (read_state & write_bit);
-            std::atomic_thread_fence(LSTM_ACQUIRE);
+            word read_state = read_count.fetch_add(1, LSTM_ACQUIRE);
+            if (read_state & write_bit) {
+                do {
+                    read_state = 0;
+                    while (!(read_state & write_bit)
+                        && !read_count.compare_exchange_weak(read_state,
+                                                             read_state + 1,
+                                                             LSTM_RELAXED,
+                                                             LSTM_RELAXED));
+                    
+                } while (read_state & write_bit);
+                std::atomic_thread_fence(LSTM_ACQUIRE);
+            }
         }
         
         void unlock_shared() noexcept { read_count.fetch_sub(1, LSTM_RELEASE); }
