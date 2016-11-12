@@ -87,6 +87,7 @@ LSTM_DETAIL_BEGIN
         }
     }
     
+    // TODO: kill the CAS operation
     inline void synchronize() noexcept {
         std::atomic_thread_fence(LSTM_ACQUIRE);
         {
