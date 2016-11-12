@@ -160,6 +160,9 @@ LSTM_DETAIL_BEGIN
             commit_publish(write_version, write_set_deleters);
         }
 
+        // TODO: optimize for the following case
+        // write_set.size() == 1 && (read_set.empty() ||
+        //                           read_set.size() == 1 && read_set[0] == write_set[0])
         void commit() {
             write_set_deleters_t write_set_deleters;
             if (!write_set.empty())
