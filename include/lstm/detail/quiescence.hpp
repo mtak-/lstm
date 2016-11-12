@@ -62,8 +62,7 @@ LSTM_DETAIL_BEGIN
     }
     
     inline void access_lock() noexcept {
-       quiescence& q = tls_quiescence();
-       q.active.store(grace_period<>.load(LSTM_RELAXED), LSTM_RELAXED);
+       tls_quiescence().active.store(grace_period<>.load(LSTM_RELAXED), LSTM_RELAXED);
        std::atomic_thread_fence(LSTM_ACQUIRE);
     }
     
@@ -87,7 +86,8 @@ LSTM_DETAIL_BEGIN
         }
     }
     
-    // TODO: kill the CAS operation
+    // TODO: kill the CAS operation (speculative xor, might actually decrease grace period times)
+    // TODO: kill the thread fences?
     inline void synchronize() noexcept {
         std::atomic_thread_fence(LSTM_ACQUIRE);
         {
