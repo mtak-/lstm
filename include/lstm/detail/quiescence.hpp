@@ -27,12 +27,14 @@ LSTM_DETAIL_BEGIN
     // in concurrent writes
     // still not ideal, as writes should be batched
     struct quiescence {
+        transaction* tx;
         std::atomic<gp_t> active;
         quiescence* next;
         
         // TODO: make actually noexcept
         quiescence() noexcept
-            : active(0)
+            : tx(nullptr)
+            , active(0)
         {
             quiescence_mut<>.lock();
             next = quiescence_root<>.load(LSTM_RELAXED);
@@ -58,20 +60,20 @@ LSTM_DETAIL_BEGIN
         
         quiescence(const quiescence&) = delete;
         quiescence& operator=(const quiescence&) = delete;
+        
+        inline void access_lock() noexcept {
+           active.store(grace_period<>.load(LSTM_RELAXED), LSTM_RELAXED);
+           std::atomic_thread_fence(LSTM_ACQUIRE);
+        }
+        
+        inline void access_unlock() noexcept
+        { active.store(0, LSTM_RELEASE); }
     };
     
     inline quiescence& tls_quiescence() noexcept {
         static LSTM_THREAD_LOCAL quiescence data;
         return data;
     }
-    
-    inline void access_lock() noexcept {
-       tls_quiescence().active.store(grace_period<>.load(LSTM_RELAXED), LSTM_RELAXED);
-       std::atomic_thread_fence(LSTM_ACQUIRE);
-    }
-    
-    inline void access_unlock() noexcept
-    { tls_quiescence().active.store(0, LSTM_RELEASE); }
     
     inline bool check_grace_period(const quiescence& q,
                                    const gp_t gp,
@@ -91,7 +93,7 @@ LSTM_DETAIL_BEGIN
         }
     }
     
-    // TODO: kill the CAS operation? (speculative xor, might actually decrease grace period times)
+    // TODO: kill the CAS operation? (speculative or, might actually decrease grace period times)
     // TODO: kill the thread fences?
     inline void synchronize() noexcept {
         std::atomic_thread_fence(LSTM_ACQUIRE);

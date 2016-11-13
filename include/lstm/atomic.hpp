@@ -18,19 +18,7 @@ LSTM_END
 
 LSTM_DETAIL_BEGIN
     struct atomic_fn {
-    private:
-#ifdef LSTM_THREAD_LOCAL
-        static inline transaction*& tls_transaction() noexcept {
-            static LSTM_THREAD_LOCAL transaction* tx = nullptr;
-            return tx;
-        }
-#else
-    #error "TODO: pthreads implementation of thread locals"
-        static inline transaction*& tls_transaction() noexcept { /* TODO: this */ }
-#endif /* LSTM_THREAD_LOCAL */
-
-        static inline void reset_active_transaction() noexcept { tls_transaction() = nullptr; }
-        
+    private:        
         template<typename Func, typename Tx,
             LSTM_REQUIRES_(callable_with_tx<Func, Tx&>())>
         static decltype(auto) call(Func& func, Tx& tx) {
@@ -49,9 +37,9 @@ LSTM_DETAIL_BEGIN
         
         template<typename Func, typename Tx, typename ScopeGuard,
             LSTM_REQUIRES_(is_void_transact_function<Func>())>
-        static void try_transact(Func& func, Tx& tx, ScopeGuard scope_guard) {
+        static void try_transact(Func& func, Tx& tx, ScopeGuard scope_guard, quiescence& tls_q) {
             {
-                rcu_lock_guard rcu_guard;
+                rcu_lock_guard rcu_guard(tls_q);
                 call(func, tx);
             }
             // TODO: release the tls transaction, this allows destructors of deleted objects
@@ -62,11 +50,12 @@ LSTM_DETAIL_BEGIN
         
         template<typename Func, typename Tx, typename ScopeGuard,
             LSTM_REQUIRES_(!is_void_transact_function<Func>())>
-        static transact_result<Func> try_transact(Func& func, Tx& tx, ScopeGuard scope_guard) {
-            rcu_lock_guard rcu_guard;
+        static transact_result<Func>
+        try_transact(Func& func, Tx& tx, ScopeGuard scope_guard, quiescence& tls_q) {
+            rcu_lock_guard rcu_guard(tls_q);
             decltype(auto) result = call(func, tx);
             rcu_guard.release();
-            access_unlock();
+            tls_q.access_unlock();
             
             // TODO: release the tls transaction, this allows destructors of deleted objects
             // to have a transaction
@@ -80,25 +69,28 @@ LSTM_DETAIL_BEGIN
         static transact_result<Func> atomic_slow_path(Func func,
                                                       transaction_domain* domain,
                                                       const Alloc& alloc,
-                                                      knobs<ReadSize, WriteSize, DeleteSize>) {
+                                                      knobs<ReadSize, WriteSize, DeleteSize>,
+                                                      quiescence& tls_q) {
             transaction_impl<Alloc, ReadSize, WriteSize, DeleteSize> tx{domain, alloc};
-            tls_transaction() = &tx;
+            tls_q.tx = &tx;
             
-            const auto tls_guard = make_scope_guard([]() noexcept
-                                                    { atomic_fn::reset_active_transaction(); });
+            const auto tls_guard = make_scope_guard([&]() noexcept
+                                                    { tls_q.tx = nullptr; });
             while(true) {
                 try {
                     assert(tx.read_set.size() == 0);
                     assert(tx.write_set.size() == 0);
                     
                     return atomic_fn::try_transact(func, tx, make_scope_guard([&]() noexcept
-                                                                              { tx.cleanup(); }));
+                                                                              { tx.cleanup(); }),
+                                                             tls_q);
                 } catch(const _tx_retry&) { tx.reset_read_version(); }
             }
         }
         
     public:
-        inline bool in_transaction() const noexcept { return tls_transaction() != nullptr; }
+        inline bool in_transaction() const noexcept
+        { return tls_quiescence().tx != nullptr; }
         
         template<typename Func, typename Alloc = std::allocator<detail::var_base*>,
             std::size_t MaxStackReadBuffSize = 4,
@@ -111,11 +103,12 @@ LSTM_DETAIL_BEGIN
                                          knobs<MaxStackWriteBuffSize,
                                                MaxStackReadBuffSize,
                                                MaxStackDeleterBuffSize> knobs = {}) const {
-            auto tls_tx = tls_transaction();
+            auto& tls_q = tls_quiescence();
             
-            if (tls_tx) return call(func, *tls_tx); // TODO: which domain should this use???
+            if (tls_q.tx)
+                return call(func, *tls_q.tx);
             
-            return atomic_fn::atomic_slow_path(std::move(func), domain, alloc, knobs);
+            return atomic_fn::atomic_slow_path(std::move(func), domain, alloc, knobs, tls_q);
         }
     };
 
