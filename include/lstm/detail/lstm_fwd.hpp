@@ -94,6 +94,7 @@ LSTM_DETAIL_END
 LSTM_BEGIN
     // TODO verify lockfreeness of this on each platform
     using word = std::intptr_t;
+    using uword = std::uintptr_t;
     
     template<typename T, typename Alloc = std::allocator<std::remove_reference_t<T>>>
     struct var;

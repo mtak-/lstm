@@ -7,18 +7,17 @@ LSTM_DETAIL_BEGIN
     // this class is probly best for use in wait-free write side algorithms
     struct fast_rw_mutex {
     private:
-        static constexpr word write_bit = word(1) << (sizeof(word) * 8 - 1);
-        std::atomic<word> read_count{0};
+        static constexpr uword write_bit = uword(1) << (sizeof(uword) * 8 - 1);
+        std::atomic<uword> read_count{0};
         
     public:
-        // TODO: optimal memory ordering
         // TODO: compare_exchange_weak is overkill?
         void lock_shared() noexcept {
-            word read_state = read_count.fetch_add(1, LSTM_ACQUIRE);
+            uword read_state = read_count.fetch_add(1, LSTM_ACQUIRE);
             if (read_state & write_bit) {
-                read_count.fetch_sub(1, LSTM_RELAXED);
-                
                 exponential_delay<100000, 10000000> exp_delay;
+                
+                read_count.fetch_sub(1, LSTM_RELAXED);
                 do {
                     exp_delay();
                     read_state = 0;
@@ -36,7 +35,7 @@ LSTM_DETAIL_BEGIN
         void unlock_shared() noexcept { read_count.fetch_sub(1, LSTM_RELEASE); }
         
         void lock() noexcept {
-            word prev_read_count;
+            uword prev_read_count;
             exponential_delay<100000, 10000000> exp_delay;
             
             while ((prev_read_count = read_count.fetch_or(write_bit, LSTM_RELAXED)) & write_bit)
