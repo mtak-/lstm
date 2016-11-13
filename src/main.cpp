@@ -1,150 +1,41 @@
 #include <lstm/lstm.hpp>
 
-#include <cassert>
+#include "../test/thread_manager.hpp"
+
 #include <chrono>
 #include <iostream>
-#include <thread>
 
-void playground_entry();
+static constexpr auto loop_count = 100000000;
 
 int main() {
-    for(int loop = 0; loop < 100; ++loop) {
-        lstm::var<int> x{0};
-        int i0 = 0;
-        
-        auto start = std::chrono::high_resolution_clock::now();
-        std::thread t0([&] {
-            while (i0++ < 10000)
+    lstm::var<int> x{0};
+    thread_manager thread_manager;
+    
+    for (int i = 0; i < 4; ++i) {
+        thread_manager.queue_thread([&x, i] {
+            int j = 0;
+            while (j++ < loop_count) {
                 lstm::atomic([&](auto& tx) {
-                    if (i0 % 100 >= 0 && i0 % 100 < 5)
+                    if (j % 100 >= i*25 && j % 100 < i*25 + 5)
                         tx.store(x, tx.load(x) + 1);
                     else
                         tx.load(x);
                 });
-        });
-        
-        int i1 = 0;
-        std::thread t1([&] {
-            while (i1++ < 10000)
-                lstm::atomic([&](auto& tx) {
-                    if (i1 % 100 >= 25 && i1 % 100 < 30)
-                        tx.store(x, tx.load(x) + 1);
-                    else
-                        tx.load(x);
-                });
-        });
-        
-        int i2 = 0;
-        std::thread t2([&] {
-            while (i2++ < 10000)
-                lstm::atomic([&](auto& tx) {
-                    if (i2 % 100 >= 50 && i2 % 100 < 55)
-                        tx.store(x, tx.load(x) + 1);
-                    else
-                        tx.load(x);
-                });
-        });
-        
-        int i3 = 0;
-        std::thread t3([&] {
-            while (i3++ < 10000)
-                lstm::atomic([&](auto& tx) {
-                    if (i3 % 100 >= 75 && i3 % 100 < 80)
-                        tx.store(x, tx.load(x) + 1);
-                    else
-                        tx.load(x);
-                });
-        });
-        
-        t3.join();
-        t2.join();
-        t1.join();
-        t0.join();
-        
-        auto end = std::chrono::high_resolution_clock::now();
-        
-        lstm::atomic([&](auto& tx) {
-            assert(tx.load(x) == 2000);
-        });
-        
-        std::cout << "LSTM: "
-                  << (std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() / 1000000.f)
-                  << "ms"
-                  << std::endl;
+            }});
     }
-
-    for(int loop = 0; loop < 100; ++loop) {
-        int x{0};
-        std::mutex x_mut;
-        int i0 = 0;
+    auto start = std::chrono::high_resolution_clock::now();
+    thread_manager.run();
+    auto end = std::chrono::high_resolution_clock::now();
     
-        auto start = std::chrono::high_resolution_clock::now();
-        std::thread t0([&] {
-            while (i0++ < 10000) {
-                if (i0 % 100 >= 60 && i0 % 100 < 65) {
-                    std::lock_guard<std::mutex> guard{x_mut};
-                    ++x;
-                }
-                else {
-                    std::lock_guard<std::mutex> guard{x_mut};
-                }
-            }
-        });
+    lstm::atomic([&](auto& tx) {
+        (void)tx;
+        assert(tx.load(x) == 2000);
+    });
     
-        int i1 = 0;
-        std::thread t1([&] {
-            while (i1++ < 10000) {
-                if (i1 % 100 >= 40 && i1 % 100 < 45) {
-                    std::lock_guard<std::mutex> guard{x_mut};
-                    ++x;
-                }
-                else {
-                    std::lock_guard<std::mutex> guard{x_mut};
-                }
-            }
-        });
-    
-        int i2 = 0;
-        std::thread t2([&] {
-            while (i2++ < 10000) {
-                if (i2 % 100 >= 20 && i2 % 100 < 25) {
-                    std::lock_guard<std::mutex> guard{x_mut};
-                    ++x;
-                }
-                else {
-                    std::lock_guard<std::mutex> guard{x_mut};
-                }
-            }
-        });
-    
-        int i3 = 0;
-        std::thread t3([&] {
-            while (i3++ < 10000) {
-                if (i3 % 100 >= 0 && i3 % 100 < 5) {
-                    std::lock_guard<std::mutex> guard{x_mut};
-                    ++x;
-                }
-                else {
-                    std::lock_guard<std::mutex> guard{x_mut};
-                }
-            }
-        });
-    
-        t3.join();
-        t2.join();
-        t1.join();
-        t0.join();
-    
-        auto end = std::chrono::high_resolution_clock::now();
-        assert(x == 2000);
-    
-        std::cout << "MUT: "
-                  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-                  << "ms"
-                  << std::endl;
-    }
-    
-    playground_entry();
+    std::cout << "LSTM: "
+              << (std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() / 1000000.f)
+              << "ms"
+              << std::endl;
     
     return 0;
 }

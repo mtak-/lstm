@@ -2,7 +2,6 @@
 #define LSTM_TRANSACTION_DOMAIN_HPP
 
 #include <lstm/detail/lstm_fwd.hpp>
-#include <lstm/detail/thread_local.hpp>
 
 #include <atomic>
 #include <cassert>

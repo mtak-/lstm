@@ -20,7 +20,12 @@ LSTM_DETAIL_BEGIN
     // TODO: inline variable
     template<std::nullptr_t = nullptr>
     std::atomic<gp_t> grace_period{1};
-
+    
+    // with the guarantee of no nested critical sections only one bit is needed
+    // to say a thread is active.
+    // this means the remaining bits can be used for the grace period, resulting
+    // in concurrent writes
+    // still not ideal, as writes should be batched
     struct quiescence {
         std::atomic<gp_t> active;
         quiescence* next;
