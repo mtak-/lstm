@@ -2,6 +2,7 @@
 #define LSTM_DETAIL_TRANSACTION_IMPL_HPP
 
 #include <lstm/detail/small_pod_vector.hpp>
+#include <lstm/detail/thread_data.hpp>
 
 #include <lstm/transaction.hpp>
 
