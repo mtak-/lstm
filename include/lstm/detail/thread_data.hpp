@@ -1,21 +1,21 @@
-#ifndef LSTM_DETAIL_QUIESCENCE_HPP
-#define LSTM_DETAIL_QUIESCENCE_HPP
+#ifndef LSTM_DETAIL_THREAD_DATA_HPP
+#define LSTM_DETAIL_THREAD_DATA_HPP
 
-#include <lstm/detail/exponential_delay.hpp>
+#include <lstm/detail/backoff.hpp>
 #include <lstm/detail/fast_rw_mutex.hpp>
 #include <lstm/detail/thread_local.hpp>
 
 LSTM_DETAIL_BEGIN
-    struct quiescence;
-    using gp_t = std::uint_fast8_t;
+    struct thread_data;
+    using gp_t = uword;
 
     // TODO: inline variable
     template<std::nullptr_t = nullptr>
-    fast_rw_mutex quiescence_mut{};
+    fast_rw_mutex thread_data_mut{};
 
     // TODO: inline variable
     template<std::nullptr_t = nullptr>
-    std::atomic<quiescence*> quiescence_root{nullptr};
+    std::atomic<thread_data*> thread_data_root{nullptr};
 
     // TODO: inline variable
     template<std::nullptr_t = nullptr>
@@ -26,40 +26,38 @@ LSTM_DETAIL_BEGIN
     // this means the remaining bits can be used for the grace period, resulting
     // in concurrent writes
     // still not ideal, as writes should be batched
-    struct quiescence {
-        transaction* tx;
+    struct thread_data {
         std::atomic<gp_t> active;
-        quiescence* next;
+        transaction* tx;
+        thread_data* next;
         
-        // TODO: make actually noexcept
-        quiescence() noexcept
-            : tx(nullptr)
-            , active(0)
+        thread_data() noexcept
+            : active(0)
+            , tx(nullptr)
         {
-            quiescence_mut<>.lock();
-            next = quiescence_root<>.load(LSTM_RELAXED);
-            quiescence_root<>.store(this, LSTM_RELAXED);
-            quiescence_mut<>.unlock();
+            thread_data_mut<>.lock();
+            next = thread_data_root<>.load(LSTM_RELAXED);
+            thread_data_root<>.store(this, LSTM_RELAXED);
+            thread_data_mut<>.unlock();
         }
         
-        // TODO: make actually noexcept
-        ~quiescence() noexcept {
-            quiescence_mut<>.lock();
-            quiescence* root_ptr = quiescence_root<>.load(LSTM_RELAXED);
+        ~thread_data() noexcept {
+            thread_data_mut<>.lock();
+            thread_data* root_ptr = thread_data_root<>.load(LSTM_RELAXED);
             assert(root_ptr != nullptr);
             if (root_ptr == this)
-                quiescence_root<>.store(next, LSTM_RELAXED);
+                thread_data_root<>.store(next, LSTM_RELAXED);
             else {
                 assert(root_ptr != nullptr);
                 while (root_ptr != nullptr && root_ptr->next != this) root_ptr = root_ptr->next;
                 assert(root_ptr != nullptr);
                 root_ptr->next = next;
             }
-            quiescence_mut<>.unlock();
+            thread_data_mut<>.unlock();
         }
         
-        quiescence(const quiescence&) = delete;
-        quiescence& operator=(const quiescence&) = delete;
+        thread_data(const thread_data&) = delete;
+        thread_data& operator=(const thread_data&) = delete;
         
         inline void access_lock() noexcept {
            active.store(grace_period<>.load(LSTM_RELAXED), LSTM_RELAXED);
@@ -70,31 +68,33 @@ LSTM_DETAIL_BEGIN
         { active.store(0, LSTM_RELEASE); }
     };
     
-    inline quiescence& tls_quiescence() noexcept {
-        static LSTM_THREAD_LOCAL quiescence data;
+    // TODO: allow specifying a backoff strategy
+    inline thread_data& tls_thread_data() noexcept {
+        static LSTM_THREAD_LOCAL thread_data data;
         return data;
     }
     
-    inline bool check_grace_period(const quiescence& q,
-                                   const gp_t gp,
-                                   const bool desired) noexcept {
+    inline bool not_in_grace_period(const thread_data& q,
+                                    const gp_t gp,
+                                    const bool desired) noexcept {
         const gp_t thread_gp = q.active.load(LSTM_RELAXED);
         return thread_gp && !!(thread_gp & gp) == desired;
     }
     
+    // TODO: allow specifying a backoff strategy
     inline void wait(const gp_t gp, const bool desired) noexcept {
-        for (quiescence* q = quiescence_root<>.load(LSTM_ACQUIRE);
+        for (thread_data* q = thread_data_root<>.load(LSTM_ACQUIRE);
                 q != nullptr;
                 q = q->next) {
-            exponential_delay<100000, 10000000> exp_delay;
-            while (check_grace_period(*q, gp, desired)) {
-                exp_delay();
-            }
+            default_backoff backoff;
+            while (not_in_grace_period(*q, gp, desired))
+                backoff();
         }
     }
     
     // TODO: kill the CAS operation? (speculative or, might actually decrease grace period times)
     // TODO: kill the thread fences?
+    // TODO: allow specifying a backoff strategy
     inline void synchronize() noexcept {
         std::atomic_thread_fence(LSTM_ACQUIRE);
         {
@@ -109,14 +109,14 @@ LSTM_DETAIL_BEGIN
                                                                    LSTM_RELAXED,
                                                                    LSTM_RELEASE));
             
-            quiescence_mut<>.lock_shared();
+            thread_data_mut<>.lock_shared();
             wait(gp2, false);
             grace_period<>.fetch_xor(gp2, LSTM_RELEASE);
             wait(gp2, true);
-            quiescence_mut<>.unlock_shared();
+            thread_data_mut<>.unlock_shared();
         }
         std::atomic_thread_fence(LSTM_ACQUIRE);
     }
 LSTM_DETAIL_END
 
-#endif /* LSTM_DETAIL_QUIESCENCE_HPP */
+#endif /* LSTM_DETAIL_THREAD_DATA_HPP */

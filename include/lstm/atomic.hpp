@@ -18,7 +18,7 @@ LSTM_END
 
 LSTM_DETAIL_BEGIN
     struct atomic_fn {
-    private:        
+    private:
         template<typename Func, typename Tx,
             LSTM_REQUIRES_(callable_with_tx<Func, Tx&>())>
         static decltype(auto) call(Func& func, Tx& tx) {
@@ -37,9 +37,9 @@ LSTM_DETAIL_BEGIN
         
         template<typename Func, typename Tx, typename ScopeGuard,
             LSTM_REQUIRES_(is_void_transact_function<Func>())>
-        static void try_transact(Func& func, Tx& tx, ScopeGuard scope_guard, quiescence& tls_q) {
+        static void try_transact(Func& func, Tx& tx, ScopeGuard scope_guard, thread_data& tls_td) {
             {
-                rcu_lock_guard rcu_guard(tls_q);
+                rcu_lock_guard rcu_guard(tls_td);
                 call(func, tx);
             }
             // TODO: release the tls transaction, this allows destructors of deleted objects
@@ -51,11 +51,11 @@ LSTM_DETAIL_BEGIN
         template<typename Func, typename Tx, typename ScopeGuard,
             LSTM_REQUIRES_(!is_void_transact_function<Func>())>
         static transact_result<Func>
-        try_transact(Func& func, Tx& tx, ScopeGuard scope_guard, quiescence& tls_q) {
-            rcu_lock_guard rcu_guard(tls_q);
+        try_transact(Func& func, Tx& tx, ScopeGuard scope_guard, thread_data& tls_td) {
+            rcu_lock_guard rcu_guard(tls_td);
             decltype(auto) result = call(func, tx);
             rcu_guard.release();
-            tls_q.access_unlock();
+            tls_td.access_unlock();
             
             // TODO: release the tls transaction, this allows destructors of deleted objects
             // to have a transaction
@@ -70,12 +70,12 @@ LSTM_DETAIL_BEGIN
                                                       transaction_domain* domain,
                                                       const Alloc& alloc,
                                                       knobs<ReadSize, WriteSize, DeleteSize>,
-                                                      quiescence& tls_q) {
+                                                      thread_data& tls_td) {
             transaction_impl<Alloc, ReadSize, WriteSize, DeleteSize> tx{domain, alloc};
-            tls_q.tx = &tx;
+            tls_td.tx = &tx;
             
             const auto tls_guard = make_scope_guard([&]() noexcept
-                                                    { tls_q.tx = nullptr; });
+                                                    { tls_td.tx = nullptr; });
             while(true) {
                 try {
                     assert(tx.read_set.size() == 0);
@@ -83,14 +83,14 @@ LSTM_DETAIL_BEGIN
                     
                     return atomic_fn::try_transact(func, tx, make_scope_guard([&]() noexcept
                                                                               { tx.cleanup(); }),
-                                                             tls_q);
+                                                             tls_td);
                 } catch(const _tx_retry&) { tx.reset_read_version(); }
             }
         }
         
     public:
         inline bool in_transaction() const noexcept
-        { return tls_quiescence().tx != nullptr; }
+        { return tls_thread_data().tx != nullptr; }
         
         template<typename Func, typename Alloc = std::allocator<detail::var_base*>,
             std::size_t MaxStackReadBuffSize = 4,
@@ -103,12 +103,12 @@ LSTM_DETAIL_BEGIN
                                          knobs<MaxStackWriteBuffSize,
                                                MaxStackReadBuffSize,
                                                MaxStackDeleterBuffSize> knobs = {}) const {
-            auto& tls_q = tls_quiescence();
+            auto& tls_td = tls_thread_data();
             
-            if (tls_q.tx)
-                return call(func, *tls_q.tx);
+            if (tls_td.tx)
+                return call(func, *tls_td.tx);
             
-            return atomic_fn::atomic_slow_path(std::move(func), domain, alloc, knobs, tls_q);
+            return atomic_fn::atomic_slow_path(std::move(func), domain, alloc, knobs, tls_td);
         }
     };
 

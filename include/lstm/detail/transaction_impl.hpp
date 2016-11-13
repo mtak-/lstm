@@ -1,10 +1,9 @@
 #ifndef LSTM_DETAIL_TRANSACTION_IMPL_HPP
 #define LSTM_DETAIL_TRANSACTION_IMPL_HPP
 
-#include <lstm/transaction.hpp>
 #include <lstm/detail/small_pod_vector.hpp>
 
-#include <lstm/detail/quiescence.hpp>
+#include <lstm/transaction.hpp>
 
 #include <algorithm>
 
