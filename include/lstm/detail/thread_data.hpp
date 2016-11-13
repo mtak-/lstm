@@ -5,6 +5,8 @@
 #include <lstm/detail/fast_rw_mutex.hpp>
 #include <lstm/detail/thread_local.hpp>
 
+#include <cassert>
+
 LSTM_DETAIL_BEGIN
     struct thread_data;
     using gp_t = uword;

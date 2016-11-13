@@ -1,12 +1,9 @@
 #ifndef LSTM_ATOMIC_HPP
 #define LSTM_ATOMIC_HPP
 
+#include <lstm/detail/thread_data.hpp>
+
 #include <lstm/transaction.hpp>
-
-#include <lstm/detail/scope_guard.hpp>
-#include <lstm/detail/thread_local.hpp>
-
-#include <lstm/detail/rcu_helper.hpp>
 
 LSTM_BEGIN
     // optional knobs
@@ -35,32 +32,35 @@ LSTM_DETAIL_BEGIN
             return func();
         }
         
-        template<typename Func, typename Tx, typename ScopeGuard,
+        // heavy use of exceptions for lack of a better control flow
+        // means RAII has a bit of a penalty
+        template<typename Func, typename Tx,
             LSTM_REQUIRES_(is_void_transact_function<Func>())>
-        static void try_transact(Func& func, Tx& tx, ScopeGuard scope_guard, thread_data& tls_td) {
+        static void try_transact(Func& func, Tx& tx, thread_data& tls_td) {
             {
-                rcu_lock_guard rcu_guard(tls_td);
+                tls_td.access_lock();
                 call(func, tx);
+                tls_td.access_unlock();
             }
+            
             // TODO: release the tls transaction, this allows destructors of deleted objects
             // to have a transaction
             tx.commit();
-            scope_guard.release();
+            tls_td.tx = nullptr;
         }
         
-        template<typename Func, typename Tx, typename ScopeGuard,
+        template<typename Func, typename Tx,
             LSTM_REQUIRES_(!is_void_transact_function<Func>())>
         static transact_result<Func>
-        try_transact(Func& func, Tx& tx, ScopeGuard scope_guard, thread_data& tls_td) {
-            rcu_lock_guard rcu_guard(tls_td);
+        try_transact(Func& func, Tx& tx, thread_data& tls_td) {
+            tls_td.access_lock();
             decltype(auto) result = call(func, tx);
-            rcu_guard.release();
             tls_td.access_unlock();
             
             // TODO: release the tls transaction, this allows destructors of deleted objects
             // to have a transaction
             tx.commit();
-            scope_guard.release();
+            tls_td.tx = nullptr;
             return static_cast<transact_result<Func>&&>(result);
         }
         
@@ -74,17 +74,22 @@ LSTM_DETAIL_BEGIN
             transaction_impl<Alloc, ReadSize, WriteSize, DeleteSize> tx{domain, alloc};
             tls_td.tx = &tx;
             
-            const auto tls_guard = make_scope_guard([&]() noexcept
-                                                    { tls_td.tx = nullptr; });
             while(true) {
                 try {
                     assert(tx.read_set.size() == 0);
                     assert(tx.write_set.size() == 0);
                     
-                    return atomic_fn::try_transact(func, tx, make_scope_guard([&]() noexcept
-                                                                              { tx.cleanup(); }),
-                                                             tls_td);
-                } catch(const _tx_retry&) { tx.reset_read_version(); }
+                    return atomic_fn::try_transact(func, tx, tls_td);
+                } catch(const _tx_retry&) {
+                    tls_td.access_unlock();
+                    tx.cleanup();
+                    tx.reset_read_version();
+                } catch(...) {
+                    tls_td.access_unlock();
+                    tx.cleanup();
+                    tls_td.tx = nullptr;
+                    throw;
+                }
             }
         }
         
