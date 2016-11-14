@@ -40,6 +40,8 @@ LSTM_DETAIL_BEGIN
         { while (!thread_data_root<>.compare_exchange_weak(next, this, LSTM_ACQ_REL)); }
         
         ~thread_data() noexcept {
+            assert(!active.load(LSTM_RELAXED));
+            assert(tx == nullptr);
             thread_data_mut<>.lock();
             thread_data* root_ptr = thread_data_root<>.load(LSTM_RELAXED);
             assert(root_ptr != nullptr);
@@ -58,12 +60,15 @@ LSTM_DETAIL_BEGIN
         thread_data& operator=(const thread_data&) = delete;
         
         inline void access_lock() noexcept {
-           active.store(grace_period<>.load(LSTM_RELAXED), LSTM_RELAXED);
-           std::atomic_thread_fence(LSTM_ACQUIRE);
+            assert(!active.load(LSTM_RELAXED));
+            active.store(grace_period<>.load(LSTM_RELAXED), LSTM_RELAXED);
+            std::atomic_thread_fence(LSTM_ACQUIRE);
         }
         
-        inline void access_unlock() noexcept
-        { active.store(0, LSTM_RELEASE); }
+        inline void access_unlock() noexcept {
+            assert(!!active.load(LSTM_RELAXED));
+            active.store(0, LSTM_RELEASE);
+        }
     };
     
     // TODO: allow specifying a backoff strategy
@@ -95,6 +100,7 @@ LSTM_DETAIL_BEGIN
     // TODO: allow specifying a backoff strategy
     inline void synchronize() noexcept {
         std::atomic_thread_fence(LSTM_ACQUIRE);
+        assert(!tls_thread_data().active.load(LSTM_RELAXED));
         {
             gp_t gp2 = 0;
             gp_t gp;

@@ -3,6 +3,8 @@
 
 #include <lstm/detail/backoff.hpp>
 
+#include <cassert>
+
 LSTM_DETAIL_BEGIN
     // this class is probly best for use in otherwise wait-free write side algorithms
     struct fast_rw_mutex {
@@ -63,7 +65,11 @@ LSTM_DETAIL_BEGIN
             // we have the lock!
             std::atomic_thread_fence(LSTM_ACQUIRE);
         }
-        void unlock() noexcept { read_count.store(0, LSTM_RELEASE); }
+        void unlock() noexcept {
+            uword prev = read_count.fetch_and(~write_bit, LSTM_RELEASE);
+            (void)prev;
+            assert(prev == write_bit);
+        }
     };
 LSTM_DETAIL_END
 
