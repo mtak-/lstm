@@ -68,7 +68,7 @@ LSTM_DETAIL_BEGIN
         void unlock() noexcept {
             uword prev = read_count.fetch_and(~write_bit, LSTM_RELEASE);
             (void)prev;
-            assert(prev == write_bit);
+            assert(prev & write_bit);
         }
     };
 LSTM_DETAIL_END
