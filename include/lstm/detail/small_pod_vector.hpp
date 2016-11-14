@@ -25,6 +25,8 @@ LSTM_DETAIL_BEGIN
             assert(newBegin);
             if (newBegin != begin_)
                 std::memcpy(newBegin, begin_, sizeof(T) * size());
+            if ((capacity_ >> 1) > N)
+                alloc_traits::deallocate(alloc(), begin_, capacity_ >> 1);
             end_ = newBegin + size();
             begin_ = newBegin;
             ::new (end_++) T((Us&&)us...);
