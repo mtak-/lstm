@@ -6,8 +6,13 @@
 #include <type_traits>
 #include <utility>
 
-#define LSTM_BEGIN namespace lstm { inline namespace v1 {
-#define LSTM_END }}
+#ifndef NDEBUG
+    #define LSTM_BEGIN namespace lstm { inline namespace v1 { inline namespace debug {
+    #define LSTM_END }}}
+#else
+    #define LSTM_BEGIN namespace lstm { inline namespace v1 {
+    #define LSTM_END }}
+#endif /* NDEBUG */
 
 #define LSTM_DETAIL_BEGIN LSTM_BEGIN namespace detail {
 #define LSTM_DETAIL_END LSTM_END }
@@ -89,6 +94,14 @@ LSTM_DETAIL_BEGIN
         inline constexpr bool success() const noexcept { return _pending_write != nullptr; }
         inline constexpr var_storage& pending_write() const noexcept { return *_pending_write; }
     };
+    
+    template<typename T>
+    using uncvref = std::remove_cv_t<std::remove_reference_t<T>>;
+    
+    template<typename... Bs>
+    using and_ = std::is_same<
+        std::integer_sequence<bool, Bs::value..., true>,
+        std::integer_sequence<bool, true, Bs::value...>>;
 LSTM_DETAIL_END
 
 LSTM_BEGIN
@@ -101,14 +114,6 @@ LSTM_BEGIN
     
     struct transaction;
     struct transaction_domain;
-    
-    template<typename T>
-    using uncvref = std::remove_cv_t<std::remove_reference_t<T>>;
-    
-    template<typename... Bs>
-    using and_ = std::is_same<
-        std::integer_sequence<bool, Bs::value..., true>,
-        std::integer_sequence<bool, true, Bs::value...>>;
 LSTM_END
 
 LSTM_DETAIL_BEGIN
@@ -148,6 +153,16 @@ LSTM_DETAIL_BEGIN
 
     template<typename T>
     using uninitialized = std::aligned_storage_t<sizeof(T), alignof(T)>;
+    
+    template<typename T> inline T* to_raw_pointer(T* p) noexcept { return p; }
+    template<typename Pointer,
+        LSTM_REQUIRES_(!std::is_pointer<uncvref<Pointer>>())>
+    inline typename std::pointer_traits<uncvref<Pointer>>::element_type*
+    to_raw_pointer(Pointer&& p) noexcept {
+        return p != nullptr
+            ? detail::to_raw_pointer(p.operator->())
+            : nullptr;
+    }
 LSTM_DETAIL_END
 
 LSTM_TEST_BEGIN

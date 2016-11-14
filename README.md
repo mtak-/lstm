@@ -47,3 +47,7 @@ bool transfer_funds(int amount, lstm::easy_var<int>& fromAccount, lstm::easy_var
     });
 }
 ```
+
+## Performance
+`TODO:`
+A single threaded noop transaction which neither reads nor writes share data, has an overhead of around 15ns on a `2.4 GHz Intel Core i5`.

@@ -16,6 +16,9 @@ LSTM_DETAIL_BEGIN
         std::size_t capacity_;
         
         using alloc_traits = std::allocator_traits<Alloc>;
+        static_assert(std::is_pointer<typename alloc_traits::pointer>{},
+            "sorry, lstm only supports allocators that return raw pointers");
+        
         Alloc& alloc() noexcept { return *this; }
         
         template<typename... Us>

@@ -59,6 +59,9 @@ LSTM_DETAIL_BEGIN
         friend struct ::lstm::detail::transaction_impl;
         friend struct ::lstm::transaction;
         using alloc_traits = std::allocator_traits<Alloc>;
+        static_assert(std::is_pointer<typename alloc_traits::pointer>{},
+            "sorry, lstm only supports allocators that return raw pointers");
+        
         constexpr Alloc& alloc() noexcept { return static_cast<Alloc&>(*this); }
         
         constexpr var_alloc_policy()
@@ -78,8 +81,8 @@ LSTM_DETAIL_BEGIN
             noexcept(noexcept(alloc_traits::allocate(alloc(), 1)) &&
                      noexcept(alloc_traits::construct(alloc(), (T*)nullptr, (Us&&)us...)))
         {
-            T* ptr = alloc_traits::allocate(alloc(), 1);
-            alloc_traits::construct(alloc(), ptr, (Us&&)us...);
+            auto ptr = alloc_traits::allocate(alloc(), 1);
+            alloc_traits::construct(alloc(), to_raw_pointer(ptr), (Us&&)us...);
             return ptr;
         }
         

@@ -20,7 +20,7 @@ LSTM_BEGIN
     public:
         template<typename U, typename... Us,
             LSTM_REQUIRES_(std::is_constructible<T, U&&, Us&&...>() &&
-                           !std::is_same<uncvref<U>, uncvref<Alloc>>())>
+                           !std::is_same<detail::uncvref<U>, detail::uncvref<Alloc>>())>
         constexpr var(U&& u, Us&&... us)
             noexcept(noexcept(base::allocate_construct((U&&)u, (Us&&)us...)))
         { detail::var_base::storage = base::allocate_construct((U&&)u, (Us&&)us...); }
