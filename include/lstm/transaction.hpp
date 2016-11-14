@@ -161,7 +161,7 @@ LSTM_BEGIN
             static_assert(std::is_trivially_destructible<detail::deleter<T, Alloc>>{});
             
             detail::deleter_storage& storage = delete_set_push_back_storage();
-            new (&storage) detail::deleter<T, Alloc>(dest_var, alloc);
+            ::new (&storage) detail::deleter<T, Alloc>(dest_var, alloc);
         }
 
         // TODO: reading/writing an rvalue probably never makes sense?
