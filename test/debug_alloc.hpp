@@ -9,12 +9,21 @@ std::atomic<int> debug_live_allocations{0};
 
 #ifndef NDEBUG
     template<typename T>
+    struct debug_alloc;
+    
+    template<typename T>
     struct debug_alloc : private std::allocator<T> {
     private:
         std::allocator<T>& alloc() noexcept { return *this; }
+        template<typename U>
+        friend struct debug_alloc;
         
     public:
         using typename std::allocator<T>::value_type;
+        
+        constexpr debug_alloc() noexcept = default;
+        template<typename U>
+        constexpr debug_alloc(const debug_alloc<U>& rhs) noexcept : std::allocator<T>{rhs} {}
         
         T* allocate(std::size_t n) {
             ++debug_live_allocations<>;

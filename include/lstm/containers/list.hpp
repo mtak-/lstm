@@ -41,6 +41,7 @@ LSTM_BEGIN
         lstm::var<word> _size{0};
         
         Alloc& alloc() noexcept { return *this; }
+        const Alloc& alloc() const noexcept { return *this; }
         
         template<typename Transaction>
         static node_t* prev(node_t& n, Transaction& tx)
@@ -94,7 +95,7 @@ LSTM_BEGIN
                 auto result = tx.load(head);
                 tx.store(head, nullptr);
                 return result;
-            });
+            }, nullptr, alloc());
             if (node)
                 lstm::atomic([&](auto& tx) {
                     while (node) {
@@ -102,7 +103,7 @@ LSTM_BEGIN
                         tx.delete_(node, alloc());
                         node = next_;
                     }
-                });
+                }, nullptr, alloc());
         }
         
         template<typename... Us>
@@ -117,11 +118,11 @@ LSTM_BEGIN
                 //     tx.store(_head->_prev, (void*)new_head);
                 tx.store(_size, tx.load(_size) + 1);
                 tx.store(head, new_head);
-            });
+            }, nullptr, alloc());
         }
         
         word size() const noexcept
-        { return lstm::atomic([&](auto& tx) { return tx.load(_size); }); }
+        { return lstm::atomic([&](auto& tx) { return tx.load(_size); }, nullptr, alloc()); }
     };
 LSTM_END
 
