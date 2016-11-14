@@ -1,6 +1,6 @@
 # lstm
 
-`lstm` is an implementation of Software Transactional Memory using the Transactional Locking II model (i.e. there's actually some spinlocking in the commit phase). It fully supports nested transactions (merges them into just 1 transaction), RAII, Allocators, and exceptions (unless thrown from a destructor). It currently requires a reasonably `C++14` compliant compiler and STL, and either `__thread` or `thread_local`.
+`lstm` is an implementation of Software Transactional Memory using the Transactional Locking II model (i.e. there's actually some spinlocking in the commit phase). It fully supports nested transactions (merges them into just 1 transaction), RAII, Allocators, and exceptions (unless thrown from a destructor). It currently requires a reasonably `C++14` compliant compiler and STL, and `thread_local`.
 
 ## Brief description of the interface
 - declare variable as shared: `lstm::var<Type> my_var(/*params*/);`
@@ -27,6 +27,17 @@ $ mkdir build && cd build
 $ mkdir release && cd release
 $ cmake -G"Unix Makefiles" -DCMAKE_BUILD_TYPE=Release ../..
 $ make test
+```
+
+## easy_var
+
+```cpp
+lstm::easy_var<int> x{100};
+lstm::easy_var<int> y{0};
+lstm::atomic([]{
+    x -= 20;
+    y += 20;
+});
 ```
 
 ## Example Code
