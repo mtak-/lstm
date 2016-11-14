@@ -36,12 +36,8 @@ LSTM_DETAIL_BEGIN
         thread_data() noexcept
             : active(0)
             , tx(nullptr)
-        {
-            thread_data_mut<>.lock();
-            next = thread_data_root<>.load(LSTM_RELAXED);
-            thread_data_root<>.store(this, LSTM_RELAXED);
-            thread_data_mut<>.unlock();
-        }
+            , next(nullptr)
+        { while (!thread_data_root<>.compare_exchange_weak(next, this, LSTM_ACQ_REL)); }
         
         ~thread_data() noexcept {
             thread_data_mut<>.lock();
