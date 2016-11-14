@@ -101,7 +101,7 @@ LSTM_DETAIL_BEGIN
                 unlock(begin->dest_var());
         }
 
-        void commit_lock_writes() {
+        bool commit_lock_writes() noexcept {
             auto write_begin = std::begin(write_set);
             auto write_end = std::end(write_set);
             std::sort(write_begin, write_end);
@@ -112,7 +112,7 @@ LSTM_DETAIL_BEGIN
                 // TODO: only care what version the var is, if it's also a read?
                 if (!lock(version_buf, write_iter->dest_var())) {
                     unlock_write_set(std::move(write_begin), std::move(write_iter));
-                    detail::internal_retry();
+                    return false;
                 }
                 
                 // TODO: weird to have this here
@@ -120,16 +120,19 @@ LSTM_DETAIL_BEGIN
                 if (read_iter != std::end(read_set))
                     read_set.unordered_erase(read_iter);
             }
+            
+            return true;
         }
 
-        void commit_validate_reads() {
+        bool commit_validate_reads() noexcept {
             // reads do not need to be locked to be validated
             for (auto& read_set_vaue : read_set) {
                 if (!read_valid(read_set_vaue.src_var())) {
                     unlock_write_set(std::begin(write_set), std::end(write_set));
-                    detail::internal_retry();
+                    return false;
                 }
             }
+            return true;
         }
 
         void commit_publish(const word write_version,
@@ -151,25 +154,32 @@ LSTM_DETAIL_BEGIN
                 dler.var_ptr->destroy_deallocate(dler.storage);
         }
         
-        void commit_slow_path(write_set_deleters_t& write_set_deleters) {
-            commit_lock_writes();
+        bool commit_slow_path(write_set_deleters_t& write_set_deleters) noexcept {
+            if (!commit_lock_writes())
+                return false;
             auto write_version = domain().bump_clock();
             
-            commit_validate_reads();
+            if (!commit_validate_reads())
+                return false;
             
             commit_publish(write_version, write_set_deleters);
+            
+            return true;
         }
 
-        // TODO: optimize for the following case
+        // TODO: optimize for the following case?
         // write_set.size() == 1 && (read_set.empty() ||
         //                           read_set.size() == 1 && read_set[0] == write_set[0])
-        void commit() {
+        bool commit() noexcept {
             write_set_deleters_t write_set_deleters;
-            if (!write_set.empty())
-                commit_slow_path(write_set_deleters);
+            if (!write_set.empty() && !commit_slow_path(write_set_deleters)) {
+                LSTM_INTERNAL_FAIL_TX();
+                return false;
+            }
             if (!deleter_set.empty() || !write_set_deleters.empty())
                 commit_reclaim(write_set_deleters);
             LSTM_SUCC_TX();
+            return true;
         }
 
         void cleanup() noexcept {

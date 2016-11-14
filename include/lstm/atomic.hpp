@@ -2,6 +2,7 @@
 #define LSTM_ATOMIC_HPP
 
 #include <lstm/detail/thread_data.hpp>
+#include <lstm/detail/tx_result_buffer.hpp>
 
 #include <lstm/transaction.hpp>
 
@@ -33,35 +34,29 @@ LSTM_DETAIL_BEGIN
         }
         
         // heavy use of exceptions for lack of a better control flow
-        // means RAII has a bit of a penalty
+        // means RAII has a bit of a penalty in some circumstances
         template<typename Func, typename Tx,
             LSTM_REQUIRES_(is_void_transact_function<Func>())>
-        static void try_transact(Func& func, Tx& tx, thread_data& tls_td) {
-            {
-                tls_td.access_lock();
-                call(func, tx);
-                tls_td.access_unlock();
-            }
+        static bool try_transact(Func& func, Tx& tx, thread_data& tls_td, tx_result_buffer<void>&) {
+            tls_td.access_lock();
+            call(func, tx);
+            tls_td.tx = nullptr; // in the future, unlocking, might trigger a transaction
+            tls_td.access_unlock();
             
-            // TODO: release the tls transaction, this allows destructors of deleted objects
-            // to have a transaction
-            tx.commit();
-            tls_td.tx = nullptr;
+            return tx.commit();
         }
         
         template<typename Func, typename Tx,
             LSTM_REQUIRES_(!is_void_transact_function<Func>())>
-        static transact_result<Func>
-        try_transact(Func& func, Tx& tx, thread_data& tls_td) {
+        static bool try_transact(Func& func, Tx& tx,
+                                 thread_data& tls_td,
+                                 tx_result_buffer<transact_result<Func>>& buf) {
             tls_td.access_lock();
-            decltype(auto) result = call(func, tx);
+            buf.emplace(call(func, tx));
+            tls_td.tx = nullptr; // in the future, unlocking, might trigger a transaction
             tls_td.access_unlock();
             
-            // TODO: release the tls transaction, this allows destructors of deleted objects
-            // to have a transaction
-            tx.commit();
-            tls_td.tx = nullptr;
-            return static_cast<transact_result<Func>&&>(result);
+            return tx.commit();
         }
         
         template<typename Func, typename Alloc, std::size_t ReadSize, std::size_t WriteSize,
@@ -71,6 +66,7 @@ LSTM_DETAIL_BEGIN
                                                       const Alloc& alloc,
                                                       knobs<ReadSize, WriteSize, DeleteSize>,
                                                       thread_data& tls_td) {
+            tx_result_buffer<transact_result<Func>> buf;
             transaction_impl<Alloc, ReadSize, WriteSize, DeleteSize> tx{domain, alloc};
             tls_td.tx = &tx;
             
@@ -79,7 +75,12 @@ LSTM_DETAIL_BEGIN
                     assert(tx.read_set.size() == 0);
                     assert(tx.write_set.size() == 0);
                     
-                    return atomic_fn::try_transact(func, tx, tls_td);
+                    if (atomic_fn::try_transact(func, tx, tls_td, buf))
+                        return return_tx_result_buffer_fn{}(buf);
+                    buf.reset();
+                    tx.cleanup();
+                    tls_td.tx = &tx;
+                    tx.reset_read_version();
                 } catch(const _tx_retry&) {
                     tls_td.access_unlock();
                     tx.cleanup();
