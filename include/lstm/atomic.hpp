@@ -116,6 +116,14 @@ LSTM_DETAIL_BEGIN
             
             return atomic_fn::atomic_slow_path(std::move(func), domain, alloc, knobs, tls_td);
         }
+        
+        template<typename Func, typename... Args,
+            LSTM_REQUIRES_(!detail::is_transact_function<Func>())>
+        void operator()(Func, Args&&...) const {
+            static_assert(detail::is_transact_function<Func>(),
+                "functions passed to lstm::atomic must either take no parameters, "
+                "lstm::transaction&, or auto&/T&");
+        }
     };
 
     template<typename T> constexpr const T static_const{};
