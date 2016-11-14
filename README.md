@@ -34,7 +34,7 @@ $ make test
 ```cpp
 lstm::easy_var<int> x{100};
 lstm::easy_var<int> y{0};
-lstm::atomic([]{
+lstm::atomic([&]{
     x -= 20;
     y += 20;
 });
