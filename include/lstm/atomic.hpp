@@ -75,8 +75,10 @@ LSTM_DETAIL_BEGIN
                     assert(tx.read_set.size() == 0);
                     assert(tx.write_set.size() == 0);
                     
-                    if (atomic_fn::try_transact(func, tx, tls_td, buf))
+                    if (atomic_fn::try_transact(func, tx, tls_td, buf)) {
+                        tx.reset_heap();
                         return return_tx_result_buffer_fn{}(buf);
+                    }
                     buf.reset();
                     tx.cleanup();
                     tls_td.tx = &tx;
@@ -88,6 +90,7 @@ LSTM_DETAIL_BEGIN
                 } catch(...) {
                     tls_td.access_unlock();
                     tx.cleanup();
+                    tx.reset_heap();
                     tls_td.tx = nullptr;
                     throw;
                 }

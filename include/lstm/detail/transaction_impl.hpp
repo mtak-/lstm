@@ -191,6 +191,12 @@ LSTM_DETAIL_BEGIN
             deleter_set.clear();
         }
         
+        void reset_heap() noexcept {
+            write_set.reset();
+            read_set.reset();
+            deleter_set.reset();
+        }
+        
         read_set_const_iter find_read_set(const var_base& src_var) const noexcept {
             return std::find_if(std::begin(read_set),
                                 std::end(read_set),

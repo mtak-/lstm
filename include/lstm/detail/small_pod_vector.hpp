@@ -50,7 +50,7 @@ LSTM_DETAIL_BEGIN
         small_pod_vector(const small_pod_vector&) = delete;
         small_pod_vector& operator=(const small_pod_vector&) = delete;
             
-        ~small_pod_vector() noexcept
+        void reset() noexcept
         { if (capacity() > N) alloc_traits::deallocate(alloc(), begin_, capacity_); }
             
         bool empty() const noexcept { return end_ == begin_; }
