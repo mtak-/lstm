@@ -18,8 +18,8 @@ LSTM_DETAIL_BEGIN
     struct var_base {
     protected:
         mutable std::atomic<word> version_lock;
-        var_storage storage;
-        var_type kind;
+        std::atomic<var_storage> storage;
+        const var_type kind;
         
         inline var_base(const var_type in_kind) noexcept
             : version_lock{0}
@@ -93,8 +93,12 @@ LSTM_DETAIL_BEGIN
         }
         
         static T& load(var_storage& storage) noexcept { return *static_cast<T*>(storage); }
-        static const T& load(const var_storage& storage)  noexcept
+        static const T& load(const var_storage& storage) noexcept
         { return *static_cast<const T*>(storage); }
+        
+        void store(T&& t) noexcept
+        { *static_cast<T*>(storage.load(LSTM_RELAXED)) = std::move(t); }
+        void store(const T& t) noexcept { *static_cast<T*>(storage.load(LSTM_RELAXED)) = t; }
     };
     template<typename T, typename Alloc>
     struct var_alloc_policy<T, Alloc, var_type::atomic>
@@ -119,9 +123,14 @@ LSTM_DETAIL_BEGIN
         void destroy_deallocate(var_storage s) noexcept override final
         { load(s).~T(); }
         
-        static T& load(var_storage& storage) noexcept { return reinterpret_cast<T&>(storage); }
+        static T& load(var_storage& storage) noexcept
+        { return reinterpret_cast<T&>(storage); }
+        
         static const T& load(const var_storage& storage) noexcept
         { return reinterpret_cast<const T&>(storage); }
+        
+        void store(const T& t) noexcept
+        { storage.store(reinterpret_cast<const var_storage&>(t), LSTM_RELAXED); }
     };
 LSTM_DETAIL_END
 

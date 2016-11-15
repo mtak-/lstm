@@ -49,12 +49,14 @@ LSTM_DETAIL_BEGIN
         void lock(Backoff backoff = {}) noexcept {
             uword prev_read_count;
             
-            // first signal that we want to write, whilst checking if another thread is
+            // first signal that we want to write, while checking if another thread is
             // already in line to write. first come first serve
             while ((prev_read_count = read_count.fetch_or(write_bit, LSTM_RELAXED)) & write_bit)
                 backoff();
             
             backoff.reset();
+            
+            assert(!prev_read_count & write_bit);
             
             // now, wait for all readers to finish
             while (prev_read_count & ~write_bit) {

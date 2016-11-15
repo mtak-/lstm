@@ -31,8 +31,8 @@ auto get_loop(philosopher& p, fork& f0, fork& f1) {
             
             --p.food;
             
-            f0.in_use.unsafe() = false;
-            f1.in_use.unsafe() = false;
+            f0.in_use.unsafe_store(false);
+            f1.in_use.unsafe_store(false);
         }
     };
 }
@@ -52,7 +52,7 @@ int main() {
         manager.run();
             
         for(auto& fork : forks)
-            CHECK(fork.in_use.unsafe() == false);
+            CHECK(fork.in_use.unsafe_load() == false);
         
         CHECK(phil.food == 0u);
         CHECK(sami.food == 0u);

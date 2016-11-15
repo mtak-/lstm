@@ -39,8 +39,8 @@ int main() {
     
     manager.run();
     
-    CHECK(account0.unsafe() == 280);
-    CHECK(account1.unsafe() == 320);
+    CHECK(account0.unsafe_load() == 280);
+    CHECK(account1.unsafe_load() == 320);
     CHECK(debug_live_allocations<> == 0);
     
     LSTM_LOG_DUMP();

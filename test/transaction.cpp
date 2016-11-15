@@ -73,7 +73,7 @@ int lstm::test::transaction_tester::run_tests() {
         CHECK(tx0.read_set.size() == 1u);
         CHECK(tx0.find_read_set(x) != std::end(tx0.read_set));
     
-        ++x.unsafe();
+        x.unsafe_store(x.unsafe_load() + 1);
     
         CHECK(tx0.load(x) == 43);
         CHECK(tx0.read_set.size() == 1u);
@@ -105,7 +105,7 @@ int lstm::test::transaction_tester::run_tests() {
         CHECK(reinterpret_cast<int&>(tx0.write_set[0].pending_write()) == 43);
     
         CHECK(tx0.load(x) == 43);
-        CHECK(x.unsafe() == 42);
+        CHECK(x.unsafe_load() == 42);
     
         tx_t tx1{nullptr, {}};
         tx1.read_version = 0;
@@ -118,7 +118,7 @@ int lstm::test::transaction_tester::run_tests() {
     
         CHECK(tx1.load(x) == 44);
         CHECK(tx0.load(x) == 43);
-        CHECK(x.unsafe() == 42);
+        CHECK(x.unsafe_load() == 42);
     
         tx1.store(x, 45);
         CHECK(tx1.write_set.size() == 1u);
@@ -127,7 +127,7 @@ int lstm::test::transaction_tester::run_tests() {
     
         CHECK(tx1.load(x) == 45);
         CHECK(tx0.load(x) == 43);
-        CHECK(x.unsafe() == 42);
+        CHECK(x.unsafe_load() == 42);
     
         tx0.cleanup();
         tx1.cleanup();

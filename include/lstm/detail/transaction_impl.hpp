@@ -139,9 +139,11 @@ LSTM_DETAIL_BEGIN
                             write_set_deleters_t& write_set_deleters) noexcept {
             for (auto& write_set_value : write_set) {
                 if (write_set_value.dest_var().kind != var_type::atomic)
-                    write_set_deleters.emplace_back(&write_set_value.dest_var(),
-                                                    write_set_value.dest_var().storage);
-                write_set_value.dest_var().storage = std::move(write_set_value.pending_write());
+                    write_set_deleters.emplace_back(
+                        &write_set_value.dest_var(),
+                        write_set_value.dest_var().storage.load(LSTM_RELAXED));
+                write_set_value.dest_var().storage.store(std::move(write_set_value.pending_write()),
+                                                         LSTM_RELAXED);
                 unlock(write_version, write_set_value.dest_var());
             }
         }

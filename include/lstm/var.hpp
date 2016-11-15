@@ -38,11 +38,19 @@ LSTM_BEGIN
         
         ~var() noexcept override final { base::destroy_deallocate(detail::var_base::storage); }
         
-        T& unsafe() & noexcept { return base::load(detail::var_base::storage); }
-        T&& unsafe() && noexcept { return std::move(base::load(detail::var_base::storage)); }
-        const T& unsafe() const & noexcept { return base::load(detail::var_base::storage); }
-        const T&& unsafe() const && noexcept
-        { return std::move(base::load(detail::var_base::storage)); }
+        // TODO: return types are wrong for atomic types        
+        decltype(auto) unsafe_load() const & noexcept
+        { return base::load(detail::var_base::storage.load(LSTM_RELAXED)); }
+        
+        decltype(auto) unsafe_load() const && noexcept
+        { return std::move(base::load(detail::var_base::storage.load(LSTM_RELAXED))); }
+        
+        // TODO: return types are wrong for atomic types
+        void unsafe_store(const T& t) noexcept
+        { return base::store(t); }
+        
+        void unsafe_store(T&& t) noexcept
+        { return base::store(std::move(t)); }
     };
 LSTM_END
 

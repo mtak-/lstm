@@ -58,7 +58,7 @@ int main() {
             manager.queue_loop_n(get_loop(x), 500000);
         manager.run();
         
-        CHECK(x.unsafe().empty());
+        CHECK(x.unsafe_load().empty());
     }
     CHECK(debug_live_allocations<> == 0);
     

@@ -59,17 +59,17 @@ LSTM_BEGIN
         static const node_t* next(const node_t& n, Transaction& tx)
         { return reinterpret_cast<const node_t*>(tx.load(n._next)); }
         
-        static node_t*& unsafe_prev(node_t& n) noexcept
-        { return reinterpret_cast<node_t*&>(n._prev.unsafe()); }
+        static node_t* unsafe_prev(node_t& n) noexcept
+        { return reinterpret_cast<node_t*>(n._prev.unsafe_load()); }
         
-        static const node_t*& unsafe_prev(const node_t& n) noexcept
-        { return reinterpret_cast<const node_t*&>(n._prev.unsafe()); }
+        static const node_t* unsafe_prev(const node_t& n) noexcept
+        { return reinterpret_cast<const node_t*>(n._prev.unsafe_load()); }
         
-        static node_t*& unsafe_next(node_t& n) noexcept
-        { return reinterpret_cast<node_t*&>(n._next.unsafe()); }
+        static node_t* unsafe_next(node_t& n) noexcept
+        { return reinterpret_cast<node_t*>(n._next.unsafe_load()); }
         
-        static const node_t*& unsafe_next(const node_t& n) noexcept
-        { return reinterpret_cast<const node_t*&>(n._next.unsafe()); }
+        static const node_t* unsafe_next(const node_t& n) noexcept
+        { return reinterpret_cast<const node_t*>(n._next.unsafe_load()); }
         
     public:
         constexpr list() noexcept(std::is_nothrow_default_constructible<Alloc>{}) = default;
@@ -79,8 +79,7 @@ LSTM_BEGIN
         {}
         
         ~list() {
-            auto node = head.unsafe();
-            _size.unsafe() = 0;
+            auto node = head.unsafe_load();
             while (node) {
                 auto next_ = unsafe_next(*node);
                 alloc_traits::destroy(alloc(), node);
@@ -112,7 +111,7 @@ LSTM_BEGIN
             new (new_head) node_t((Us&&)us...);
             lstm::atomic([&](auto& tx) {
                 auto _head = tx.load(head);
-                unsafe_next(*new_head) = _head;
+                new_head->_next.unsafe_store(_head);
                 // TODO: segfaults if this is uncommented
                 // if (_head)
                 //     tx.store(_head->_prev, (void*)new_head);
