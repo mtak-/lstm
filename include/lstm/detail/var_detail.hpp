@@ -143,7 +143,7 @@ LSTM_DETAIL_BEGIN
         
         template<typename U>
         static void store(std::atomic<var_storage>& storage, U&& u) noexcept
-        { storage.store(reinterpret_cast<var_storage&>(u), LSTM_RELAXED); }
+        { storage.store(reinterpret_cast<var_storage>(static_cast<T>(u)), LSTM_RELAXED); }
         
         template<typename U>
         static void store(const std::atomic<var_storage>& storage, U&&) noexcept = delete;
