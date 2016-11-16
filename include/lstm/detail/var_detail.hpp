@@ -6,7 +6,7 @@
 #include <atomic>
 
 LSTM_BEGIN
-    // slowest to fastest
+    // TODO: this naming is wrong now. nothing is locking except in the commit phase
     enum class var_type {
         locking,
         trivial,
@@ -39,9 +39,11 @@ LSTM_DETAIL_BEGIN
     template<typename T>
     constexpr var_type var_type_switch() noexcept {
         if (sizeof(T) <= sizeof(word) && alignof(T) <= alignof(word) &&
-                std::is_trivially_copy_constructible<T>{}())
+                std::is_trivially_copy_constructible<T>{}() &&
+                std::is_trivially_move_constructible<T>{}())
             return var_type::atomic;
-        else if (std::is_trivially_copy_constructible<T>{}())
+        else if (std::is_trivially_copy_constructible<T>{}() &&
+                 std::is_trivially_move_constructible<T>{}())
             return var_type::trivial;
         return var_type::locking;
     }
@@ -92,14 +94,25 @@ LSTM_DETAIL_BEGIN
             alloc_traits::deallocate(alloc(), ptr, 1);
         }
         
-        static T& load(var_storage& storage) noexcept { return *static_cast<T*>(storage); }
-        static const T& load(const var_storage& storage) noexcept
-        { return *static_cast<const T*>(storage); }
+        static T& load(var_storage storage) noexcept { return *static_cast<T*>(storage); }
         
-        void store(T&& t) noexcept
-        { *static_cast<T*>(storage.load(LSTM_RELAXED)) = std::move(t); }
-        void store(const T& t) noexcept { *static_cast<T*>(storage.load(LSTM_RELAXED)) = t; }
+        template<typename U>
+        static void store(var_storage storage, U&& u)
+            noexcept(std::is_nothrow_assignable<T&, U&&>{})
+        { load(storage) = (U&&)u; }
+        
+        template<typename U>
+        static void store(std::atomic<var_storage>& storage, U&& u)
+            noexcept(std::is_nothrow_assignable<T&, U&&>{})
+        { store(storage.load(LSTM_RELAXED), (U&&)u); }
+        
+        template<typename U>
+        static void store(const std::atomic<var_storage>& storage, U&&) noexcept = delete;
+        template<typename U>
+        static void store(const std::atomic<var_storage>&& storage, U&&) noexcept = delete;
     };
+    
+    // TODO: extremely likely there's strict aliasing issues...
     template<typename T, typename Alloc>
     struct var_alloc_policy<T, Alloc, var_type::atomic>
         : var_base
@@ -120,18 +133,23 @@ LSTM_DETAIL_BEGIN
             noexcept(std::is_nothrow_constructible<T, Us&&...>{})
         { return reinterpret_cast<var_storage>(T((Us&&)us...)); }
         
-        void destroy_deallocate(var_storage s) noexcept override final
-        { load(s).~T(); }
+        void destroy_deallocate(var_storage s) noexcept override final { load(s).~T(); }
         
-        static T& load(var_storage& storage) noexcept
-        { return reinterpret_cast<T&>(storage); }
+        static T load(var_storage storage) noexcept { return reinterpret_cast<T&>(storage); }
         
-        static const T& load(const var_storage& storage) noexcept
-        { return reinterpret_cast<const T&>(storage); }
+        template<typename U>
+        static void store(var_storage& storage, U&& u) noexcept
+        { reinterpret_cast<T&>(storage) = (U&&)u; }
         
-        void store(const T& t) noexcept
-        { storage.store(reinterpret_cast<const var_storage&>(t), LSTM_RELAXED); }
+        template<typename U>
+        static void store(std::atomic<var_storage>& storage, U&& u) noexcept
+        { storage.store(reinterpret_cast<var_storage&>(u), LSTM_RELAXED); }
+        
+        template<typename U>
+        static void store(const std::atomic<var_storage>& storage, U&&) noexcept = delete;
+        template<typename U>
+        static void store(const std::atomic<var_storage>&& storage, U&&) noexcept = delete;
     };
 LSTM_DETAIL_END
 
-#endif /* LSTM_DETAIL_MACROS_HPP */
+#endif /* LSTM_DETAIL_VAR_HPP */

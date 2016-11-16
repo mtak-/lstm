@@ -23,22 +23,25 @@ LSTM_BEGIN
                            !std::is_same<detail::uncvref<U>, detail::uncvref<Alloc>>())>
         constexpr var(U&& u, Us&&... us)
             noexcept(noexcept(base::allocate_construct((U&&)u, (Us&&)us...)))
-        { detail::var_base::storage = base::allocate_construct((U&&)u, (Us&&)us...); }
+        { detail::var_base::storage.store(base::allocate_construct((U&&)u, (Us&&)us...),
+                                          LSTM_RELAXED); }
         
         LSTM_REQUIRES(std::is_constructible<T>())
         constexpr var() noexcept(noexcept(base::allocate_construct()))
-        { detail::var_base::storage = base::allocate_construct(); }
+        { detail::var_base::storage.store(base::allocate_construct(), LSTM_RELAXED); }
         
         template<typename... Us,
             LSTM_REQUIRES_(std::is_constructible<T, Us&&...>())>
         constexpr var(const Alloc& in_alloc, Us&&... us)
             noexcept(noexcept(base::allocate_construct((Us&&)us...)))
             : base{in_alloc}
-        { detail::var_base::storage = base::allocate_construct((Us&&)us...); }
+        { detail::var_base::storage.store(base::allocate_construct((Us&&)us...),
+                                          LSTM_RELAXED); }
         
-        ~var() noexcept override final { base::destroy_deallocate(detail::var_base::storage); }
+        ~var() noexcept override final
+        { base::destroy_deallocate(detail::var_base::storage.load(LSTM_RELAXED)); }
         
-        // TODO: return types are wrong for atomic types        
+        // TODO: return types are wrong for atomic types
         decltype(auto) unsafe_load() const & noexcept
         { return base::load(detail::var_base::storage.load(LSTM_RELAXED)); }
         
@@ -47,10 +50,10 @@ LSTM_BEGIN
         
         // TODO: return types are wrong for atomic types
         void unsafe_store(const T& t) noexcept
-        { return base::store(t); }
+        { return base::store(detail::var_base::storage, t); }
         
         void unsafe_store(T&& t) noexcept
-        { return base::store(std::move(t)); }
+        { return base::store(detail::var_base::storage, std::move(t)); }
     };
 LSTM_END
 

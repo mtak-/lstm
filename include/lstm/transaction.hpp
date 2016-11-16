@@ -148,7 +148,7 @@ LSTM_BEGIN
             if (!lookup.success())
                 add_write_set(dest_var, dest_var.allocate_construct((U&&)u));
             else
-                dest_var.load(lookup.pending_write()) = (U&&)u;
+                dest_var.store(lookup.pending_write(), (U&&)u);
 
             // TODO: where is this best placed???, or is it best removed altogether?
             if (!read_valid(dest_var)) detail::internal_retry();
