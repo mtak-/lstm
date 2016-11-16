@@ -148,12 +148,13 @@ LSTM_DETAIL_BEGIN
             }
         }
         
-        void commit_reclaim(const write_set_deleters_t& write_set_deleters) noexcept {
+        void commit_reclaim(write_set_deleters_t& write_set_deleters) noexcept {
             synchronize();
             for (auto& dler : deleter_set)
                 (*static_cast<deleter_base*>(static_cast<a_deleter_type*>((void*)&dler)))();
-            for (auto& dler : write_set_deleters)
+            for (const auto& dler : write_set_deleters)
                 dler.var_ptr->destroy_deallocate(dler.storage);
+            write_set_deleters.reset();
         }
         
         bool commit_slow_path(write_set_deleters_t& write_set_deleters) noexcept {
