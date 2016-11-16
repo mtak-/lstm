@@ -56,7 +56,7 @@ LSTM_DETAIL_BEGIN
             
             backoff.reset();
             
-            assert(!prev_read_count & write_bit);
+            assert(!(prev_read_count & write_bit));
             
             // now, wait for all readers to finish
             while (prev_read_count & ~write_bit) {
