@@ -19,7 +19,7 @@ Debug
 $ mkdir build && cd build
 $ mkdir debug && cd debug
 $ cmake -G"Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug ../..
-$ make test
+$ make -j8 && make test
 ```
 
 Release
@@ -27,7 +27,7 @@ Release
 $ mkdir build && cd build
 $ mkdir release && cd release
 $ cmake -G"Unix Makefiles" -DCMAKE_BUILD_TYPE=Release ../..
-$ make test
+$ make -j8 && make test
 ```
 
 ## easy_var
