@@ -13,7 +13,7 @@ LSTM_DETAIL_BEGIN
         std::atomic<uword> read_count{0};
         
         template<typename Backoff>
-        void lock_shared_slow_path(Backoff backoff) noexcept {
+        void lock_shared_slow_path(Backoff& backoff) noexcept {
             // didn't succeed in acquiring read access, so undo, the reader count increment
             read_count.fetch_sub(1, LSTM_RELAXED);
             
@@ -34,12 +34,18 @@ LSTM_DETAIL_BEGIN
         
         
     public:
+        fast_rw_mutex() noexcept = default;
+        
+    #ifndef NDEBUG
+        ~fast_rw_mutex() noexcept { assert(read_count == 0); }
+    #endif /* NDEBUG */
+        
         template<typename Backoff = default_backoff,
             LSTM_REQUIRES_(is_backoff_strategy<Backoff>())>
         inline void lock_shared(Backoff backoff = {}) noexcept {
             // if there's a writer, do the slow stuff
             if (read_count.fetch_add(1, LSTM_ACQUIRE) & write_bit)
-                lock_shared_slow_path(std::move(backoff));
+                lock_shared_slow_path(backoff);
         }
         
         void unlock_shared() noexcept { read_count.fetch_sub(1, LSTM_RELEASE); }
@@ -64,9 +70,12 @@ LSTM_DETAIL_BEGIN
                 prev_read_count = read_count.load(LSTM_RELAXED);
             }
             
+            assert(!(prev_read_count & ~write_bit));
+            
             // we have the lock!
             std::atomic_thread_fence(LSTM_ACQUIRE);
         }
+        
         void unlock() noexcept {
             uword prev = read_count.fetch_and(~write_bit, LSTM_RELEASE);
             (void)prev;
