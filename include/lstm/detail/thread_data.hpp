@@ -29,18 +29,18 @@ LSTM_DETAIL_BEGIN
     // in concurrent writes
     // still not ideal, as writes should be batched
     struct thread_data {
-        std::atomic<gp_t> active;
         transaction* tx;
+        std::atomic<gp_t> active;
         std::atomic<thread_data*> next;
         
         thread_data() noexcept
-            : active(0)
-            , tx(nullptr)
-            , next(nullptr)
+            : tx(nullptr)
+            , active(0)
         {
-            thread_data* next_{nullptr};
-            while (!thread_data_root<>.compare_exchange_weak(next_, this, LSTM_ACQ_REL))
-                next.store(next_, LSTM_RELAXED);
+            thread_data_mut<>.lock();
+            std::atomic_init(&next, thread_data_root<>.load(LSTM_RELAXED));
+            thread_data_root<>.store(this);
+            thread_data_mut<>.unlock();
         }
         
         ~thread_data() noexcept {
