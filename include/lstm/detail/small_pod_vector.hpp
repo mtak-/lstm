@@ -6,14 +6,14 @@
 #include <cassert>
 
 LSTM_DETAIL_BEGIN
-    template<typename T, int N = 4, typename Alloc = std::allocator<T>>
+    template<typename T, uword N = 4, typename Alloc = std::allocator<T>>
     struct small_pod_vector : private Alloc {
     private:
         static_assert(std::is_pod<T>{}, "");
         
         T buffer[N];
         T* begin_; T* end_;
-        std::size_t capacity_;
+        uword capacity_;
         
         using alloc_traits = std::allocator_traits<Alloc>;
         static_assert(std::is_pointer<typename alloc_traits::pointer>{},
@@ -49,13 +49,22 @@ LSTM_DETAIL_BEGIN
             
         small_pod_vector(const small_pod_vector&) = delete;
         small_pod_vector& operator=(const small_pod_vector&) = delete;
+        
+    #ifndef NDEBUG
+        ~small_pod_vector() noexcept { assert(begin_ == buffer); }
+    #endif
             
-        void reset() noexcept
-        { if (capacity() > N) alloc_traits::deallocate(alloc(), begin_, capacity_); }
+        void reset() noexcept {
+            if (capacity() > N)
+                alloc_traits::deallocate(alloc(), begin_, capacity_);
+    #ifndef NDEBUG
+            end_ = begin_ = buffer;
+    #endif
+        }
             
         bool empty() const noexcept { return end_ == begin_; }
-        std::size_t size() const noexcept { return end_ - begin_; }
-        std::size_t capacity() const noexcept { return capacity_; }
+        uword size() const noexcept { return end_ - begin_; }
+        uword capacity() const noexcept { return capacity_; }
         
         template<typename... Us>
         void emplace_back(Us&&... us) {
