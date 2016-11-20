@@ -39,7 +39,7 @@ LSTM_DETAIL_BEGIN
         {
             thread_data_mut<>.lock();
             std::atomic_init(&next, thread_data_root<>.load(LSTM_RELAXED));
-            thread_data_root<>.store(this);
+            thread_data_root<>.store(this, LSTM_RELAXED);
             thread_data_mut<>.unlock();
         }
         
