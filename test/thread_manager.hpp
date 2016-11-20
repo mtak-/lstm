@@ -14,7 +14,7 @@ public:
     template<typename F>
     void queue_thread(F&& f) {
         threads.emplace_back([this, f = (F&&)f]{
-            while(!_run.load(LSTM_ACQUIRE));
+            while(!_run.load(LSTM_RELAXED));
             f();
         });
         LSTM_LOG_REGISTER_THREAD_ID(threads.back().get_id());
@@ -23,7 +23,7 @@ public:
     template<typename F>
     void queue_loop_n(F&& f, const int n) {
         threads.emplace_back([this, f = (F&&)f, n]{
-            while(!_run.load(LSTM_ACQUIRE));
+            while(!_run.load(LSTM_RELAXED));
             for (int i = 0; i < n; ++i)
                 f();
         });
@@ -37,7 +37,7 @@ public:
     
     void clear() {
         threads.clear();
-        _run.store(false, LSTM_RELEASE);
+        _run.store(false, LSTM_RELAXED);
     }
     
     void join_and_clear_threads() {
@@ -45,7 +45,7 @@ public:
         clear();
     }
     
-    void start_threads() { _run.store(true, LSTM_RELEASE); }
+    void start_threads() { _run.store(true, LSTM_RELAXED); }
     
     void run() {
         start_threads();
