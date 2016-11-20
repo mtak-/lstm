@@ -104,6 +104,8 @@ LSTM_DETAIL_BEGIN
         bool commit_lock_writes() noexcept {
             write_set_iter write_begin = std::begin(write_set);
             write_set_iter write_end = std::end(write_set);
+            
+            // sorting ensures a thread always makes progress...
             std::sort(write_begin, write_end);
             
             word version_buf;
