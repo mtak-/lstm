@@ -10,8 +10,8 @@
 #include "simple_test.hpp"
 #include "thread_manager.hpp"
 
-static constexpr int iter_count = LSTM_TEST_INIT(5000, 500);
-static constexpr int loop_count = LSTM_TEST_INIT(200, 20);
+static constexpr int iter_count = LSTM_TEST_INIT(2500, 500);
+static constexpr int loop_count = LSTM_TEST_INIT(100, 20);
 
 int main() {
     for(int loop = 0; loop < loop_count; ++loop) {
