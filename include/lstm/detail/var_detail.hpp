@@ -89,7 +89,7 @@ LSTM_DETAIL_BEGIN
         }
         
         void destroy_deallocate(var_storage s) noexcept override final {
-            auto ptr = &load(s);
+            T* ptr = &load(s);
             alloc_traits::destroy(alloc(), ptr);
             alloc_traits::deallocate(alloc(), ptr, 1);
         }

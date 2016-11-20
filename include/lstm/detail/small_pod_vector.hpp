@@ -24,7 +24,7 @@ LSTM_DETAIL_BEGIN
         template<typename... Us>
         void emplace_back_slow_path(Us&&... us) {
             capacity_ = capacity_ * 2;
-            auto newBegin = alloc_traits::allocate(alloc(), capacity_);
+            T* newBegin = alloc_traits::allocate(alloc(), capacity_);
             assert(newBegin);
             if (newBegin != begin_)
                 std::memcpy(newBegin, begin_, sizeof(T) * size());
@@ -80,12 +80,12 @@ LSTM_DETAIL_BEGIN
         void unordered_erase(const T* const ptr) noexcept
         { std::memmove((void*)ptr, --end_, sizeof(T)); }
             
-        T* begin() noexcept { return begin_; }
-        T* end() noexcept { return end_; }
-        const T* begin() const noexcept { return begin_; }
-        const T* end() const noexcept { return end_; }
-        const T* cbegin() const noexcept { return begin_; }
-        const T* cend() const noexcept { return end_; }
+        iterator begin() noexcept { return begin_; }
+        iterator end() noexcept { return end_; }
+        const_iterator begin() const noexcept { return begin_; }
+        const_iterator end() const noexcept { return end_; }
+        const_iterator cbegin() const noexcept { return begin_; }
+        const_iterator cend() const noexcept { return end_; }
         
         void clear() noexcept { end_ = begin_; }
         
@@ -96,12 +96,23 @@ LSTM_DETAIL_BEGIN
         const T& back() const noexcept { return end_[-1]; }
     };
     
-    template<typename T> auto begin(small_pod_vector<T>& v) noexcept { return v.begin(); }
-    template<typename T> auto end(small_pod_vector<T>& v) noexcept { return v.end(); }
-    template<typename T> auto begin(const small_pod_vector<T>& v) noexcept { return v.begin(); }
-    template<typename T> auto end(const small_pod_vector<T>& v) noexcept { return v.end(); }
-    template<typename T> auto cbegin(const small_pod_vector<T>& v) noexcept { return v.cbegin(); }
-    template<typename T> auto cend(const small_pod_vector<T>& v) noexcept { return v.cend(); }
+    template<typename T> typename small_pod_vector<T>::iterator
+    begin(small_pod_vector<T>& v) noexcept { return v.begin(); }
+    
+    template<typename T> typename small_pod_vector<T>::iterator
+    end(small_pod_vector<T>& v) noexcept { return v.end(); }
+    
+    template<typename T> typename small_pod_vector<T>::const_iterator
+    begin(const small_pod_vector<T>& v) noexcept { return v.begin(); }
+    
+    template<typename T> typename small_pod_vector<T>::const_iterator
+    end(const small_pod_vector<T>& v) noexcept { return v.end(); }
+    
+    template<typename T> typename small_pod_vector<T>::const_iterator
+    cbegin(const small_pod_vector<T>& v) noexcept { return v.cbegin(); }
+    
+    template<typename T> typename small_pod_vector<T>::const_iterator
+    cend(const small_pod_vector<T>& v) noexcept { return v.cend(); }
 LSTM_DETAIL_END
 
 #endif /* LSTM_SMALL_POD_VECTOR_HPP */

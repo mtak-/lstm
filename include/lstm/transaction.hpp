@@ -108,7 +108,7 @@ LSTM_BEGIN
             detail::write_set_lookup lookup = find_write_set(src_var);
             if (!lookup.success()) {
                 // TODO: this is not optimal!!!
-                auto src_version = src_var.version_lock.load(LSTM_ACQUIRE);
+                word src_version = src_var.version_lock.load(LSTM_ACQUIRE);
                 if (src_version <= read_version && !locked(src_version)) {
                     const T& result = var<T>::load(src_var.storage.load(LSTM_RELAXED));
                     if (src_var.version_lock.load(LSTM_RELEASE) == src_version) {
@@ -127,7 +127,7 @@ LSTM_BEGIN
             detail::write_set_lookup lookup = find_write_set(src_var);
             if (!lookup.success()) {
                 // TODO: this is not optimal!!!
-                auto src_version = src_var.version_lock.load(LSTM_ACQUIRE);
+                word src_version = src_var.version_lock.load(LSTM_ACQUIRE);
                 if (src_version <= read_version && !locked(src_version)) {
                     T result = var<T>::load(src_var.storage.load(LSTM_RELAXED));
                     if (src_var.version_lock.load(LSTM_RELEASE) == src_version) {

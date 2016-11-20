@@ -102,12 +102,12 @@ LSTM_DETAIL_BEGIN
         }
 
         bool commit_lock_writes() noexcept {
-            auto write_begin = std::begin(write_set);
-            auto write_end = std::end(write_set);
+            write_set_iter write_begin = std::begin(write_set);
+            write_set_iter write_end = std::end(write_set);
             std::sort(write_begin, write_end);
             
             word version_buf;
-            for (auto write_iter = write_begin; write_iter != write_end; ++write_iter) {
+            for (write_set_iter write_iter = write_begin; write_iter != write_end; ++write_iter) {
                 version_buf = 0;
                 // TODO: only care what version the var is, if it's also a read?
                 if (!lock(version_buf, write_iter->dest_var())) {
@@ -116,7 +116,7 @@ LSTM_DETAIL_BEGIN
                 }
                 
                 // TODO: weird to have this here
-                auto read_iter = find_read_set(write_iter->dest_var());
+                read_set_const_iter read_iter = find_read_set(write_iter->dest_var());
                 if (read_iter != std::end(read_set))
                     read_set.unordered_erase(read_iter);
             }
@@ -160,7 +160,7 @@ LSTM_DETAIL_BEGIN
         bool commit_slow_path(write_set_deleters_t& write_set_deleters) noexcept {
             if (!commit_lock_writes())
                 return false;
-            auto write_version = domain().bump_clock();
+            word write_version = domain().bump_clock();
             
             if (!commit_validate_reads())
                 return false;
@@ -219,8 +219,8 @@ LSTM_DETAIL_BEGIN
         }
 
         write_set_lookup find_write_set(const var_base& dest_var) noexcept override final {
-            const auto end = std::end(write_set);
-            const auto iter = std::find_if(
+            const write_set_iter end = std::end(write_set);
+            const write_set_iter iter = std::find_if(
                 std::begin(write_set),
                 end,
                 [&dest_var](const write_set_value_type& rhs) noexcept -> bool

@@ -19,7 +19,7 @@ LSTM_DETAIL_BEGIN
     private:
         template<typename Func, typename Tx,
             LSTM_REQUIRES_(callable_with_tx<Func, Tx&>())>
-        static decltype(auto) call(Func& func, Tx& tx) {
+        static auto call(Func& func, Tx& tx) -> decltype(func(tx)) {
             static_assert(!noexcept(func(tx)),
                 "functions passed to atomic must not be marked noexcept");
             return func(tx);
@@ -27,7 +27,7 @@ LSTM_DETAIL_BEGIN
         
         template<typename Func, typename Tx,
             LSTM_REQUIRES_(!callable_with_tx<Func, Tx&>())>
-        static decltype(auto) call(Func& func, Tx&) {
+        static auto call(Func& func, Tx&) -> decltype(func()) {
             static_assert(!noexcept(func()),
                 "functions passed to atomic must not be marked noexcept");
             return func();
