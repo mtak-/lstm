@@ -35,10 +35,10 @@ LSTM_DETAIL_BEGIN
         
         thread_data() noexcept
             : tx(nullptr)
-            , active(0)
         {
             thread_data_mut<>.lock();
-            std::atomic_init(&next, thread_data_root<>.load(LSTM_RELAXED));
+            active.store(0, LSTM_RELAXED);
+            next.store(thread_data_root<>.load(LSTM_RELAXED), LSTM_RELAXED);
             thread_data_root<>.store(this, LSTM_RELAXED);
             thread_data_mut<>.unlock();
         }
@@ -91,7 +91,7 @@ LSTM_DETAIL_BEGIN
     
     // TODO: allow specifying a backoff strategy
     inline void wait(const gp_t gp, const bool desired) noexcept {
-        for (thread_data* q = thread_data_root<>.load(LSTM_ACQUIRE);
+        for (thread_data* q = thread_data_root<>.load(LSTM_RELAXED);
                 q != nullptr;
                 q = q->next.load(LSTM_RELAXED)) {
             default_backoff backoff;
@@ -101,10 +101,8 @@ LSTM_DETAIL_BEGIN
     }
     
     // TODO: kill the CAS operation? (speculative or, might actually decrease grace period times)
-    // TODO: kill the thread fences?
     // TODO: allow specifying a backoff strategy
     inline void synchronize() noexcept {
-        std::atomic_thread_fence(LSTM_ACQUIRE);
         assert(!tls_thread_data().active.load(LSTM_RELAXED));
         {
             gp_t gp2 = 0;
@@ -124,7 +122,6 @@ LSTM_DETAIL_BEGIN
             wait(gp2, true);
             thread_data_mut<>.unlock_shared();
         }
-        std::atomic_thread_fence(LSTM_ACQUIRE);
     }
 LSTM_DETAIL_END
 
