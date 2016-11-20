@@ -1,6 +1,7 @@
 #ifndef LSTM_TRANSACTION_DOMAIN_HPP
 #define LSTM_TRANSACTION_DOMAIN_HPP
 
+#include <lstm/detail/compiler.hpp>
 #include <lstm/detail/lstm_fwd.hpp>
 
 #include <atomic>
@@ -34,11 +35,10 @@ LSTM_BEGIN
     };
     
     namespace detail {
-        // inline
-        template<std::nullptr_t = nullptr> transaction_domain _default_domain{};
+        LSTM_INLINE_VAR(transaction_domain _default_domain){};
     }
     
-    inline transaction_domain& default_domain() noexcept { return detail::_default_domain<>; }
+    inline transaction_domain& default_domain() noexcept { return detail::LSTM_ACCESS_INLINE_VAR(_default_domain); }
 LSTM_END
 
 #endif /* LSTM_TRANSACTION_DOMAIN_HPP */

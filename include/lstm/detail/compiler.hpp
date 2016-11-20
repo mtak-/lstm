@@ -139,6 +139,7 @@
 
 #endif
 
+/****************** thread_local ******************/
 #  if LSTM_COMPILER_IS_GNU
 
 #    if !((__GNUC__ * 100 + __GNUC_MINOR__) >= 404)
@@ -236,13 +237,21 @@
 
 #  if LSTM_COMPILER_CXX_THREAD_LOCAL
 #    define LSTM_THREAD_LOCAL thread_local
-#  elif LSTM_COMPILER_IS_GNU || LSTM_COMPILER_IS_Clang || LSTM_COMPILER_IS_AppleClang
-#    define LSTM_THREAD_LOCAL __thread
-#  elif LSTM_COMPILER_IS_MSVC
-#    define LSTM_THREAD_LOCAL __declspec(thread)
 #  else
-// LSTM_THREAD_LOCAL not defined for this configuration.
+#    error "lstm requires support for thread_local storage duration specifier"
 #  endif
+/**************** end thread_local ****************/
+
+/******************* inline var *******************/
+#  define LSTM_INLINE_VAR(...)                                                                     \
+    template<std::nullptr_t = nullptr>                                                             \
+    __VA_ARGS__                                                                                    \
+    /**/
+
+#  define LSTM_ACCESS_INLINE_VAR(...)                                                              \
+    __VA_ARGS__ <>                                                                                 \
+    /**/
+/***************** end inline var *****************/
 
 #endif
 

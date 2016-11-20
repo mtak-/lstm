@@ -2,8 +2,8 @@
 #define LSTM_DETAIL_THREAD_DATA_HPP
 
 #include <lstm/detail/backoff.hpp>
+#include <lstm/detail/compiler.hpp>
 #include <lstm/detail/fast_rw_mutex.hpp>
-#include <lstm/detail/thread_local.hpp>
 
 #include <cassert>
 
@@ -11,17 +11,9 @@ LSTM_DETAIL_BEGIN
     struct thread_data;
     using gp_t = uword;
 
-    // TODO: inline variable
-    template<std::nullptr_t = nullptr>
-    fast_rw_mutex thread_data_mut{};
-
-    // TODO: inline variable
-    template<std::nullptr_t = nullptr>
-    std::atomic<thread_data*> thread_data_root{nullptr};
-
-    // TODO: inline variable
-    template<std::nullptr_t = nullptr>
-    std::atomic<gp_t> grace_period{1};
+    LSTM_INLINE_VAR(fast_rw_mutex thread_data_mut){};
+    LSTM_INLINE_VAR(std::atomic<thread_data*> thread_data_root){nullptr};
+    LSTM_INLINE_VAR(std::atomic<gp_t> grace_period){1};
     
     // with the guarantee of no nested critical sections only one bit is needed
     // to say a thread is active.
@@ -36,21 +28,22 @@ LSTM_DETAIL_BEGIN
         thread_data() noexcept
             : tx(nullptr)
         {
-            thread_data_mut<>.lock();
+            LSTM_ACCESS_INLINE_VAR(thread_data_mut).lock();
             active.store(0, LSTM_RELAXED);
-            next.store(thread_data_root<>.load(LSTM_RELAXED), LSTM_RELAXED);
-            thread_data_root<>.store(this, LSTM_RELAXED);
-            thread_data_mut<>.unlock();
+            next.store(LSTM_ACCESS_INLINE_VAR(thread_data_root).load(LSTM_RELAXED), LSTM_RELAXED);
+            LSTM_ACCESS_INLINE_VAR(thread_data_root).store(this, LSTM_RELAXED);
+            LSTM_ACCESS_INLINE_VAR(thread_data_mut).unlock();
         }
         
         ~thread_data() noexcept {
             assert(tx == nullptr);
-            thread_data_mut<>.lock();
+            LSTM_ACCESS_INLINE_VAR(thread_data_mut).lock();
             assert(active.load(LSTM_RELAXED) == 0);
-            thread_data* root_ptr = thread_data_root<>.load(LSTM_RELAXED);
+            thread_data* root_ptr = LSTM_ACCESS_INLINE_VAR(thread_data_root).load(LSTM_RELAXED);
             assert(root_ptr != nullptr);
             if (root_ptr == this)
-                thread_data_root<>.store(next.load(LSTM_RELAXED), LSTM_RELAXED);
+                LSTM_ACCESS_INLINE_VAR(thread_data_root).store(next.load(LSTM_RELAXED),
+                                                               LSTM_RELAXED);
             else {
                 assert(root_ptr != nullptr);
                 while (root_ptr != nullptr && root_ptr->next.load(LSTM_RELAXED) != this)
@@ -58,7 +51,7 @@ LSTM_DETAIL_BEGIN
                 assert(root_ptr != nullptr);
                 root_ptr->next.store(next.load(LSTM_RELAXED), LSTM_RELAXED);
             }
-            thread_data_mut<>.unlock();
+            LSTM_ACCESS_INLINE_VAR(thread_data_mut).unlock();
         }
         
         thread_data(const thread_data&) = delete;
@@ -66,7 +59,7 @@ LSTM_DETAIL_BEGIN
         
         inline void access_lock() noexcept {
             assert(!active.load(LSTM_RELAXED));
-            active.store(grace_period<>.load(LSTM_RELAXED), LSTM_RELAXED);
+            active.store(LSTM_ACCESS_INLINE_VAR(grace_period).load(LSTM_RELAXED), LSTM_RELAXED);
             std::atomic_thread_fence(LSTM_ACQUIRE);
         }
         
@@ -91,7 +84,7 @@ LSTM_DETAIL_BEGIN
     
     // TODO: allow specifying a backoff strategy
     inline void wait(const gp_t gp, const bool desired) noexcept {
-        for (thread_data* q = thread_data_root<>.load(LSTM_RELAXED);
+        for (thread_data* q = LSTM_ACCESS_INLINE_VAR(thread_data_root).load(LSTM_RELAXED);
                 q != nullptr;
                 q = q->next.load(LSTM_RELAXED)) {
             default_backoff backoff;
@@ -109,18 +102,18 @@ LSTM_DETAIL_BEGIN
             gp_t gp;
             
             do {
-                if (!gp2) gp = grace_period<>.load(LSTM_RELAXED);
+                if (!gp2) gp = LSTM_ACCESS_INLINE_VAR(grace_period).load(LSTM_RELAXED);
                 gp2 = ~gp & -~gp;
-            } while (!gp2 || !grace_period<>.compare_exchange_weak(gp,
+            } while (!gp2 || !LSTM_ACCESS_INLINE_VAR(grace_period).compare_exchange_weak(gp,
                                                                    gp ^ gp2,
                                                                    LSTM_RELAXED,
                                                                    LSTM_RELEASE));
             
-            thread_data_mut<>.lock_shared();
+            LSTM_ACCESS_INLINE_VAR(thread_data_mut).lock_shared();
             wait(gp2, false);
-            grace_period<>.fetch_xor(gp2, LSTM_RELEASE);
+            LSTM_ACCESS_INLINE_VAR(grace_period).fetch_xor(gp2, LSTM_RELEASE);
             wait(gp2, true);
-            thread_data_mut<>.unlock_shared();
+            LSTM_ACCESS_INLINE_VAR(thread_data_mut).unlock_shared();
         }
     }
 LSTM_DETAIL_END

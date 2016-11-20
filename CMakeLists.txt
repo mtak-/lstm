@@ -5,13 +5,13 @@ project(LSTM CXX)
 enable_testing()
 include(CTest)
 
-include(WriteCompilerDetectionHeader)
-write_compiler_detection_header(
-  FILE "${CMAKE_SOURCE_DIR}/include/lstm/detail/thread_local.hpp"
-  PREFIX LSTM
-  COMPILERS GNU Clang AppleClang MSVC
-  FEATURES cxx_thread_local
-)
+# include(WriteCompilerDetectionHeader)
+# write_compiler_detection_header(
+#   FILE "${CMAKE_SOURCE_DIR}/include/lstm/detail/thread_local.hpp"
+#   PREFIX LSTM
+#   COMPILERS GNU Clang AppleClang MSVC
+#   FEATURES cxx_thread_local
+# )
 
 include_directories(include)
 
