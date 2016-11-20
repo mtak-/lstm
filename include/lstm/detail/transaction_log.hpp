@@ -79,7 +79,6 @@ LSTM_DETAIL_BEGIN
         }
         
         inline records_iter register_thread(const std::thread::id& id) noexcept {
-            LSTM_GUARD_RECORDS();
             auto iter_success = _records.emplace(id, thread_record());
             assert(iter_success.second);
             return iter_success.first;
