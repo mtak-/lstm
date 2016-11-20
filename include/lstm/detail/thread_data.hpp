@@ -104,10 +104,11 @@ LSTM_DETAIL_BEGIN
             do {
                 if (!gp2) gp = LSTM_ACCESS_INLINE_VAR(grace_period).load(LSTM_RELAXED);
                 gp2 = ~gp & -~gp;
-            } while (!gp2 || !LSTM_ACCESS_INLINE_VAR(grace_period).compare_exchange_weak(gp,
-                                                                   gp ^ gp2,
-                                                                   LSTM_RELAXED,
-                                                                   LSTM_RELEASE));
+            } while (!gp2 || !LSTM_ACCESS_INLINE_VAR(grace_period)
+                                .compare_exchange_weak(gp,
+                                                       gp ^ gp2,
+                                                       LSTM_RELAXED,
+                                                       LSTM_RELEASE));
             
             LSTM_ACCESS_INLINE_VAR(thread_data_mut).lock_shared();
             wait(gp2, false);
