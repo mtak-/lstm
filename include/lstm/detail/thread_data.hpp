@@ -31,15 +31,15 @@ LSTM_DETAIL_BEGIN
     struct thread_data {
         transaction* tx;
         std::atomic<gp_t> active;
-        thread_data* next;
+        std::atomic<thread_data*> next;
         
         thread_data() noexcept
             : tx(nullptr)
             , active(0)
         {
             thread_data_mut<>.lock();
-            next = thread_data_root<>.load(LSTM_RELAXED);
-            thread_data_root<>.store(this, LSTM_RELAXED);
+            std::atomic_init(&next, thread_data_root<>.load(LSTM_RELAXED));
+            thread_data_root<>.store(this);
             thread_data_mut<>.unlock();
         }
         
@@ -50,13 +50,13 @@ LSTM_DETAIL_BEGIN
             thread_data* root_ptr = thread_data_root<>.load(LSTM_RELAXED);
             assert(root_ptr != nullptr);
             if (root_ptr == this)
-                thread_data_root<>.store(next, LSTM_RELAXED);
+                thread_data_root<>.store(next.load(LSTM_RELAXED), LSTM_RELAXED);
             else {
                 assert(root_ptr != nullptr);
-                while (root_ptr != nullptr && root_ptr->next != this)
-                    root_ptr = root_ptr->next;
+                while (root_ptr != nullptr && root_ptr->next.load(LSTM_RELAXED) != this)
+                    root_ptr = root_ptr->next.load(LSTM_RELAXED);
                 assert(root_ptr != nullptr);
-                root_ptr->next = next;
+                root_ptr->next.store(next.load(LSTM_RELAXED), LSTM_RELAXED);
             }
             thread_data_mut<>.unlock();
         }
@@ -93,7 +93,7 @@ LSTM_DETAIL_BEGIN
     inline void wait(const gp_t gp, const bool desired) noexcept {
         for (thread_data* q = thread_data_root<>.load(LSTM_ACQUIRE);
                 q != nullptr;
-                q = q->next) {
+                q = q->next.load(LSTM_RELAXED)) {
             default_backoff backoff;
             while (not_in_grace_period(*q, gp, desired))
                 backoff();
