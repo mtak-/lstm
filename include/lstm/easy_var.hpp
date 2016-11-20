@@ -35,15 +35,9 @@ LSTM_BEGIN
         
         inline operator T() const { return get(); }
         
-        // TODO: return types
-        decltype(auto) unsafe_load() const & noexcept { return var.unsafe_load(); }
-        decltype(auto) unsafe_load() const && noexcept { return std::move(var.unsafe_load()); }
-        
-        void unsafe_store(const T& t) noexcept
-        { return var.unsafe_store(t); }
-        
-        void unsafe_store(T&& t) noexcept
-        { return var.unsafe_store(std::move(t)); }
+        T unsafe_load() const noexcept { return var.unsafe_load(); }
+        void unsafe_store(const T& t) noexcept { return var.unsafe_store(t); }
+        void unsafe_store(T&& t) noexcept { return var.unsafe_store(std::move(t)); }
     };
 LSTM_END
 
