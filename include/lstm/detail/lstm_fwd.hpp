@@ -63,7 +63,7 @@
     #ifndef LSTM_LOG_DUMP
         #define LSTM_LOG_DUMP() /**/
     #endif /* LSTM_LOG_DUMP */
-    #define LSTM_ALWAYS_INLINE inline __attribute((always_inline))
+    #define LSTM_ALWAYS_INLINE inline __attribute((always_inline)) // TODO: compiler specific
 #endif /* LSTM_LOG_TRANSACTIONS */
 
 LSTM_DETAIL_BEGIN

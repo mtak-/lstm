@@ -9,7 +9,9 @@
 #include <string>
 #include <thread>
 
-#define LSTM_GUARD_RECORDS() std::lock_guard<std::mutex> _guard{records_mut}
+#ifndef LSTM_GUARD_RECORDS
+    #define LSTM_GUARD_RECORDS() std::lock_guard<std::mutex> _guard{records_mut}
+#endif
 
 LSTM_DETAIL_BEGIN
     struct thread_record {
@@ -77,6 +79,7 @@ LSTM_DETAIL_BEGIN
         }
         
         inline records_iter register_thread(const std::thread::id& id) noexcept {
+            LSTM_GUARD_RECORDS();
             auto iter_success = _records.emplace(id, thread_record());
             assert(iter_success.second);
             return iter_success.first;
