@@ -85,7 +85,7 @@ LSTM_DETAIL_BEGIN
     inline bool not_in_grace_period(const thread_data& q,
                                     const gp_t gp,
                                     const bool desired) noexcept {
-        const gp_t thread_gp = q.active.load(LSTM_RELAXED);
+        const gp_t thread_gp = q.active.load(LSTM_ACQUIRE);
         return thread_gp && !!(thread_gp & gp) == desired;
     }
     
