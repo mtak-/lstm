@@ -44,9 +44,9 @@ LSTM_DETAIL_BEGIN
         }
         
         ~thread_data() noexcept {
-            assert(!active.load(LSTM_RELAXED));
             assert(tx == nullptr);
             thread_data_mut<>.lock();
+            assert(active.load(LSTM_RELAXED) == 0);
             thread_data* root_ptr = thread_data_root<>.load(LSTM_RELAXED);
             assert(root_ptr != nullptr);
             if (root_ptr == this)
