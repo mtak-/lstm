@@ -189,4 +189,17 @@ constexpr auto Same = std::is_same<T, U>::value;
     CHECK(noexcept(__VA_ARGS__))                                                                   \
     /**/
 
+#if defined(__has_feature)
+    #if __has_feature(thread_sanitizer)
+        #define LSTM_TEST_INIT(val, tsan_val) tsan_val
+        #ifdef LSTM_LOG_TRANSACTIONS
+            #error "LSTM_LOG_TRANSACTIONS will interfere with tsan results"
+        #endif
+    #else
+        #define LSTM_TEST_INIT(val, tsan_val) val
+    #endif
+#else
+    #define LSTM_TEST_INIT(val, tsan_val) val
+#endif
+
 #endif

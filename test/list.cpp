@@ -10,9 +10,11 @@
 #include "simple_test.hpp"
 #include "thread_manager.hpp"
 
+static constexpr int iter_count = LSTM_TEST_INIT(5000, 500);
+static constexpr int loop_count = LSTM_TEST_INIT(200, 20);
+
 int main() {
-    static constexpr int iter_count = 5000;
-    for(int loop = 0; loop < 200; ++loop) {
+    for(int loop = 0; loop < loop_count; ++loop) {
         {
             lstm::list<int, debug_alloc<int>> ints;
             thread_manager manager;

@@ -4,6 +4,9 @@
 #include "simple_test.hpp"
 #include "thread_manager.hpp"
 
+static constexpr auto loop_count0 = LSTM_TEST_INIT(5000000, 50000);
+static constexpr auto loop_count1 = LSTM_TEST_INIT(666666 * 5 + 4, 6666 * 5 + 4);
+
 using lstm::atomic;
 using lstm::easy_var;
 
@@ -14,7 +17,7 @@ int main() {
     thread_manager manager;
     
     manager.queue_thread([] {
-        for (int i = 0; i < 5'000'000; ++i) {
+        for (int i = 0; i < loop_count0; ++i) {
             lstm::atomic([] {
                 if (account1 >= 20) {
                     account0 += 20;
@@ -26,7 +29,7 @@ int main() {
     });
     
     manager.queue_thread([] {
-        for (int i = 0; i < 666666 * 5 + 4; ++i) {
+        for (int i = 0; i < loop_count1; ++i) {
             lstm::atomic([] {
                 if (account0 >= 30) {
                     account1 += 30;

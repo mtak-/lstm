@@ -14,6 +14,8 @@
 #include <thread>
 #include <vector>
 
+static constexpr auto loop_count = LSTM_TEST_INIT(500000, 5000);
+
 void push(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x, int val) {
     CHECK(lstm::in_transaction());
     
@@ -55,7 +57,7 @@ int main() {
         lstm::var<std::vector<int>, debug_alloc<std::vector<int>>> x{};
         
         for (int i = 0; i < 5; ++i)
-            manager.queue_loop_n(get_loop(x), 500000);
+            manager.queue_loop_n(get_loop(x), loop_count);
         manager.run();
         
         CHECK(x.unsafe_load().empty());

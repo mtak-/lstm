@@ -21,3 +21,7 @@ add_test(test.transfer_funds transfer_funds)
 add_executable(list list.cpp)
 target_link_libraries(list)
 add_test(test.list list)
+
+add_executable(thread_data_synchronization thread_data_synchronization.cpp)
+target_link_libraries(thread_data_synchronization)
+add_test(test.thread_data_synchronization thread_data_synchronization)
