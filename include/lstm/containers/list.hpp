@@ -112,9 +112,16 @@ LSTM_BEGIN
             lstm::atomic([&](auto& tx) {
                 auto _head = tx.load(head);
                 new_head->_next.unsafe_store(_head);
-                // TODO: segfaults if this is uncommented
-                // if (_head)
-                //     tx.store(_head->_prev, (void*)new_head);
+                
+                // TODO: segfault here
+                // the issue is that in the commit phase, everything should be checked in the
+                // same ORDER in which it was accessed
+                // e.g. if to access y, one must first access x
+                // then, deleting x, might also delete y.
+                // if x happens to be readonly, currently it will be validated after ALL writes
+                // thus the segfault here
+                if (_head)
+                    tx.store(_head->_prev, (void*)new_head);
                 tx.store(_size, tx.load(_size) + 1);
                 tx.store(head, new_head);
             }, nullptr, alloc());
