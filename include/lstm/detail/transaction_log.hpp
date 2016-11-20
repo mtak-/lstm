@@ -76,7 +76,7 @@ LSTM_DETAIL_BEGIN
             return singleton;
         }
         
-        inline records_iter register_thead(const std::thread::id& id) noexcept {
+        inline records_iter register_thread(const std::thread::id& id) noexcept {
             auto iter_success = _records.emplace(id, thread_record());
             assert(iter_success.second);
             return iter_success.first;
@@ -87,7 +87,7 @@ LSTM_DETAIL_BEGIN
             auto iter = _records.find(tid);
             if (iter == std::end(_records)) {
                 LSTM_GUARD_RECORDS();
-                iter = register_thead(tid);
+                iter = register_thread(tid);
             }
             ++iter->second.successes;
         }
@@ -97,7 +97,7 @@ LSTM_DETAIL_BEGIN
             auto iter = _records.find(tid);
             if (iter == std::end(_records)) {
                 LSTM_GUARD_RECORDS();
-                iter = register_thead(tid);
+                iter = register_thread(tid);
             }
             ++iter->second.internal_failures;
         }
@@ -107,7 +107,7 @@ LSTM_DETAIL_BEGIN
             auto iter = _records.find(tid);
             if (iter == std::end(_records)) {
                 LSTM_GUARD_RECORDS();
-                iter = register_thead(tid);
+                iter = register_thread(tid);
             }
             ++iter->second.user_failures;
         }

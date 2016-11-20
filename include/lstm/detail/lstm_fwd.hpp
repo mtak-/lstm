@@ -47,7 +47,7 @@
     #define LSTM_INTERNAL_FAIL_TX() lstm::detail::transaction_log::get().add_internal_failure()
     #define LSTM_USER_FAIL_TX() lstm::detail::transaction_log::get().add_user_failure()
     #define LSTM_SUCC_TX() lstm::detail::transaction_log::get().add_success()
-    #define LSTM_LOG_REGISTER_THREAD_ID(id) lstm::detail::transaction_log::get().register_thead(id)
+    #define LSTM_LOG_REGISTER_THREAD_ID(id) lstm::detail::transaction_log::get().register_thread(id)
     #define LSTM_LOG_CLEAR() lstm::detail::transaction_log::get().clear()
     #ifndef LSTM_LOG_DUMP
         #include <iostream>
