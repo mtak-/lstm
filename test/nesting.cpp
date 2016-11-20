@@ -64,7 +64,5 @@ int main() {
     }
     CHECK(debug_live_allocations<> == 0);
     
-    LSTM_LOG_DUMP();
-    
     return test_result();
 }

@@ -38,9 +38,6 @@ int main() {
             ints.clear();
             CHECK(ints.size() == 0);
             CHECK(debug_live_allocations<> == 0);
-    
-            LSTM_LOG_DUMP();
-            LSTM_LOG_CLEAR();
         }
     }
     

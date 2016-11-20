@@ -14,39 +14,39 @@ static easy_var<int, debug_alloc<int>> account0{300};
 static easy_var<int, debug_alloc<int>> account1{300};
 
 int main() {
-    thread_manager manager;
-    
-    manager.queue_thread([] {
-        for (int i = 0; i < loop_count0; ++i) {
-            lstm::atomic([] {
-                if (account1 >= 20) {
-                    account0 += 20;
-                    account1 -= 20;
-                } else
-                    lstm::retry();
-            });
-        }
-    });
-    
-    manager.queue_thread([] {
-        for (int i = 0; i < loop_count1; ++i) {
-            lstm::atomic([] {
-                if (account0 >= 30) {
-                    account1 += 30;
-                    account0 -= 30;
-                } else
-                    lstm::retry();
-            });
-        }
-    });
-    
-    manager.run();
-    
-    CHECK(account0.unsafe_load() == 280);
-    CHECK(account1.unsafe_load() == 320);
+    {
+        thread_manager manager;
+        
+        manager.queue_thread([] {
+            for (int i = 0; i < loop_count0; ++i) {
+                lstm::atomic([] {
+                    if (account1 >= 20) {
+                        account0 += 20;
+                        account1 -= 20;
+                    } else
+                        lstm::retry();
+                });
+            }
+        });
+        
+        manager.queue_thread([] {
+            for (int i = 0; i < loop_count1; ++i) {
+                lstm::atomic([] {
+                    if (account0 >= 30) {
+                        account1 += 30;
+                        account0 -= 30;
+                    } else
+                        lstm::retry();
+                });
+            }
+        });
+        
+        manager.run();
+        
+        CHECK(account0.unsafe_load() == 280);
+        CHECK(account1.unsafe_load() == 320);
+    }
     CHECK(debug_live_allocations<> == 0);
-    
-    LSTM_LOG_DUMP();
     
     return test_result();
 }

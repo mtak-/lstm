@@ -51,6 +51,11 @@ public:
         start_threads();
         join_and_clear_threads();
     }
+    
+    ~thread_manager() {
+        LSTM_LOG_DUMP();
+        LSTM_LOG_CLEAR();
+    }
 };
 
 #endif /* LSTM_TEST_THREAD_MANAGER_HPP */

@@ -38,8 +38,9 @@ auto get_loop(philosopher& p, fork& f0, fork& f1) {
 }
 
 int main() {
-    thread_manager manager;
     for (std::size_t i = 0; i < repeat_count; ++i) {
+        thread_manager manager;
+        
         philosopher phil, sami, eric, aimy, joey;
         fork forks[5];
         
@@ -60,9 +61,6 @@ int main() {
         CHECK(aimy.food == 0u);
         CHECK(joey.food == 0u);
         CHECK(debug_live_allocations<> == 0);
-        
-        LSTM_LOG_DUMP();
-        LSTM_LOG_CLEAR();
     }
     return test_result();
 }

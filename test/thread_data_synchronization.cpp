@@ -53,8 +53,6 @@ int main() {
         
         manager.run();
     }
-    
-    LSTM_LOG_DUMP();
 
     return test_result();
 }
