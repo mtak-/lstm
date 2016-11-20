@@ -111,6 +111,8 @@ LSTM_BEGIN
                 word src_version = src_var.version_lock.load(LSTM_ACQUIRE);
                 if (src_version <= read_version && !locked(src_version)) {
                     const T& result = var<T>::load(src_var.storage.load(LSTM_RELAXED));
+                    
+                    // TODO: this is actually super broke
                     if (src_var.version_lock.load(LSTM_RELEASE) == src_version) {
                         add_read_set(src_var);
                         return result;
@@ -130,6 +132,8 @@ LSTM_BEGIN
                 word src_version = src_var.version_lock.load(LSTM_ACQUIRE);
                 if (src_version <= read_version && !locked(src_version)) {
                     T result = var<T>::load(src_var.storage.load(LSTM_RELAXED));
+                    
+                    // TODO: this is actually super broke
                     if (src_var.version_lock.load(LSTM_RELEASE) == src_version) {
                         add_read_set(src_var);
                         return result;
