@@ -38,6 +38,8 @@ LSTM_DETAIL_BEGIN
                                                          LSTM_RELAXED));
             } while (write_locked(read_state));
             
+            std::atomic_thread_fence(LSTM_ACQUIRE);
+            
             assert(!write_locked(read_state));
             assert(read_locked(read_count.load(LSTM_RELAXED)));
         }
@@ -66,9 +68,7 @@ LSTM_DETAIL_BEGIN
         template<typename Backoff = default_backoff,
             LSTM_REQUIRES_(is_backoff_strategy<Backoff>())>
         void lock(Backoff backoff = {}) noexcept {
-            // get the acquire out of the way as well...
-            // tsan was complaining about atomic-fence synchronization?
-            uword prev_read_count = prev_read_count = read_count.fetch_or(write_bit, LSTM_ACQUIRE);
+            uword prev_read_count = prev_read_count = read_count.fetch_or(write_bit, LSTM_RELAXED);
             
             // first signal that we want to write, while checking if another thread is
             // already in line to write. first come first serve
@@ -86,6 +86,8 @@ LSTM_DETAIL_BEGIN
                 backoff();
                 prev_read_count = read_count.load(LSTM_RELAXED);
             }
+            
+            std::atomic_thread_fence(LSTM_ACQUIRE);
             
             // we have the lock
             assert(!read_locked(prev_read_count));

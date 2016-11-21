@@ -1,11 +1,8 @@
 #ifndef LSTM_DETAIL_THREAD_DATA_HPP
 #define LSTM_DETAIL_THREAD_DATA_HPP
 
-#include <lstm/detail/backoff.hpp>
 #include <lstm/detail/compiler.hpp>
 #include <lstm/detail/fast_rw_mutex.hpp>
-
-#include <cassert>
 
 LSTM_DETAIL_BEGIN
     struct thread_data;

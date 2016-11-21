@@ -192,15 +192,17 @@ inline void sleep_ms(int ms) { std::this_thread::sleep_for(std::chrono::millisec
     CHECK(noexcept(__VA_ARGS__))                                                                   \
     /**/
 
-#if defined(__has_feature)
-    #if __has_feature(thread_sanitizer)
-        #define LSTM_TEST_INIT(val, tsan_val) tsan_val
-        #ifdef LSTM_LOG_TRANSACTIONS
-            #error "LSTM_LOG_TRANSACTIONS will interfere with tsan results"
-        #endif
-        #ifndef NDEBUG
-            #error "Not defining NDEBUG will interfere with tsan results"
-        #endif
+#if !defined(__has_feature)
+    #define __has_feature(x) 0
+#endif
+
+#if __has_feature(thread_sanitizer)
+    #define LSTM_TEST_INIT(val, tsan_val) tsan_val
+    #ifdef LSTM_LOG_TRANSACTIONS
+        #error "LSTM_LOG_TRANSACTIONS will interfere with tsan results"
+    #endif
+    #ifndef NDEBUG
+        #error "Not defining NDEBUG will interfere with tsan results"
     #endif
 #endif
 

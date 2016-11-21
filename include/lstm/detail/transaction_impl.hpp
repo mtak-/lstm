@@ -30,7 +30,7 @@ LSTM_DETAIL_BEGIN
         inline constexpr read_set_value_type(const var_base& in_src_var) noexcept
             : _src_var(&in_src_var)
         {}
-            
+        
         inline constexpr const var_base& src_var() const noexcept { return *_src_var; }
         
         inline constexpr bool is_src_var(const var_base& rhs) const noexcept
@@ -53,7 +53,7 @@ LSTM_DETAIL_BEGIN
             : _dest_var(&in_dest_var)
             , _pending_write(std::move(in_pending_write))
         {}
-            
+        
         inline constexpr var_base& dest_var() const noexcept { return *_dest_var; }
         inline constexpr var_storage& pending_write() noexcept { return _pending_write; }
         inline constexpr const var_storage& pending_write() const noexcept
@@ -84,23 +84,23 @@ LSTM_DETAIL_BEGIN
                                                       write_deleter_alloc>;
         using read_set_const_iter = typename read_set_t::const_iterator;
         using write_set_iter = typename write_set_t::iterator;
-
+        
         read_set_t read_set;
         write_set_t write_set;
         deleter_set_t deleter_set;
-
+        
         inline transaction_impl(transaction_domain* domain, const Alloc& alloc) noexcept
             : transaction(domain)
             , read_set(alloc)
             , write_set(alloc)
             , deleter_set(alloc)
         {}
-            
+        
         static void unlock_write_set(write_set_iter begin, write_set_iter end) noexcept {
             for (; begin != end; ++begin)
                 unlock(begin->dest_var());
         }
-
+        
         bool commit_lock_writes() noexcept {
             write_set_iter write_begin = std::begin(write_set);
             write_set_iter write_end = std::end(write_set);
@@ -125,7 +125,7 @@ LSTM_DETAIL_BEGIN
             
             return true;
         }
-
+        
         bool commit_validate_reads() noexcept {
             // reads do not need to be locked to be validated
             for (auto& read_set_vaue : read_set) {
@@ -136,7 +136,7 @@ LSTM_DETAIL_BEGIN
             }
             return true;
         }
-
+        
         void commit_publish(const word write_version,
                             write_set_deleters_t& write_set_deleters) noexcept {
             for (auto& write_set_value : write_set) {
@@ -174,7 +174,7 @@ LSTM_DETAIL_BEGIN
             
             return true;
         }
-
+        
         // TODO: optimize for the following case?
         // write_set.size() == 1 && (read_set.empty() ||
         //                           read_set.size() == 1 && read_set[0] == write_set[0])
@@ -223,18 +223,18 @@ LSTM_DETAIL_BEGIN
                                 [&src_var](const read_set_value_type& rhs) noexcept -> bool
                                 { return rhs.is_src_var(src_var); });
         }
-
+        
         void add_read_set(const var_base& src_var) override final {
             if (find_read_set(src_var) == std::end(read_set))
                 read_set.emplace_back(src_var);
         }
-
+        
         void add_write_set(var_base& dest_var, var_storage pending_write) override final {
             // up to caller to ensure dest_var is not already in the write_set
             assert(!find_write_set(dest_var).success());
             write_set.emplace_back(dest_var, std::move(pending_write));
         }
-
+        
         write_set_lookup find_write_set(const var_base& dest_var) noexcept override final {
             const write_set_iter end = std::end(write_set);
             const write_set_iter iter = std::find_if(
