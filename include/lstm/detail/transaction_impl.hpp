@@ -165,7 +165,7 @@ LSTM_DETAIL_BEGIN
             
             word write_version = domain().bump_clock();
             
-            if (!commit_validate_reads())
+            if (write_version != read_version + 2 && !commit_validate_reads())
                 return false;
             
             commit_publish(write_version, write_set_deleters);
