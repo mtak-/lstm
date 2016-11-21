@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <utility>
 #include <iostream>
+#include <thread>
 #include <typeinfo>
 
 namespace test_impl
@@ -175,6 +176,8 @@ struct valid_instantiation<T, Arg, void_<T<Arg>>> : std::true_type {};
 template<typename T, typename U>
 constexpr auto Same = std::is_same<T, U>::value;
 
+inline void sleep_ms(int ms) { std::this_thread::sleep_for(std::chrono::milliseconds(ms)); }
+
 #define CHECK(...)                                                                                 \
     (void)(::test_impl::S{__FILE__, __LINE__, #__VA_ARGS__, __PRETTY_FUNCTION__} ->* __VA_ARGS__)  \
     /**/
@@ -195,10 +198,13 @@ constexpr auto Same = std::is_same<T, U>::value;
         #ifdef LSTM_LOG_TRANSACTIONS
             #error "LSTM_LOG_TRANSACTIONS will interfere with tsan results"
         #endif
-    #else
-        #define LSTM_TEST_INIT(val, tsan_val) val
+        #ifndef NDEBUG
+            #error "Not defining NDEBUG will interfere with tsan results"
+        #endif
     #endif
-#else
+#endif
+
+#ifndef LSTM_TEST_INIT
     #define LSTM_TEST_INIT(val, tsan_val) val
 #endif
 
