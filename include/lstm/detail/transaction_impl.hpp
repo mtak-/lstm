@@ -140,6 +140,8 @@ LSTM_DETAIL_BEGIN
         void commit_publish(const word write_version,
                             write_set_deleters_t& write_set_deleters) noexcept {
             for (auto& write_set_value : write_set) {
+                // TODO: possibly could reduce overhead here by adding to the write_set_deleters
+                // in "store" calls
                 if (write_set_value.dest_var().kind != var_type::atomic)
                     write_set_deleters.emplace_back(
                         &write_set_value.dest_var(),
