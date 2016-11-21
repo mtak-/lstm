@@ -33,31 +33,13 @@ LSTM_DETAIL_BEGIN
             return func();
         }
         
-        // heavy use of exceptions for lack of a better control flow
-        // means RAII has a bit of a penalty in some circumstances
-        template<typename Func, typename Tx,
-            LSTM_REQUIRES_(is_void_transact_function<Func>())>
-        static bool try_transact(Func& func, Tx& tx, thread_data& tls_td, tx_result_buffer<void>&) {
-            tls_td.access_lock();
-            call(func, tx);
-            tls_td.tx = nullptr; // in the future, unlocking, might trigger a transaction
-            tls_td.access_unlock();
-            
-            return tx.commit();
-        }
+        template<typename Func, typename Tx>
+        static void try_transact(Func& func, Tx& tx, tx_result_buffer<void>&)
+        { call(func, tx); }
         
-        template<typename Func, typename Tx,
-            LSTM_REQUIRES_(!is_void_transact_function<Func>())>
-        static bool try_transact(Func& func, Tx& tx,
-                                 thread_data& tls_td,
-                                 tx_result_buffer<transact_result<Func>>& buf) {
-            tls_td.access_lock();
-            buf.emplace(call(func, tx));
-            tls_td.tx = nullptr; // in the future, unlocking, might trigger a transaction
-            tls_td.access_unlock();
-            
-            return tx.commit();
-        }
+        template<typename Func, typename Tx>
+        static void try_transact(Func& func, Tx& tx, tx_result_buffer<transact_result<Func>>& buf)
+        { buf.emplace(call(func, tx)); }
         
         template<typename Func, typename Alloc, std::size_t ReadSize, std::size_t WriteSize,
             std::size_t DeleteSize>
@@ -70,26 +52,34 @@ LSTM_DETAIL_BEGIN
             transaction_impl<Alloc, ReadSize, WriteSize, DeleteSize> tx{domain, alloc};
             tls_td.tx = &tx;
             
+            // TODO: restructure this...
             while(true) {
                 try {
                     assert(tx.read_set.size() == 0);
                     assert(tx.write_set.size() == 0);
                     
-                    if (atomic_fn::try_transact(func, tx, tls_td, buf)) {
+                    tls_td.access_lock();
+                    atomic_fn::try_transact(func, tx, buf);
+                    tls_td.tx = nullptr;
+                    
+                    // commit performs access_unlock()
+                    // commit does no throw, and calls cleanup on fail
+                    // therefore no need to call cleanup on fail here
+                    // feeling overly committed to the idea that RAII makes this lib slow... :(
+                    if (tx.commit(tls_td)) {
                         tx.reset_heap();
                         return return_tx_result_buffer_fn{}(buf);
                     }
                     buf.reset();
-                    tx.cleanup();
                     tls_td.tx = &tx;
                     tx.reset_read_version();
                 } catch(const _tx_retry&) {
-                    tls_td.access_unlock();
                     tx.cleanup();
+                    tls_td.access_unlock();
                     tx.reset_read_version();
                 } catch(...) {
-                    tls_td.access_unlock();
                     tx.cleanup();
+                    tls_td.access_unlock();
                     tx.reset_heap();
                     tls_td.tx = nullptr;
                     throw;

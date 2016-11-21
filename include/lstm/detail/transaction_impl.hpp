@@ -162,6 +162,7 @@ LSTM_DETAIL_BEGIN
         bool commit_slow_path(write_set_deleters_t& write_set_deleters) noexcept {
             if (!commit_lock_writes())
                 return false;
+            
             word write_version = domain().bump_clock();
             
             if (!commit_validate_reads())
@@ -175,18 +176,30 @@ LSTM_DETAIL_BEGIN
         // TODO: optimize for the following case?
         // write_set.size() == 1 && (read_set.empty() ||
         //                           read_set.size() == 1 && read_set[0] == write_set[0])
-        bool commit() noexcept {
+        bool commit(thread_data& tls_td) noexcept {
             write_set_deleters_t write_set_deleters;
-            if (!write_set.empty() && !commit_slow_path(write_set_deleters)) {
+            
+            const bool fail = !write_set.empty() && !commit_slow_path(write_set_deleters);
+            
+            // if the transaction failed, cleanup calls a virtual function (:o) on var's
+            // therefore, access_lock() must be active
+            if (fail) cleanup();
+            
+            tls_td.access_unlock();
+            
+            if (fail) {
                 LSTM_INTERNAL_FAIL_TX();
                 return false;
             }
+            
             if (!deleter_set.empty() || !write_set_deleters.empty())
                 commit_reclaim(write_set_deleters);
             LSTM_SUCC_TX();
             return true;
         }
-
+        
+        // if the transaction failed, cleanup calls a virtual function (:o) on var's
+        // therefore, access_lock() must be active
         void cleanup() noexcept {
             // TODO: destroy only???
             for (auto& write_set_value : write_set)
