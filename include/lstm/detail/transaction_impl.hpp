@@ -185,6 +185,7 @@ LSTM_DETAIL_BEGIN
             
             // if the transaction failed, cleanup calls a virtual function (:o) on var's
             // therefore, access_lock() must be active
+            // TODO: this is a problem as destructors could start a transaction
             if (fail) cleanup();
             
             tls_td.access_unlock();
