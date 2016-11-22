@@ -25,3 +25,7 @@ add_test(test.list list)
 add_executable(thread_data_synchronization thread_data_synchronization.cpp)
 target_link_libraries(thread_data_synchronization)
 add_test(test.thread_data_synchronization thread_data_synchronization)
+
+add_executable(exception exception.cpp)
+target_link_libraries(exception)
+add_test(test.exception exception)
