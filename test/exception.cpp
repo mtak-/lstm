@@ -17,15 +17,14 @@ int main() {
         for (int i = 0; i < 5; ++i) {
             tm.queue_thread([&] {
                 for (int j = 0; j < loop_count; ++j) {
-                     try {
+                    try {
                         atomic([&](auto& tx) {
-                             int foo = tx.load(x);
-                             tx.store(x, foo + 5);
-                             if (foo + 5 >= 10000)
-                                 throw std::exception{};
+                            int foo = tx.load(x);
+                            tx.store(x, foo + 5);
+                            if (foo + 5 >= 10000)
+                                throw std::exception{};
                         });
-                     } catch(const std::exception&) {
-                     }
+                    } catch(const std::exception&) {}
                 }
             });
         }
@@ -33,7 +32,7 @@ int main() {
         tm.run();
     }
     
-     CHECK(x.unsafe_load() == 10000 - 5);
+    CHECK(x.unsafe_load() == 10000 - 5);
     
     return test_result();
 }

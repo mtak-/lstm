@@ -18,6 +18,7 @@ LSTM_BEGIN
             "raw c arrays are not allowed. try using a std::array");
         
     public:
+        // TODO: support construction from initializer_lists
         template<typename U, typename... Us,
             LSTM_REQUIRES_(std::is_constructible<T, U&&, Us&&...>() &&
                            !std::is_same<detail::uncvref<U>, detail::uncvref<Alloc>>())>
