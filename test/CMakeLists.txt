@@ -29,3 +29,7 @@ add_test(test.thread_data_synchronization thread_data_synchronization)
 add_executable(exception exception.cpp)
 target_link_libraries(exception)
 add_test(test.exception exception)
+
+add_executable(destructor_transaction destructor_transaction.cpp)
+target_link_libraries(destructor_transaction)
+add_test(test.destructor_transaction destructor_transaction)
