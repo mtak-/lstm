@@ -1,5 +1,5 @@
-#ifndef LSTM_SMALL_POD_VECTOR_HPP
-#define LSTM_SMALL_POD_VECTOR_HPP
+#ifndef LSTM_DETAIL_SMALL_POD_VECTOR_HPP
+#define LSTM_DETAIL_SMALL_POD_VECTOR_HPP
 
 #include <lstm/detail/lstm_fwd.hpp>
 
@@ -115,4 +115,4 @@ LSTM_DETAIL_BEGIN
     cend(const small_pod_vector<T>& v) noexcept { return v.cend(); }
 LSTM_DETAIL_END
 
-#endif /* LSTM_SMALL_POD_VECTOR_HPP */
+#endif /* LSTM_DETAIL_SMALL_POD_VECTOR_HPP */

@@ -50,7 +50,6 @@ LSTM_DETAIL_BEGIN
                                                       thread_data& tls_td) {
             tx_result_buffer<transact_result<Func>> buf;
             transaction_impl<Alloc, ReadSize, WriteSize, DeleteSize> tx{domain, alloc};
-            tls_td.tx = &tx;
             
             // TODO: restructure this...
             while(true) {
@@ -58,30 +57,30 @@ LSTM_DETAIL_BEGIN
                     assert(tx.read_set.size() == 0);
                     assert(tx.write_set.size() == 0);
                     
+                    tls_td.tx = &tx;
                     tls_td.access_lock();
                     atomic_fn::try_transact(func, tx, buf);
                     tls_td.tx = nullptr;
                     
                     // commit performs access_unlock()
-                    // commit does no throw, and calls cleanup on fail
-                    // therefore no need to call cleanup on fail here
-                    // feeling overly committed to the idea that RAII makes this lib slow... :(
+                    // commit does not throw
                     if (tx.commit(tls_td)) {
                         tx.reset_heap();
                         return return_tx_result_buffer_fn{}(buf);
                     }
+                    tx.cleanup();
                     buf.reset();
-                    tls_td.tx = &tx;
                     tx.reset_read_version();
                 } catch(const _tx_retry&) {
+                    tls_td.tx = nullptr;
                     tx.cleanup();
                     tls_td.access_unlock();
                     tx.reset_read_version();
                 } catch(...) {
+                    tls_td.tx = nullptr;
                     tx.cleanup();
                     tls_td.access_unlock();
                     tx.reset_heap();
-                    tls_td.tx = nullptr;
                     throw;
                 }
             }

@@ -183,11 +183,6 @@ LSTM_DETAIL_BEGIN
             
             const bool fail = !write_set.empty() && !commit_slow_path(write_set_deleters);
             
-            // if the transaction failed, cleanup calls a virtual function (:o) on var's
-            // therefore, access_lock() must be active
-            // TODO: this is a problem as destructors could start a transaction
-            if (fail) cleanup();
-            
             tls_td.access_unlock();
             
             if (fail) {
