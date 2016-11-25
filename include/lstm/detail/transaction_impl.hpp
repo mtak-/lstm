@@ -37,6 +37,9 @@ LSTM_DETAIL_BEGIN
         { return _src_var == &rhs; }
         
         inline constexpr bool operator<(const read_set_value_type& rhs) const noexcept
+        { return _src_var < rhs._src_var; }
+        
+        inline constexpr bool operator==(const read_set_value_type& rhs) const noexcept
         { return _src_var == rhs._src_var; }
     };
     
