@@ -79,6 +79,11 @@ LSTM_DETAIL_BEGIN
         
         void unordered_erase(const T* const ptr) noexcept
         { std::memmove((void*)ptr, --end_, sizeof(T)); }
+        
+        void set_end(T* const ptr) noexcept {
+            assert(ptr >= begin_ && ptr <= end_);
+            end_ = ptr;
+        }
             
         iterator begin() noexcept { return begin_; }
         iterator end() noexcept { return end_; }

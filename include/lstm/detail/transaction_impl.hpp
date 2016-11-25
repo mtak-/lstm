@@ -121,9 +121,11 @@ LSTM_DETAIL_BEGIN
                 }
                 
                 // TODO: weird to have this here
-                read_set_const_iter read_iter = find_read_set(write_iter->dest_var());
-                if (read_iter != std::end(read_set))
-                    read_set.unordered_erase(read_iter);
+                read_set.set_end(std::remove_if(std::begin(read_set),
+                                                std::end(read_set),
+                                                [&](const read_set_value_type& rsv) noexcept {
+                                                    return rsv.is_src_var(write_iter->dest_var());
+                                                }));
             }
             
             return true;
@@ -223,10 +225,8 @@ LSTM_DETAIL_BEGIN
                                 { return rhs.is_src_var(src_var); });
         }
         
-        void add_read_set(const var_base& src_var) override final {
-            if (find_read_set(src_var) == std::end(read_set))
-                read_set.emplace_back(src_var);
-        }
+        void add_read_set(const var_base& src_var) override final
+        { read_set.emplace_back(src_var); }
         
         void add_write_set(var_base& dest_var, var_storage pending_write) override final {
             // up to caller to ensure dest_var is not already in the write_set
