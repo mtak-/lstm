@@ -91,6 +91,7 @@ LSTM_DETAIL_BEGIN
         read_set_t read_set;
         write_set_t write_set;
         deleter_set_t deleter_set;
+        write_set_deleters_t write_set_deleters;
         
         inline transaction_impl(transaction_domain* domain, const Alloc& alloc) noexcept
             : transaction(domain)
@@ -142,8 +143,7 @@ LSTM_DETAIL_BEGIN
             return true;
         }
         
-        void commit_publish(const word write_version,
-                            write_set_deleters_t& write_set_deleters) noexcept {
+        void commit_publish(const word write_version) noexcept {
             for (auto& write_set_value : write_set) {
                 // TODO: possibly could reduce overhead here by adding to the write_set_deleters
                 // in "store" calls
@@ -157,16 +157,18 @@ LSTM_DETAIL_BEGIN
             }
         }
         
-        void commit_reclaim(write_set_deleters_t& write_set_deleters) noexcept {
-            synchronize();
-            for (auto& dler : deleter_set)
-                (*static_cast<deleter_base*>(static_cast<a_deleter_type*>((void*)&dler)))();
-            for (const auto& dler : write_set_deleters)
-                dler.var_ptr->destroy_deallocate(dler.storage);
-            write_set_deleters.reset();
+        void commit_reclaim() noexcept {
+            if (!deleter_set.empty() || !write_set_deleters.empty()) {
+                synchronize();
+                for (auto& dler : deleter_set)
+                    (*static_cast<deleter_base*>(static_cast<a_deleter_type*>((void*)&dler)))();
+                for (const auto& dler : write_set_deleters)
+                    dler.var_ptr->destroy_deallocate(dler.storage);
+                write_set_deleters.reset();
+            }
         }
         
-        bool commit_slow_path(write_set_deleters_t& write_set_deleters) noexcept {
+        bool commit_slow_path() noexcept {
             if (!commit_lock_writes())
                 return false;
             
@@ -175,7 +177,7 @@ LSTM_DETAIL_BEGIN
             if (write_version != read_version + 2 && !commit_validate_reads())
                 return false;
             
-            commit_publish(write_version, write_set_deleters);
+            commit_publish(write_version);
             
             return true;
         }
@@ -183,18 +185,14 @@ LSTM_DETAIL_BEGIN
         // TODO: optimize for the following case?
         // write_set.size() == 1 && (read_set.empty() ||
         //                           read_set.size() == 1 && read_set[0] == write_set[0])
-        bool commit(thread_data& tls_td) noexcept {
-            if (!write_set.empty() && !commit_slow_path(write_set_deleters)) {
+        bool commit() noexcept {
+            if (!write_set.empty() && !commit_slow_path()) {
                 LSTM_INTERNAL_FAIL_TX();
                 return false;
             }
             
-            tls_td.access_unlock();
-            
             LSTM_SUCC_TX();
             
-            if (!deleter_set.empty() || !write_set_deleters.empty())
-                commit_reclaim(write_set_deleters);
             return true;
         }
         

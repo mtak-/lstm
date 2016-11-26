@@ -63,7 +63,9 @@ LSTM_DETAIL_BEGIN
                     tls_td.tx = nullptr;
                     
                     // commit does not throw
-                    if (tx.commit(tls_td)) {
+                    if (tx.commit()) {
+                        tls_td.access_unlock();
+                        tx.commit_reclaim();
                         tx.reset_heap();
                         return return_tx_result_buffer_fn{}(buf);
                     }
