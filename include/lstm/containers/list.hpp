@@ -38,6 +38,7 @@ LSTM_BEGIN
         using alloc_traits = std::allocator_traits<Alloc>;
         
         lstm::var<node_t*> head{nullptr};
+        lstm::var<node_t*> last{nullptr};
         lstm::var<word> _size{0};
         
         Alloc& alloc() noexcept { return *this; }
@@ -113,13 +114,6 @@ LSTM_BEGIN
                 auto _head = tx.load(head);
                 new_head->_next.unsafe_store(_head);
                 
-                // TODO: segfault here
-                // the issue is that in the commit phase, everything should be checked in the
-                // same ORDER in which it was accessed
-                // e.g. if to access y, one must first access x
-                // then, deleting x, might also delete y.
-                // if x happens to be readonly, currently it will be validated after ALL writes
-                // thus the segfault here
                 if (_head)
                     tx.store(_head->_prev, (void*)new_head);
                 tx.store(_size, tx.load(_size) + 1);
