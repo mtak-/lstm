@@ -62,24 +62,25 @@ LSTM_DETAIL_BEGIN
                     atomic_fn::try_transact(func, tx, buf);
                     tls_td.tx = nullptr;
                     
-                    // commit performs access_unlock()
                     // commit does not throw
                     if (tx.commit(tls_td)) {
                         tx.reset_heap();
                         return return_tx_result_buffer_fn{}(buf);
                     }
                     tx.cleanup();
+                    tls_td.access_unlock();
+                    
                     buf.reset();
                     tx.reset_read_version();
                 } catch(const _tx_retry&) {
-                    tls_td.tx = nullptr;
                     tx.cleanup();
                     tls_td.access_unlock();
+                    tls_td.tx = nullptr;
                     tx.reset_read_version();
                 } catch(...) {
-                    tls_td.tx = nullptr;
                     tx.cleanup();
                     tls_td.access_unlock();
+                    tls_td.tx = nullptr;
                     tx.reset_heap();
                     throw;
                 }

@@ -184,20 +184,17 @@ LSTM_DETAIL_BEGIN
         // write_set.size() == 1 && (read_set.empty() ||
         //                           read_set.size() == 1 && read_set[0] == write_set[0])
         bool commit(thread_data& tls_td) noexcept {
-            write_set_deleters_t write_set_deleters;
-            
-            const bool fail = !write_set.empty() && !commit_slow_path(write_set_deleters);
-            
-            tls_td.access_unlock();
-            
-            if (fail) {
+            if (!write_set.empty() && !commit_slow_path(write_set_deleters)) {
                 LSTM_INTERNAL_FAIL_TX();
                 return false;
             }
             
+            tls_td.access_unlock();
+            
+            LSTM_SUCC_TX();
+            
             if (!deleter_set.empty() || !write_set_deleters.empty())
                 commit_reclaim(write_set_deleters);
-            LSTM_SUCC_TX();
             return true;
         }
         
