@@ -51,7 +51,7 @@ LSTM_DETAIL_BEGIN
         small_pod_vector& operator=(const small_pod_vector&) = delete;
         
     #ifndef NDEBUG
-        ~small_pod_vector() noexcept { assert(begin_ == buffer); }
+        ~small_pod_vector() noexcept { assert(begin_ == buffer && end_ == buffer); }
     #endif
             
         void reset() noexcept {
