@@ -80,7 +80,7 @@ LSTM_BEGIN
 
         static inline void unlock(const detail::var_base& v) noexcept {
             assert(locked(v.version_lock.load(LSTM_RELAXED)));
-            v.version_lock.fetch_sub(1, LSTM_RELEASE); // TODO: seems correct, but might not be
+            v.version_lock.fetch_sub(1, LSTM_RELEASE);
         }
 
         inline bool read_valid(const detail::var_base& v) const noexcept
@@ -150,7 +150,6 @@ LSTM_BEGIN
             else
                 dest_var.store(lookup.pending_write(), (U&&)u);
 
-            // TODO: where is this best placed???, or is it best removed altogether?
             if (!read_valid(dest_var)) detail::internal_retry();
         }
 
@@ -164,7 +163,7 @@ LSTM_BEGIN
             ::new (&storage) detail::deleter<T, Alloc>(dest_var, alloc);
         }
 
-        // TODO: reading/writing an rvalue probably never makes sense?
+        // reading/writing an rvalue probably never makes sense
         template<typename T>
         void load(const var<T>&& v) = delete;
 
