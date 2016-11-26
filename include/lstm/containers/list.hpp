@@ -38,7 +38,6 @@ LSTM_BEGIN
         using alloc_traits = std::allocator_traits<Alloc>;
         
         lstm::var<node_t*> head{nullptr};
-        lstm::var<node_t*> last{nullptr};
         lstm::var<word> _size{0};
         
         Alloc& alloc() noexcept { return *this; }

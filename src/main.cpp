@@ -7,7 +7,7 @@
 #include <chrono>
 #include <iostream>
 
-static constexpr auto thread_count = 8;
+static constexpr auto thread_count = 1;
 static constexpr auto loop_count = 400000008 / thread_count;
 
 int main() {
@@ -30,16 +30,11 @@ int main() {
     thread_manager.run();
     auto end = std::chrono::high_resolution_clock::now();
 
-    lstm::atomic([&](auto& tx) {
-        (void)tx;
-        assert(tx.load(x) == 2000);
-    });
-
     LSTM_LOG_DUMP();
 
     std::cout << "LSTM: "
-              << (std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() / 1000000.f)
-              << "ms"
+              << (std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() / float(loop_count * thread_count))
+              << "ns"
               << std::endl;
 
     return 0;
