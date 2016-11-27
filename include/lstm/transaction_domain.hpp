@@ -1,7 +1,6 @@
 #ifndef LSTM_TRANSACTION_DOMAIN_HPP
 #define LSTM_TRANSACTION_DOMAIN_HPP
 
-#include <lstm/detail/compiler.hpp>
 #include <lstm/detail/lstm_fwd.hpp>
 
 #include <atomic>

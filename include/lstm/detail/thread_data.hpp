@@ -1,7 +1,6 @@
 #ifndef LSTM_DETAIL_THREAD_DATA_HPP
 #define LSTM_DETAIL_THREAD_DATA_HPP
 
-#include <lstm/detail/compiler.hpp>
 #include <lstm/detail/fast_rw_mutex.hpp>
 
 LSTM_DETAIL_BEGIN

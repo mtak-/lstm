@@ -1,6 +1,8 @@
 #ifndef LSTM_DETAIL_LSTM_FWD_HPP
 #define LSTM_DETAIL_LSTM_FWD_HPP
 
+#include <lstm/detail/compiler.hpp>
+
 #include <cstdint>
 #include <memory>
 #include <type_traits>
@@ -53,7 +55,6 @@
         #include <iostream>
         #define LSTM_LOG_DUMP() (std::cout << lstm::detail::transaction_log::get().results())
     #endif /* LSTM_LOG_DUMP */
-    #define LSTM_ALWAYS_INLINE inline
 #else
     #define LSTM_INTERNAL_FAIL_TX() /**/
     #define LSTM_USER_FAIL_TX() /**/
@@ -63,7 +64,6 @@
     #ifndef LSTM_LOG_DUMP
         #define LSTM_LOG_DUMP() /**/
     #endif /* LSTM_LOG_DUMP */
-    #define LSTM_ALWAYS_INLINE inline __attribute((always_inline)) // TODO: compiler specific
 #endif /* LSTM_LOG_TRANSACTIONS */
 
 LSTM_DETAIL_BEGIN
