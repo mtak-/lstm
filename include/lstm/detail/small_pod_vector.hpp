@@ -10,6 +10,8 @@ LSTM_DETAIL_BEGIN
     struct small_pod_vector : private Alloc {
     private:
         static_assert(std::is_pod<T>{}, "");
+        static_assert(N > 0,
+            "small_pod_vector must have a buffer size greater than 0");
         
         T buffer[N];
         T* begin_; T* end_;

@@ -254,14 +254,14 @@
 #  ifndef NDEBUG
 #    define LSTM_ALWAYS_INLINE inline
 #    define LSTM_NOINLINE /**/
-#    define LSTM_LIKELY(...) __VA_ARGS__
-#    define LSTM_UNLIKELY(...) __VA_ARGS__
+#    define LSTM_LIKELY(...) (__VA_ARGS__)
+#    define LSTM_UNLIKELY(...) (__VA_ARGS__)
 #  else
 #    if LSTM_COMPILER_IS_MSVC
 #      define LSTM_ALWAYS_INLINE inline __forceinline
 #      define LSTM_NOINLINE __declspec(noinline)
-#      define LSTM_LIKELY(...) __VA_ARGS__
-#      define LSTM_UNLIKELY(...) __VA_ARGS__
+#      define LSTM_LIKELY(...) (__VA_ARGS__)
+#      define LSTM_UNLIKELY(...) (__VA_ARGS__)
 #    elif LSTM_COMPILER_IS_Clang || LSTM_COMPILER_IS_GNU || LSTM_COMPILER_IS_AppleClang
 #      define LSTM_ALWAYS_INLINE inline __attribute__((always_inline))
 #      define LSTM_NOINLINE __attribute__((noinline))
@@ -270,8 +270,8 @@
 #    else
 #      define LSTM_ALWAYS_INLINE inline
 #      define LSTM_NOINLINE /**/
-#      define LSTM_LIKELY(...) __VA_ARGS__
-#      define LSTM_UNLIKELY(...) __VA_ARGS__
+#      define LSTM_LIKELY(...) (__VA_ARGS__)
+#      define LSTM_UNLIKELY(...) (__VA_ARGS__)
 #    endif
 #  endif /* NDEBUG */
 /******************* end inline *******************/

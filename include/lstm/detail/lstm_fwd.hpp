@@ -1,6 +1,12 @@
 #ifndef LSTM_DETAIL_LSTM_FWD_HPP
 #define LSTM_DETAIL_LSTM_FWD_HPP
 
+#ifdef NDEBUG
+    #if NDEBUG != 1
+        #error "NDEBUG must either be undefined or defined to be 1"
+    #endif
+#endif
+
 #include <lstm/detail/compiler.hpp>
 
 #include <cstdint>
