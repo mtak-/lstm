@@ -87,20 +87,6 @@ LSTM_DETAIL_BEGIN
         throw detail::_tx_retry{};
     }
     
-    struct write_set_lookup {
-    private:
-        var_storage* _pending_write;
-        
-    public:
-        inline constexpr write_set_lookup(std::nullptr_t) noexcept : _pending_write{nullptr} {}
-        inline constexpr write_set_lookup(var_storage& in_pending_write) noexcept
-            : _pending_write{&in_pending_write}
-        {}
-            
-        inline constexpr bool success() const noexcept { return _pending_write != nullptr; }
-        inline constexpr var_storage& pending_write() const noexcept { return *_pending_write; }
-    };
-    
     template<typename T>
     using uncvref = std::remove_cv_t<std::remove_reference_t<T>>;
     

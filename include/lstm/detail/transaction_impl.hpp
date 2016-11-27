@@ -2,6 +2,7 @@
 #define LSTM_DETAIL_TRANSACTION_IMPL_HPP
 
 #include <lstm/detail/small_pod_vector.hpp>
+#include <lstm/detail/small_pod_hash_set.hpp>
 #include <lstm/detail/thread_data.hpp>
 
 #include <lstm/transaction.hpp>
@@ -80,7 +81,7 @@ LSTM_DETAIL_BEGIN
         using deleter_alloc = typename alloc_traits::template rebind_alloc<deleter_storage>;
         using write_deleter_alloc = typename alloc_traits::template rebind_alloc<write_set_deleter>;
         using read_set_t = small_pod_vector<read_set_value_type, ReadSize, read_alloc>;
-        using write_set_t = small_pod_vector<write_set_value_type, WriteSize, write_alloc>;
+        using write_set_t = small_pod_hash_set<write_set_value_type, WriteSize, write_alloc>;
         using deleter_set_t = small_pod_vector<deleter_storage, DeleteSize, deleter_alloc>;
         using write_set_deleters_t = small_pod_vector<write_set_deleter,
                                                       WriteSize,
@@ -223,28 +224,96 @@ LSTM_DETAIL_BEGIN
         void add_read_set(const var_base& src_var) override final
         { read_set.emplace_back(src_var); }
         
-        void add_write_set(var_base& dest_var, var_storage pending_write) override final {
+        void add_write_set(var_base& dest_var,
+                           const var_storage pending_write,
+                           const std::uint64_t hash) override final {
             // up to caller to ensure dest_var is not already in the write_set
             assert(!find_write_set(dest_var).success());
-            write_set.emplace_back(dest_var, std::move(pending_write));
+            write_set.push_back(dest_var, pending_write, hash);
         }
         
         write_set_lookup find_write_set(const var_base& dest_var) noexcept override final {
-            const write_set_iter end = std::end(write_set);
-            const write_set_iter iter = std::find_if(
-                std::begin(write_set),
-                end,
-                [&dest_var](const write_set_value_type& rhs) noexcept -> bool
-                { return rhs.is_dest_var(dest_var); });
-            return iter != end
-                ? write_set_lookup{iter->pending_write()}
-                : write_set_lookup{nullptr};
+            write_set_lookup lookup;
+            lookup.hash = hash(dest_var);
+            if (LSTM_LIKELY(!(write_set.filter() & lookup.hash)))
+                return lookup;
+            write_set_iter iter = slow_find(write_set.begin(), write_set.end(), dest_var);
+            return iter != write_set.end()
+                ? write_set_lookup{&iter->pending_write(), 0}
+                : lookup;
         }
         
         deleter_storage& delete_set_push_back_storage() override final {
             deleter_set.emplace_back();
             return deleter_set.back();
         }
+        
+    public:
+        template<typename T, typename Alloc0,
+            LSTM_REQUIRES_(!var<T, Alloc0>::atomic)>
+        const T& load(const var<T, Alloc0>& src_var) {
+            detail::write_set_lookup lookup = find_write_set(src_var);
+            if (LSTM_LIKELY(!lookup.success())) {
+                const word src_version = src_var.version_lock.load(LSTM_ACQUIRE);
+                const T& result = var<T>::load(src_var.storage.load(LSTM_ACQUIRE));
+                if (src_version <= read_version
+                        && !locked(src_version)
+                        && src_var.version_lock.load(LSTM_RELAXED) == src_version) {
+                    add_read_set(src_var);
+                    return result;
+                }
+            } else if (src_var.version_lock.load(LSTM_RELAXED) <= read_version)
+                return var<T>::load(lookup.pending_write());
+            detail::internal_retry();
+        }
+        
+        template<typename T, typename Alloc0,
+            LSTM_REQUIRES_(var<T, Alloc0>::atomic)>
+        T load(const var<T, Alloc0>& src_var) {
+             detail::write_set_lookup lookup = find_write_set(src_var);
+             if (LSTM_LIKELY(!lookup.success())) {
+                const word src_version = src_var.version_lock.load(LSTM_ACQUIRE);
+                const T result = var<T>::load(src_var.storage.load(LSTM_ACQUIRE));
+                if (src_version <= read_version
+                        && !locked(src_version)
+                        && src_var.version_lock.load(LSTM_RELAXED) == src_version) {
+                    add_read_set(src_var);
+                    return result;
+                }
+             } else if (src_var.version_lock.load(LSTM_RELAXED) <= read_version)
+                 return var<T>::load(lookup.pending_write());
+            detail::internal_retry();
+        }
+
+        template<typename T, typename Alloc0, typename U,
+            LSTM_REQUIRES_(std::is_assignable<T&, U&&>() &&
+                           std::is_constructible<T, U&&>())>
+        void store(var<T, Alloc0>& dest_var, U&& u) {
+            detail::write_set_lookup lookup = find_write_set(dest_var);
+            if (LSTM_LIKELY(!lookup.success()))
+                add_write_set(dest_var, dest_var.allocate_construct((U&&)u), lookup.hash);
+            else
+                var<T>::store(lookup.pending_write(), (U&&)u);
+            
+            if (!read_valid(dest_var)) detail::internal_retry();
+        }
+
+        template<typename T, typename Alloc0 = std::allocator<T>>
+        void delete_(T* dest_var, const Alloc0& alloc = {}) {
+            static_assert(sizeof(detail::deleter<T, Alloc0>) == sizeof(detail::deleter_storage));
+            static_assert(alignof(detail::deleter<T, Alloc0>) == alignof(detail::deleter_storage));
+            static_assert(std::is_trivially_destructible<detail::deleter<T, Alloc0>>{});
+            
+            detail::deleter_storage& storage = delete_set_push_back_storage();
+            ::new (&storage) detail::deleter<T, Alloc0>(dest_var, alloc);
+        }
+
+        // reading/writing an rvalue probably never makes sense
+        template<typename T>
+        void load(const var<T>&& v) = delete;
+
+        template<typename T>
+        void store(var<T>&& v) = delete;
     };
 LSTM_DETAIL_END
 

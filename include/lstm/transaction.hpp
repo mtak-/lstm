@@ -32,6 +32,14 @@ LSTM_DETAIL_BEGIN
     
     using a_deleter_type = deleter<word, std::allocator<word>>;
     using deleter_storage = uninitialized<a_deleter_type>;
+    
+    struct write_set_lookup {
+        var_storage* pending_write_;
+        std::uint64_t hash;
+        
+        inline constexpr bool success() const noexcept { return !hash; }
+        inline constexpr var_storage& pending_write() const noexcept { return *pending_write_; }
+    };
 LSTM_DETAIL_END
 
 LSTM_BEGIN
@@ -88,7 +96,8 @@ LSTM_BEGIN
 
         virtual void add_read_set(const detail::var_base& src_var) = 0;
         virtual void add_write_set(detail::var_base& dest_var,
-                                   detail::var_storage pending_write) = 0;
+                                   detail::var_storage pending_write,
+                                   const std::uint64_t hash) = 0;
         
         virtual detail::write_set_lookup
         find_write_set(const detail::var_base& dest_var) noexcept = 0;
@@ -102,54 +111,52 @@ LSTM_BEGIN
         transaction& operator=(const transaction&) = delete;
         transaction& operator=(transaction&&) = delete;
         
-        template<typename T, typename Alloc,
-            LSTM_REQUIRES_(!var<T, Alloc>::atomic)>
-        const T& load(const var<T, Alloc>& src_var) {
+        template<typename T, typename Alloc0,
+            LSTM_REQUIRES_(!var<T, Alloc0>::atomic)>
+        const T& load(const var<T, Alloc0>& src_var) {
             detail::write_set_lookup lookup = find_write_set(src_var);
-            if (!lookup.success()) {
-                // TODO: this is not optimal!!!
-                word src_version = src_var.version_lock.load(LSTM_ACQUIRE);
-                if (src_version <= read_version && !locked(src_version)) {
-                    const T& result = var<T>::load(src_var.storage.load(LSTM_ACQUIRE));
-                    if (src_var.version_lock.load(LSTM_RELAXED) == src_version) {
-                        add_read_set(src_var);
-                        return result;
-                    }
+            if (LSTM_LIKELY(!lookup.success())) {
+                const word src_version = src_var.version_lock.load(LSTM_ACQUIRE);
+                const T& result = var<T>::load(src_var.storage.load(LSTM_ACQUIRE));
+                if (src_version <= read_version
+                        && !locked(src_version)
+                        && src_var.version_lock.load(LSTM_RELAXED) == src_version) {
+                    add_read_set(src_var);
+                    return result;
                 }
-            } else if (read_valid(src_var))
+            } else if (src_var.version_lock.load(LSTM_RELAXED) <= read_version)
                 return var<T>::load(lookup.pending_write());
             detail::internal_retry();
         }
         
-        template<typename T, typename Alloc,
-            LSTM_REQUIRES_(var<T, Alloc>::atomic)>
-        T load(const var<T, Alloc>& src_var) {
-            detail::write_set_lookup lookup = find_write_set(src_var);
-            if (!lookup.success()) {
-                // TODO: this is not optimal!!!
-                word src_version = src_var.version_lock.load(LSTM_ACQUIRE);
-                if (src_version <= read_version && !locked(src_version)) {
-                    T result = var<T>::load(src_var.storage.load(LSTM_ACQUIRE));
-                    if (src_var.version_lock.load(LSTM_RELAXED) == src_version) {
-                        add_read_set(src_var);
-                        return result;
-                    }
+        template<typename T, typename Alloc0,
+            LSTM_REQUIRES_(var<T, Alloc0>::atomic)>
+        T load(const var<T, Alloc0>& src_var) {
+             detail::write_set_lookup lookup = find_write_set(src_var);
+             if (LSTM_LIKELY(!lookup.success())) {
+                const word src_version = src_var.version_lock.load(LSTM_ACQUIRE);
+                const T result = var<T>::load(src_var.storage.load(LSTM_ACQUIRE));
+                if (src_version <= read_version
+                        && !locked(src_version)
+                        && src_var.version_lock.load(LSTM_RELAXED) == src_version) {
+                    add_read_set(src_var);
+                    return result;
                 }
-            } else if (read_valid(src_var))
-                return var<T>::load(lookup.pending_write());
+             } else if (src_var.version_lock.load(LSTM_RELAXED) <= read_version)
+                 return var<T>::load(lookup.pending_write());
             detail::internal_retry();
         }
-
-        template<typename T, typename Alloc, typename U,
+        
+        template<typename T, typename Alloc0, typename U,
             LSTM_REQUIRES_(std::is_assignable<T&, U&&>() &&
                            std::is_constructible<T, U&&>())>
-        void store(var<T, Alloc>& dest_var, U&& u) {
+        void store(var<T, Alloc0>& dest_var, U&& u) {
             detail::write_set_lookup lookup = find_write_set(dest_var);
-            if (!lookup.success())
-                add_write_set(dest_var, dest_var.allocate_construct((U&&)u));
+            if (LSTM_LIKELY(!lookup.success()))
+                add_write_set(dest_var, dest_var.allocate_construct((U&&)u), lookup.hash);
             else
-                dest_var.store(lookup.pending_write(), (U&&)u);
-
+                var<T>::store(lookup.pending_write(), (U&&)u);
+            
             if (!read_valid(dest_var)) detail::internal_retry();
         }
 
