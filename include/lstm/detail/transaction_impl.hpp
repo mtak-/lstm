@@ -169,7 +169,7 @@ LSTM_DETAIL_BEGIN
             }
         }
         
-        bool commit_slow_path() noexcept {
+        LSTM_NOINLINE bool commit_slow_path() noexcept {
             if (!commit_lock_writes())
                 return false;
             
