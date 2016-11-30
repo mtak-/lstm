@@ -72,10 +72,12 @@ LSTM_BEGIN
         static inline word as_locked(word version) noexcept { return version | 1; }
 
         bool lock(const detail::var_base& v) const noexcept {
-            word version_buf = read_version;
-            return v.version_lock.compare_exchange_strong(version_buf,
-                                                          as_locked(read_version),
-                                                          LSTM_RELEASE);
+            word version_buf = v.version_lock.load(LSTM_RELAXED);
+            // TODO: not convinced of this ordering
+            return version_buf <= read_version && !locked(version_buf) &&
+                    v.version_lock.compare_exchange_strong(version_buf,
+                                                           as_locked(version_buf),
+                                                           LSTM_RELEASE);
         }
 
         static inline
