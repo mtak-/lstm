@@ -71,12 +71,11 @@ LSTM_BEGIN
         static inline bool locked(word version) noexcept { return version & 1; }
         static inline word as_locked(word version) noexcept { return version | 1; }
 
-        bool lock(word& version_buf, const detail::var_base& v) const noexcept {
-            while (version_buf <= read_version && !locked(version_buf) &&
-                !v.version_lock.compare_exchange_weak(version_buf,
-                                                      as_locked(version_buf),
-                                                      LSTM_RELEASE)); // TODO: is this correct?
-            return version_buf <= read_version && !locked(version_buf);
+        bool lock(const detail::var_base& v) const noexcept {
+            word version_buf = read_version;
+            return v.version_lock.compare_exchange_strong(version_buf,
+                                                          as_locked(read_version),
+                                                          LSTM_RELEASE);
         }
 
         static inline

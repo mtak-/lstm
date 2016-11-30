@@ -113,11 +113,9 @@ LSTM_DETAIL_BEGIN
             // sorting ensures a thread always makes progress...
             std::sort(write_begin, write_end);
             
-            word version_buf;
             for (write_set_iter write_iter = write_begin; write_iter != write_end; ++write_iter) {
-                version_buf = 0;
                 // TODO: only care what version the var is, if it's also a read?
-                if (!lock(version_buf, write_iter->dest_var())) {
+                if (!lock(write_iter->dest_var())) {
                     unlock_write_set(std::move(write_begin), std::move(write_iter));
                     return false;
                 }
