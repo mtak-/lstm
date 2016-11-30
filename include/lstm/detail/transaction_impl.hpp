@@ -121,6 +121,12 @@ LSTM_DETAIL_BEGIN
                 }
                 
                 // TODO: weird to have this here
+                // typical usage patterns would probly be:
+                //   read shared variable
+                //   do stuff
+                //   store result
+                //   end transaction
+                // transactions are pretty composable which might matter a little
                 read_set.set_end(std::remove_if(std::begin(read_set),
                                                 std::end(read_set),
                                                 [&](const read_set_value_type& rsv) noexcept {
