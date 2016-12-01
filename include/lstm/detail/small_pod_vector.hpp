@@ -23,8 +23,7 @@ LSTM_DETAIL_BEGIN
         
         Alloc& alloc() noexcept { return *this; }
         
-        template<typename... Us>
-        LSTM_NOINLINE void emplace_back_slow_path(Us&&... us) {
+        LSTM_NOINLINE void reserve_more() {
             capacity_ = capacity_ * 2;
             T* newBegin = alloc_traits::allocate(alloc(), capacity_);
             assert(newBegin);
@@ -34,7 +33,6 @@ LSTM_DETAIL_BEGIN
                 alloc_traits::deallocate(alloc(), begin_, capacity_ >> 1);
             end_ = newBegin + size();
             begin_ = newBegin;
-            ::new (end_++) T((Us&&)us...);
         }
     
     public:
@@ -70,10 +68,9 @@ LSTM_DETAIL_BEGIN
         
         template<typename... Us>
         void emplace_back(Us&&... us) {
-            if (LSTM_LIKELY(size() < capacity()))
-                ::new (end_++) T((Us&&)us...);
-            else
-                emplace_back_slow_path((Us&&)us...);
+            if (LSTM_UNLIKELY(size() == capacity()))
+                reserve_more();
+            ::new (end_++) T((Us&&)us...);
         }
         
         void unordered_erase(T* const ptr) noexcept {
