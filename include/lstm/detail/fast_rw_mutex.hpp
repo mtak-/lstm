@@ -22,7 +22,7 @@ LSTM_DETAIL_BEGIN
         inline static bool read_locked(const std::atomic<uword>& state) noexcept = delete;
         
         template<typename Backoff>
-        void lock_shared_slow_path(Backoff& backoff) noexcept {
+        LSTM_NOINLINE void lock_shared_slow_path(Backoff& backoff) noexcept {
             // didn't succeed in acquiring read access, so undo, the reader count increment
             read_count.fetch_sub(1, LSTM_RELAXED);
             
@@ -55,7 +55,7 @@ LSTM_DETAIL_BEGIN
             LSTM_REQUIRES_(is_backoff_strategy<Backoff>())>
         inline void lock_shared(Backoff backoff = {}) noexcept {
             // if there's a writer, do the slow stuff
-            if (write_locked(read_count.fetch_add(1, LSTM_ACQUIRE)))
+            if (LSTM_UNLIKELY(write_locked(read_count.fetch_add(1, LSTM_ACQUIRE))))
                 lock_shared_slow_path(backoff);
         }
         
