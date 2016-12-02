@@ -13,8 +13,9 @@ private:
 public:
     template<typename F>
     void queue_thread(F&& f) {
+        using namespace std::chrono_literals;
         threads.emplace_back([this, f = (F&&)f]{
-            while(!_run.load(LSTM_RELAXED));
+            while(!_run.load(LSTM_RELAXED)) { std::this_thread::sleep_for(1ns); }
             f();
         });
         LSTM_LOG_REGISTER_THREAD_ID(threads.back().get_id());
@@ -22,8 +23,9 @@ public:
     
     template<typename F>
     void queue_loop_n(F&& f, const int n) {
+        using namespace std::chrono_literals;
         threads.emplace_back([this, f = (F&&)f, n]{
-            while(!_run.load(LSTM_RELAXED));
+            while(!_run.load(LSTM_RELAXED)) { std::this_thread::sleep_for(1ns); }
             for (int i = 0; i < n; ++i)
                 f();
         });

@@ -29,12 +29,13 @@ int main() {
     auto start = std::chrono::high_resolution_clock::now();
     thread_manager.run();
     auto end = std::chrono::high_resolution_clock::now();
-
-    LSTM_LOG_DUMP();
-
+    
+    std::cout << "LSTM: "
+              << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+              << "ms total\n";
     std::cout << "LSTM: "
               << (std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() / float(loop_count * thread_count))
-              << "ns"
+              << "ns per transaction"
               << std::endl;
 
     return 0;
