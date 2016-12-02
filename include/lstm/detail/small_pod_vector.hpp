@@ -6,12 +6,13 @@
 #include <cassert>
 
 LSTM_DETAIL_BEGIN
+    // this class never calls construct/destroy... there's no need for POD types
+    // if an allocator "requires" construct/destroy to be called, it will be in for a surprise
     template<typename T, uword N = 4, typename Alloc = std::allocator<T>>
     struct small_pod_vector : private Alloc {
     private:
         static_assert(std::is_pod<T>{}, "");
-        static_assert(N > 0,
-            "small_pod_vector must have a buffer size greater than 0");
+        static_assert(N > 0, "small_pod_vector must have a buffer size greater than 0");
         
         T buffer[N];
         T* begin_; T* end_;
@@ -19,22 +20,26 @@ LSTM_DETAIL_BEGIN
         
         using alloc_traits = std::allocator_traits<Alloc>;
         static_assert(std::is_pointer<typename alloc_traits::pointer>{},
-            "sorry, lstm only supports allocators that return raw pointers");
+            "sorry, lstm currently only supports allocators that return raw pointers");
         
-        Alloc& alloc() noexcept { return *this; }
+        inline Alloc& alloc() noexcept { return *this; }
         
-        LSTM_NOINLINE void reserve_more() {
-            capacity_ = capacity_ * 2;
+        LSTM_NOINLINE void reserve_more()
+            noexcept(noexcept(alloc_traits::allocate(alloc(), capacity_)))
+        {
+            capacity_ = capacity_ << 1;
+            assert(capacity_ > size()); // zomg big transaction
             T* newBegin = alloc_traits::allocate(alloc(), capacity_);
             assert(newBegin);
-            if (newBegin != begin_)
+            if (newBegin != begin_) {
                 std::memcpy(newBegin, begin_, sizeof(T) * size());
-            if ((capacity_ >> 1) > N)
-                alloc_traits::deallocate(alloc(), begin_, capacity_ >> 1);
-            end_ = newBegin + size();
-            begin_ = newBegin;
+                if ((capacity_ >> 1) > N)
+                    alloc_traits::deallocate(alloc(), begin_, capacity_ >> 1);
+                end_ = newBegin + size();
+                begin_ = newBegin;
+            }
         }
-    
+        
     public:
         using iterator = T*;
         using const_iterator = const T*;
@@ -46,14 +51,16 @@ LSTM_DETAIL_BEGIN
             , end_(buffer)
             , capacity_(N)
         {}
-            
+        
         small_pod_vector(const small_pod_vector&) = delete;
         small_pod_vector& operator=(const small_pod_vector&) = delete;
         
     #ifndef NDEBUG
+        // ensure reset has been called on destruction
         ~small_pod_vector() noexcept { assert(begin_ == buffer && end_ == buffer); }
     #endif
-            
+        
+        // in release, leaves object in an invalid state
         void reset() noexcept {
             if (capacity() > N)
                 alloc_traits::deallocate(alloc(), begin_, capacity_);
@@ -61,14 +68,14 @@ LSTM_DETAIL_BEGIN
             end_ = begin_ = buffer;
     #endif
         }
-            
+        
         bool empty() const noexcept { return end_ == begin_; }
         uword size() const noexcept { return end_ - begin_; }
         uword capacity() const noexcept { return capacity_; }
         
         template<typename... Us>
-        void emplace_back(Us&&... us) {
-            if (LSTM_UNLIKELY(size() == capacity()))
+        void emplace_back(Us&&... us) noexcept(noexcept(reserve_more())) {
+            if (LSTM_UNLIKELY(size() == capacity_))
                 reserve_more();
             ::new (end_++) T((Us&&)us...);
         }
@@ -87,7 +94,7 @@ LSTM_DETAIL_BEGIN
             assert(ptr >= begin_ && ptr <= end_);
             end_ = ptr;
         }
-            
+        
         iterator begin() noexcept { return begin_; }
         iterator end() noexcept { return end_; }
         const_iterator begin() const noexcept { return begin_; }
