@@ -73,6 +73,7 @@ LSTM_DETAIL_BEGIN
     inline bool not_in_grace_period(const thread_data& q,
                                     const gp_t gp,
                                     const bool desired) noexcept {
+        // TODO: acquire seems unneeded
         const gp_t thread_gp = q.active.load(LSTM_ACQUIRE);
         return thread_gp && !!(thread_gp & gp) == desired;
     }
@@ -92,25 +93,26 @@ LSTM_DETAIL_BEGIN
     // TODO: allow specifying a backoff strategy
     inline void synchronize() noexcept {
         assert(!tls_thread_data().active.load(LSTM_RELAXED));
-        {
-            gp_t gp2 = 0;
-            gp_t gp;
-            
-            do {
-                if (!gp2) gp = LSTM_ACCESS_INLINE_VAR(grace_period).load(LSTM_RELAXED);
-                gp2 = ~gp & -~gp;
-            } while (!gp2 || !LSTM_ACCESS_INLINE_VAR(grace_period)
-                                .compare_exchange_weak(gp,
-                                                       gp ^ gp2,
-                                                       LSTM_RELAXED,
-                                                       LSTM_RELEASE));
-            
-            LSTM_ACCESS_INLINE_VAR(thread_data_mut).lock_shared();
-            wait(gp2, false);
-            LSTM_ACCESS_INLINE_VAR(grace_period).fetch_xor(gp2, LSTM_RELEASE);
-            wait(gp2, true);
-            LSTM_ACCESS_INLINE_VAR(thread_data_mut).unlock_shared();
-        }
+        
+        gp_t gp2 = 0;
+        gp_t gp;
+        
+        do {
+            if (!gp2) gp = LSTM_ACCESS_INLINE_VAR(grace_period).load(LSTM_RELAXED);
+            gp2 = ~gp & -~gp;
+        } while (!gp2 || !LSTM_ACCESS_INLINE_VAR(grace_period)
+                            .compare_exchange_weak(gp,
+                                                   gp ^ gp2,
+                                                   LSTM_RELAXED,
+                                                   LSTM_RELEASE));
+        
+        LSTM_ACCESS_INLINE_VAR(thread_data_mut).lock_shared();
+        wait(gp2, false);
+        
+        // TODO: release seems unneeded
+        LSTM_ACCESS_INLINE_VAR(grace_period).fetch_xor(gp2, LSTM_RELEASE);
+        wait(gp2, true);
+        LSTM_ACCESS_INLINE_VAR(thread_data_mut).unlock_shared();
     }
 LSTM_DETAIL_END
 
