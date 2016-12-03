@@ -90,10 +90,7 @@ LSTM_DETAIL_BEGIN
     }
     
     // TODO: kill the CAS operation? (speculative or, might actually decrease grace period times)
-    // TODO: allow specifying a backoff strategy
-    inline void synchronize() noexcept {
-        assert(!tls_thread_data().active.load(LSTM_RELAXED));
-        
+    inline gp_t acquire_gp_bit() {
         gp_t gp2 = 0;
         gp_t gp;
         
@@ -105,13 +102,21 @@ LSTM_DETAIL_BEGIN
                                                    gp ^ gp2,
                                                    LSTM_RELAXED,
                                                    LSTM_RELEASE));
+        return gp2;
+    }
+    
+    // TODO: allow specifying a backoff strategy
+    inline void synchronize() noexcept {
+        assert(!tls_thread_data().active.load(LSTM_RELAXED));
+        
+        gp_t gp = acquire_gp_bit();
         
         LSTM_ACCESS_INLINE_VAR(thread_data_mut).lock_shared();
-        wait(gp2, false);
+        wait(gp, false);
         
         // TODO: release seems unneeded
-        LSTM_ACCESS_INLINE_VAR(grace_period).fetch_xor(gp2, LSTM_RELEASE);
-        wait(gp2, true);
+        LSTM_ACCESS_INLINE_VAR(grace_period).fetch_xor(gp, LSTM_RELEASE);
+        wait(gp, true);
         LSTM_ACCESS_INLINE_VAR(thread_data_mut).unlock_shared();
     }
 LSTM_DETAIL_END
