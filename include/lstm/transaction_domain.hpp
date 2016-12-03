@@ -7,12 +7,12 @@
 #include <cassert>
 
 LSTM_BEGIN
-    struct transaction_domain {
+    struct LSTM_CACHE_ALIGNED transaction_domain {
     private:
         static constexpr word clock_bump_size = 2;
         static constexpr word max_version = std::numeric_limits<word>::max() - clock_bump_size + 1;
         
-        std::atomic<word> clock{0};
+        LSTM_CACHE_ALIGNED std::atomic<word> clock{0};
         
         inline word bump_clock() noexcept {
             word result = clock.fetch_add(clock_bump_size, LSTM_RELEASE) + clock_bump_size;
