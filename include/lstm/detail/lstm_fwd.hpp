@@ -72,6 +72,31 @@
     #endif /* LSTM_LOG_DUMP */
 #endif /* LSTM_LOG_TRANSACTIONS */
 
+#ifndef LSTM_ALWAYS_SEQ_CST
+    #define LSTM_ACQUIRE std::memory_order_acquire
+    #define LSTM_RELEASE std::memory_order_release
+    #define LSTM_ACQ_REL std::memory_order_acq_rel
+    #define LSTM_RELAXED std::memory_order_relaxed
+    #define LSTM_CONSUME std::memory_order_consume
+    #define LSTM_SEQ_CST std::memory_order_seq_cst
+#else
+    #define LSTM_ACQUIRE std::memory_order_seq_cst
+    #define LSTM_RELEASE std::memory_order_seq_cst
+    #define LSTM_ACQ_REL std::memory_order_seq_cst
+    #define LSTM_RELAXED std::memory_order_seq_cst
+    #define LSTM_CONSUME std::memory_order_seq_cst
+    #define LSTM_SEQ_CST std::memory_order_seq_cst
+#endif
+
+#ifndef LSTM_CACHE_LINE_SIZE
+    #define LSTM_CACHE_LINE_SIZE 64
+#endif
+#ifndef LSTM_NO_CACHE_ALIGNMENT
+    #define LSTM_CACHE_ALIGNED alignas(LSTM_CACHE_LINE_SIZE)
+#else
+    #define LSTM_CACHE_ALIGNED /**/
+#endif
+
 LSTM_DETAIL_BEGIN
     using var_storage = void*;
     
@@ -171,21 +196,5 @@ LSTM_DETAIL_END
 LSTM_TEST_BEGIN
     struct transaction_tester;
 LSTM_TEST_END
-
-#ifndef LSTM_ALWAYS_SEQ_CST
-    #define LSTM_ACQUIRE std::memory_order_acquire
-    #define LSTM_RELEASE std::memory_order_release
-    #define LSTM_ACQ_REL std::memory_order_acq_rel
-    #define LSTM_RELAXED std::memory_order_relaxed
-    #define LSTM_CONSUME std::memory_order_consume
-    #define LSTM_SEQ_CST std::memory_order_seq_cst
-#else
-    #define LSTM_ACQUIRE std::memory_order_seq_cst
-    #define LSTM_RELEASE std::memory_order_seq_cst
-    #define LSTM_ACQ_REL std::memory_order_seq_cst
-    #define LSTM_RELAXED std::memory_order_seq_cst
-    #define LSTM_CONSUME std::memory_order_seq_cst
-    #define LSTM_SEQ_CST std::memory_order_seq_cst
-#endif
 
 #endif /* LSTM_DETAIL_LSTM_FWD_HPP */
