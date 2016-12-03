@@ -90,7 +90,7 @@ LSTM_DETAIL_BEGIN
     }
     
     // TODO: kill the CAS operation? (speculative or, might actually decrease grace period times)
-    inline gp_t acquire_gp_bit() {
+    inline gp_t acquire_gp_bit() noexcept {
         gp_t gp2 = 0;
         gp_t gp;
         
