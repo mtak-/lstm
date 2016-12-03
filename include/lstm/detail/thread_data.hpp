@@ -25,28 +25,27 @@ LSTM_DETAIL_BEGIN
             : tx(nullptr)
         {
             LSTM_ACCESS_INLINE_VAR(thread_data_mut).lock();
-            active.store(0, LSTM_RELAXED);
-            next.store(LSTM_ACCESS_INLINE_VAR(thread_data_root).load(LSTM_RELAXED), LSTM_RELAXED);
-            LSTM_ACCESS_INLINE_VAR(thread_data_root).store(this, LSTM_RELAXED);
+                
+                active.store(0, LSTM_RELAXED);
+                next.store(LSTM_ACCESS_INLINE_VAR(thread_data_root).load(LSTM_RELAXED),
+                           LSTM_RELAXED);
+                LSTM_ACCESS_INLINE_VAR(thread_data_root).store(this, LSTM_RELAXED);
+                
             LSTM_ACCESS_INLINE_VAR(thread_data_mut).unlock();
         }
         
-        ~thread_data() noexcept {
+        LSTM_NOINLINE ~thread_data() noexcept {
             assert(tx == nullptr);
-            LSTM_ACCESS_INLINE_VAR(thread_data_mut).lock();
             assert(active.load(LSTM_RELAXED) == 0);
-            thread_data* root_ptr = LSTM_ACCESS_INLINE_VAR(thread_data_root).load(LSTM_RELAXED);
-            assert(root_ptr != nullptr);
-            if (root_ptr == this)
-                LSTM_ACCESS_INLINE_VAR(thread_data_root).store(next.load(LSTM_RELAXED),
-                                                               LSTM_RELAXED);
-            else {
-                assert(root_ptr != nullptr);
-                while (root_ptr != nullptr && root_ptr->next.load(LSTM_RELAXED) != this)
-                    root_ptr = root_ptr->next.load(LSTM_RELAXED);
-                assert(root_ptr != nullptr);
-                root_ptr->next.store(next.load(LSTM_RELAXED), LSTM_RELAXED);
-            }
+            
+            LSTM_ACCESS_INLINE_VAR(thread_data_mut).lock();
+                
+                std::atomic<thread_data*>* indirect = &LSTM_ACCESS_INLINE_VAR(thread_data_root);
+                while (indirect->load(LSTM_RELAXED) != this)
+                    indirect = &indirect->load(LSTM_RELAXED)->next;
+                
+                indirect->store(next.load(LSTM_RELAXED), LSTM_RELAXED);
+                
             LSTM_ACCESS_INLINE_VAR(thread_data_mut).unlock();
         }
         
