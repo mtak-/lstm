@@ -8,18 +8,18 @@ LSTM_DETAIL_BEGIN
     using gp_t = uword;
 
     LSTM_INLINE_VAR(fast_rw_mutex thread_data_mut){};
-    LSTM_INLINE_VAR(std::atomic<thread_data*> thread_data_root){nullptr};
-    LSTM_INLINE_VAR(std::atomic<gp_t> grace_period){1};
+    LSTM_INLINE_VAR(LSTM_CACHE_ALIGNED std::atomic<thread_data*> thread_data_root){nullptr};
+    LSTM_INLINE_VAR(LSTM_CACHE_ALIGNED std::atomic<gp_t> grace_period){1};
     
     // with the guarantee of no nested critical sections only one bit is needed
     // to say a thread is active.
     // this means the remaining bits can be used for the grace period, resulting
     // in concurrent writes
     // still not ideal, as writes should be batched
-    struct thread_data {
+    struct LSTM_CACHE_ALIGNED thread_data {
         transaction* tx;
-        std::atomic<gp_t> active;
-        std::atomic<thread_data*> next;
+        LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
+        LSTM_CACHE_ALIGNED std::atomic<thread_data*> next;
         
         thread_data() noexcept
             : tx(nullptr)
@@ -90,6 +90,7 @@ LSTM_DETAIL_BEGIN
     }
     
     // TODO: kill the CAS operation? (speculative or, might actually decrease grace period times)
+    // TODO: write a better less confusing implementation
     inline gp_t acquire_gp_bit() noexcept {
         gp_t gp2 = 0;
         gp_t gp;
