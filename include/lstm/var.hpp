@@ -5,7 +5,7 @@
 
 LSTM_BEGIN
     template<typename T, typename Alloc>
-    struct LSTM_CACHE_ALIGNED var
+    struct var
         : detail::var_alloc_policy<T, Alloc>
     {
     private:
