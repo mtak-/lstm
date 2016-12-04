@@ -24,7 +24,7 @@ LSTM_DETAIL_BEGIN
         
         inline Alloc& alloc() noexcept { return *this; }
         
-        void set_new_begin(T* const new_begin) noexcept {
+        void reserve_more_slow_path(T* const new_begin) noexcept {
             std::memcpy(new_begin, begin_, sizeof(T) * size());
             if ((capacity_ >> 1) > N)
                 alloc_traits::deallocate(alloc(), begin_, capacity_ >> 1);
@@ -40,7 +40,7 @@ LSTM_DETAIL_BEGIN
             T* const new_begin = alloc_traits::allocate(alloc(), capacity_);
             assert(new_begin);
             if (new_begin != begin_)
-                set_new_begin(new_begin);
+                reserve_more_slow_path(new_begin);
         }
         
     public:
