@@ -7,10 +7,10 @@
 
 LSTM_DETAIL_BEGIN
     // this class is probly best for use in otherwise wait-free write side algorithms
-    struct fast_rw_mutex {
+    struct LSTM_CACHE_ALIGNED fast_rw_mutex {
     private:
         static constexpr uword write_bit = uword(1) << (sizeof(uword) * 8 - 1);
-        std::atomic<uword> read_count{0};
+        LSTM_CACHE_ALIGNED std::atomic<uword> read_count{0};
         
         inline static constexpr bool write_locked(const uword state) noexcept
         { return state & write_bit; }
