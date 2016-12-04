@@ -19,21 +19,12 @@ int main() {
             lstm::list<int, debug_alloc<int>> ints;
             thread_manager manager;
     
-            auto start = std::chrono::high_resolution_clock::now();
-    
             manager.queue_loop_n([&] { ints.emplace_front(0); }, iter_count);
             manager.queue_loop_n([&] { ints.emplace_front(0); }, iter_count);
             manager.queue_loop_n([&] { ints.clear(); }, iter_count);
             manager.queue_loop_n([&] { ints.clear(); }, iter_count);
     
             manager.run();
-    
-            auto end = std::chrono::high_resolution_clock::now();
-    
-            std::cout << "LIST INSERTION: "
-                      << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-                      << "ms"
-                      << std::endl;
                       
             ints.clear();
             CHECK(ints.size() == 0);
