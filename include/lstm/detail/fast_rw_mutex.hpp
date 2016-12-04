@@ -46,7 +46,7 @@ LSTM_DETAIL_BEGIN
                 lock_shared_slow_path(backoff);
         }
         
-        void unlock_shared() noexcept {
+        inline void unlock_shared() noexcept {
             uword prev = read_count.fetch_sub(1, LSTM_RELEASE);
             (void)prev;
             assert(read_locked(prev));
@@ -54,14 +54,14 @@ LSTM_DETAIL_BEGIN
         
         template<typename Backoff = default_backoff,
             LSTM_REQUIRES_(is_backoff_strategy<Backoff>())>
-        void lock(Backoff backoff = {}) noexcept {
+        inline void lock(Backoff backoff = {}) noexcept {
             uword prev_read_count = request_write_lock(backoff);
             wait_for_readers(backoff, prev_read_count);
             
             std::atomic_thread_fence(LSTM_ACQUIRE);
         }
         
-        void unlock() noexcept {
+        inline void unlock() noexcept {
             uword prev = read_count.fetch_and(~write_bit, LSTM_RELEASE);
             (void)prev;
             assert(write_locked(prev));
@@ -70,7 +70,7 @@ LSTM_DETAIL_BEGIN
     
     template<typename Backoff>
     LSTM_NOINLINE void fast_rw_mutex::lock_shared_slow_path(Backoff& backoff) noexcept {
-        // didn't succeed in acquiring read access, so undo, the reader count increment
+        // didn't succeed in acquiring read access, so undo the reader count increment
         read_count.fetch_sub(1, LSTM_RELAXED);
         
         uword read_state;
@@ -94,7 +94,7 @@ LSTM_DETAIL_BEGIN
     uword fast_rw_mutex::request_write_lock(Backoff backoff) {
         uword prev_read_count = read_count.fetch_or(write_bit, LSTM_RELAXED);
         
-        // check if another thread is already in line to write. first come first serve
+        // first come first serve
         while (write_locked(prev_read_count)) {
             backoff();
             prev_read_count = read_count.fetch_or(write_bit, LSTM_RELAXED);
