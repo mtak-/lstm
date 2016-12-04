@@ -11,7 +11,7 @@ LSTM_DETAIL_BEGIN
     template<typename T, uword N = 4, typename Alloc = std::allocator<T>>
     struct small_pod_vector : private Alloc {
     private:
-        static_assert(std::is_pod<T>{}, "");
+        static_assert(std::is_pod<T>{}, "oops");
         static_assert(N > 0, "small_pod_vector must have a buffer size greater than 0");
         
         T buffer[N];
@@ -24,20 +24,23 @@ LSTM_DETAIL_BEGIN
         
         inline Alloc& alloc() noexcept { return *this; }
         
+        void set_new_begin(T* const new_begin) noexcept {
+            std::memcpy(new_begin, begin_, sizeof(T) * size());
+            if ((capacity_ >> 1) > N)
+                alloc_traits::deallocate(alloc(), begin_, capacity_ >> 1);
+            end_ = new_begin + size();
+            begin_ = new_begin;
+        }
+        
         LSTM_NOINLINE void reserve_more()
             noexcept(noexcept(alloc_traits::allocate(alloc(), capacity_)))
         {
             capacity_ = capacity_ << 1;
             assert(capacity_ > size()); // zomg big transaction
-            T* newBegin = alloc_traits::allocate(alloc(), capacity_);
-            assert(newBegin);
-            if (newBegin != begin_) {
-                std::memcpy(newBegin, begin_, sizeof(T) * size());
-                if ((capacity_ >> 1) > N)
-                    alloc_traits::deallocate(alloc(), begin_, capacity_ >> 1);
-                end_ = newBegin + size();
-                begin_ = newBegin;
-            }
+            T* const new_begin = alloc_traits::allocate(alloc(), capacity_);
+            assert(new_begin);
+            if (new_begin != begin_)
+                set_new_begin(new_begin);
         }
         
     public:
@@ -61,6 +64,7 @@ LSTM_DETAIL_BEGIN
     #endif
         
         // in release, leaves object in an invalid state
+        // aka this is the real destructor, but explicit. because... i want that
         void reset() noexcept {
             if (capacity() > N)
                 alloc_traits::deallocate(alloc(), begin_, capacity_);
