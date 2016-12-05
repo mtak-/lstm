@@ -34,7 +34,7 @@ LSTM_DETAIL_BEGIN
             LSTM_ACCESS_INLINE_VAR(thread_data_mut).unlock();
         }
         
-        LSTM_NOINLINE ~thread_data() noexcept {
+        ~thread_data() noexcept {
             assert(tx == nullptr);
             assert(active.load(LSTM_RELAXED) == 0);
             
@@ -64,10 +64,12 @@ LSTM_DETAIL_BEGIN
         }
     };
     
-    // TODO: allow specifying a backoff strategy
-    inline thread_data& tls_thread_data() noexcept {
-        static LSTM_THREAD_LOCAL thread_data data;
-        return data;
+    LSTM_INLINE_VAR(LSTM_THREAD_LOCAL thread_data _tls_thread_data){};
+    
+    LSTM_ALWAYS_INLINE thread_data& tls_thread_data() noexcept {
+        auto* result = &LSTM_ACCESS_INLINE_VAR(_tls_thread_data);
+        LSTM_ESCAPE_VAR(result);
+        return *result;
     }
     
     inline bool not_in_grace_period(const thread_data& q,
