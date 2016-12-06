@@ -68,7 +68,7 @@ LSTM_DETAIL_BEGIN
     
     LSTM_ALWAYS_INLINE thread_data& tls_thread_data() noexcept {
         auto* result = &LSTM_ACCESS_INLINE_VAR(_tls_thread_data);
-        LSTM_ESCAPE_VAR(result);
+        LSTM_ESCAPE_VAR(result); // atleast on darwin, this helps significantly
         return *result;
     }
     
