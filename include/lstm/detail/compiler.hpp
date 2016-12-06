@@ -278,7 +278,7 @@
 
 /******************* escape var *******************/
 #  if LSTM_COMPILER_IS_Clang || LSTM_COMPILER_IS_GNU || LSTM_COMPILER_IS_AppleClang
-#    define LSTM_ESCAPE_VAR(x) asm volatile("" : : "g"(&x) : "memory") /**/
+#    define LSTM_ESCAPE_VAR(x) asm ("" :: "g"(&x) : ) /**/
 #  else
 #    define LSTM_ESCAPE_VAR(x) /**/
 #  endif
