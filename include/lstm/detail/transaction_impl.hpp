@@ -218,13 +218,6 @@ LSTM_DETAIL_BEGIN
             deleter_set.reset();
         }
         
-        read_set_const_iter find_read_set(const var_base& src_var) const noexcept {
-            return std::find_if(std::begin(read_set),
-                                std::end(read_set),
-                                [&src_var](const read_set_value_type& rhs) noexcept -> bool
-                                { return rhs.is_src_var(src_var); });
-        }
-        
         void add_read_set(const var_base& src_var) override final
         { read_set.emplace_back(&src_var); }
         
