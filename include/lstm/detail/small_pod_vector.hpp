@@ -35,7 +35,7 @@ LSTM_DETAIL_BEGIN
         LSTM_NOINLINE void reserve_more()
             noexcept(noexcept(alloc_traits::allocate(alloc(), capacity_)))
         {
-            capacity_ = capacity_ << 1;
+            capacity_ <<= 1;
             assert(capacity_ > size()); // zomg big transaction
             T* const new_begin = alloc_traits::allocate(alloc(), capacity_);
             assert(new_begin);
@@ -78,10 +78,11 @@ LSTM_DETAIL_BEGIN
         uword capacity() const noexcept { return capacity_; }
         
         template<typename... Us>
-        void emplace_back(Us&&... us) noexcept(noexcept(reserve_more())) {
+        void emplace_back(const Us... us) noexcept(noexcept(reserve_more())) {
+            static_assert(and_<std::is_pod<Us>...>{}, "");
             if (LSTM_UNLIKELY(size() == capacity_))
                 reserve_more();
-            ::new (end_++) T((Us&&)us...);
+            ::new (end_++) T(us...);
         }
         
         void unordered_erase(T* const ptr) noexcept {

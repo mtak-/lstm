@@ -7,9 +7,10 @@
 #include <cmath>
 
 LSTM_DETAIL_BEGIN
-    static constexpr std::uint64_t calcShift() {
+    template<typename T>
+    static constexpr std::uint64_t calcShift() noexcept {
         std::uint64_t l = 0;
-        std::uint64_t foo = alignof(std::max_align_t);
+        std::uint64_t foo = alignof(T);
         while (foo > 0) {
             foo >>= 1;
             ++l;
@@ -21,31 +22,26 @@ LSTM_DETAIL_BEGIN
     // constexpr std::uint64_t prime = 11400714819323198393ull;
     inline std::uint64_t hash(const var_base& value) noexcept {
         static_assert(sizeof(&value) <= sizeof(std::uint64_t));
-        constexpr std::uint64_t shift = calcShift();
+        constexpr std::uint64_t shift = calcShift<var_base>();
         constexpr std::uint64_t one{1};
         const auto raw_hash = (std::uint64_t(&value) >> shift);
         return (one << (raw_hash % 64));
     }
     
-    template<typename T,
-             uword N,
-             typename Alloc = std::allocator<T>>
-    struct small_pod_hash_set;
-    
     template<typename T>
     LSTM_NOINLINE inline T* slow_find(T* begin,
-                                      T* const end,
+                                      const T* const end,
                                       const var_base& value) noexcept {
         for (; begin != end; ++begin)
             if (&begin->dest_var() == &value)
-                return begin;
-        return end;
+                break;
+        return begin;
     }
     
-    // this class is only designed to work with write_set_value_type
+    // TODO: this class is only designed to work with write_set_value_type
     template<typename T,
              uword N,
-             typename Alloc>
+             typename Alloc = std::allocator<T>>
     struct small_pod_hash_set {
     private:
         using data_t = small_pod_vector<T, N, Alloc>;
@@ -75,7 +71,10 @@ LSTM_DETAIL_BEGIN
         uword size() const noexcept { return data.size(); }
         uword capacity() const noexcept { return data.capacity(); }
         
-        void push_back(var_base& value,
+        // TODO: this is the reason it only works with write_set_value_type
+        // if more instantiations of this class are needed, probly just put hash
+        // first and make it a template (could cause registers to be swapped)
+        void push_back(var_base* const value,
                        const var_storage pending_write,
                        const std::uint64_t hash) {
             data.emplace_back(value, pending_write);

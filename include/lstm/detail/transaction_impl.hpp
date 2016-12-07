@@ -28,8 +28,8 @@ LSTM_DETAIL_BEGIN
         
     public:
         inline read_set_value_type() noexcept = default;
-        inline constexpr read_set_value_type(const var_base& in_src_var) noexcept
-            : _src_var(&in_src_var)
+        inline constexpr read_set_value_type(const var_base* const in_src_var) noexcept
+            : _src_var(in_src_var)
         {}
         
         inline constexpr const var_base& src_var() const noexcept { return *_src_var; }
@@ -53,8 +53,8 @@ LSTM_DETAIL_BEGIN
         inline write_set_value_type() noexcept = default;
         
         inline constexpr
-        write_set_value_type(var_base& in_dest_var, var_storage in_pending_write) noexcept
-            : _dest_var(&in_dest_var)
+        write_set_value_type(var_base* const in_dest_var, var_storage in_pending_write) noexcept
+            : _dest_var(in_dest_var)
             , _pending_write(std::move(in_pending_write))
         {}
         
@@ -226,14 +226,14 @@ LSTM_DETAIL_BEGIN
         }
         
         void add_read_set(const var_base& src_var) override final
-        { read_set.emplace_back(src_var); }
+        { read_set.emplace_back(&src_var); }
         
         void add_write_set(var_base& dest_var,
                            const var_storage pending_write,
                            const std::uint64_t hash) override final {
             // up to caller to ensure dest_var is not already in the write_set
             assert(!find_write_set(dest_var).success());
-            write_set.push_back(dest_var, pending_write, hash);
+            write_set.push_back(&dest_var, pending_write, hash);
         }
         
         write_set_lookup find_write_set(const var_base& dest_var) noexcept override final {
