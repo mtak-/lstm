@@ -41,6 +41,29 @@ LSTM_DETAIL_BEGIN
         static void try_transact(Func& func, Tx& tx, tx_result_buffer<transact_result<Func>>& buf)
         { buf.emplace(call(func, tx)); }
         
+        template<typename Tx>
+        [[noreturn]] static void unhandled_exception(Tx& tx, thread_data& tls_td) {
+            tx.cleanup();
+            tls_td.access_unlock();
+            tls_td.tx = nullptr;
+            tx.reset_heap();
+            throw;
+        }
+        
+        template<typename Tx>
+        LSTM_ALWAYS_INLINE static void tx_internal_failed(Tx& tx, thread_data& tls_td) noexcept {
+            tx.cleanup();
+            tls_td.access_unlock();
+            tx.reset_read_version();
+        }
+        
+        template<typename Tx>
+        LSTM_ALWAYS_INLINE static void tx_success(Tx& tx, thread_data& tls_td) noexcept {
+            tls_td.access_unlock();
+            tx.commit_reclaim();
+            tx.reset_heap();
+        }
+        
         template<typename Func, typename Alloc, std::size_t ReadSize, std::size_t WriteSize,
             std::size_t DeleteSize>
         static transact_result<Func> atomic_slow_path(Func& func,
@@ -51,41 +74,28 @@ LSTM_DETAIL_BEGIN
             tx_result_buffer<transact_result<Func>> buf;
             transaction_impl<Alloc, ReadSize, WriteSize, DeleteSize> tx{domain, alloc};
             
-            // TODO: restructure this...
             while(true) {
+                tls_td.tx = &tx;
+                tls_td.access_lock();
                 try {
                     assert(tx.read_set.size() == 0);
                     assert(tx.write_set.size() == 0);
                     
-                    tls_td.tx = &tx;
-                    tls_td.access_lock();
                     atomic_fn::try_transact(func, tx, buf);
                     tls_td.tx = nullptr;
                     
                     // commit does not throw
                     if (tx.commit()) {
-                        tls_td.access_unlock();
-                        tx.commit_reclaim();
-                        tx.reset_heap();
+                        tx_success(tx, tls_td);
                         return return_tx_result_buffer_fn{}(buf);
                     }
-                    tx.cleanup();
-                    tls_td.access_unlock();
-                    
                     buf.reset();
-                    tx.reset_read_version();
                 } catch(const _tx_retry&) {
-                    tx.cleanup();
-                    tls_td.access_unlock();
-                    tls_td.tx = nullptr;
-                    tx.reset_read_version();
+                    // nothing
                 } catch(...) {
-                    tx.cleanup();
-                    tls_td.access_unlock();
-                    tls_td.tx = nullptr;
-                    tx.reset_heap();
-                    throw;
+                    unhandled_exception(tx, tls_td);
                 }
+                tx_internal_failed(tx, tls_td);
             }
         }
         
