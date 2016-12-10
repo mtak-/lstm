@@ -94,7 +94,7 @@ LSTM_DETAIL_BEGIN
         deleter_set_t deleter_set;
         write_set_deleters_t write_set_deleters;
         
-        inline transaction_impl(transaction_domain* domain, const Alloc& alloc) noexcept
+        inline transaction_impl(transaction_domain& domain, const Alloc& alloc) noexcept
             : transaction(domain)
             , read_set(alloc)
             , write_set(alloc)

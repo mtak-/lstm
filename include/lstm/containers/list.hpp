@@ -94,7 +94,7 @@ LSTM_BEGIN
                 auto result = tx.load(head);
                 tx.store(head, nullptr);
                 return result;
-            }, nullptr, alloc());
+            }, lstm::default_domain(), alloc());
             if (node)
                 lstm::atomic([&](auto& tx) {
                     while (node) {
@@ -102,7 +102,7 @@ LSTM_BEGIN
                         tx.delete_(node, alloc());
                         node = next_;
                     }
-                }, nullptr, alloc());
+                }, lstm::default_domain(), alloc());
         }
         
         template<typename... Us>
@@ -117,11 +117,14 @@ LSTM_BEGIN
                     tx.store(_head->_prev, (void*)new_head);
                 tx.store(_size, tx.load(_size) + 1);
                 tx.store(head, new_head);
-            }, nullptr, alloc());
+            }, lstm::default_domain(), alloc());
         }
         
-        word size() const noexcept
-        { return lstm::atomic([&](auto& tx) { return tx.load(_size); }, nullptr, alloc()); }
+        word size() const noexcept {
+            return lstm::atomic([&](auto& tx) { return tx.load(_size); },
+                                lstm::default_domain(),
+                                alloc());
+        }
     };
 LSTM_END
 

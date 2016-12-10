@@ -67,7 +67,7 @@ LSTM_DETAIL_BEGIN
         template<typename Func, typename Alloc, std::size_t ReadSize, std::size_t WriteSize,
             std::size_t DeleteSize>
         static transact_result<Func> atomic_slow_path(Func& func,
-                                                      transaction_domain* domain,
+                                                      transaction_domain& domain,
                                                       const Alloc& alloc,
                                                       knobs<ReadSize, WriteSize, DeleteSize>,
                                                       thread_data& tls_td) {
@@ -109,7 +109,7 @@ LSTM_DETAIL_BEGIN
             std::size_t MaxStackDeleterBuffSize = 4,
             LSTM_REQUIRES_(detail::is_transact_function<Func>())>
         transact_result<Func> operator()(Func&& func,
-                                         transaction_domain* domain = nullptr,
+                                         transaction_domain& domain = default_domain(),
                                          const Alloc& alloc = {},
                                          knobs<MaxStackWriteBuffSize,
                                                MaxStackReadBuffSize,

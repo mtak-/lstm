@@ -56,16 +56,13 @@ LSTM_BEGIN
         transaction_domain* _domain;
         word read_version;
         
-        inline transaction_domain& domain() noexcept
-        { return _domain == nullptr ? default_domain() : *_domain; }
-        
-        inline const transaction_domain& domain() const noexcept
-        { return _domain == nullptr ? default_domain() : *_domain; }
+        inline transaction_domain& domain() noexcept { return *_domain; }
+        inline const transaction_domain& domain() const noexcept { return *_domain; }
         
         inline void reset_read_version() noexcept { read_version = domain().get_clock(); }
 
-        inline transaction(transaction_domain* in_domain) noexcept
-            : _domain(in_domain)
+        inline transaction(transaction_domain& in_domain) noexcept
+            : _domain(&in_domain)
         { reset_read_version(); }
         
         static inline bool locked(word version) noexcept { return version & 1; }

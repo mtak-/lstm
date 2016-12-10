@@ -23,7 +23,7 @@ void push(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x, int val
         auto var = tx.load(x);
         var.push_back(val);
         tx.store(x, std::move(var));
-    }, nullptr, debug_alloc<std::vector<int>>{});
+    }, lstm::default_domain(), debug_alloc<std::vector<int>>{});
 }
 
 void pop(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x) {
@@ -33,7 +33,7 @@ void pop(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x) {
         auto var = tx.load(x);
         var.pop_back();
         tx.store(x, std::move(var));
-    }, nullptr, debug_alloc<std::vector<int>>{});
+    }, lstm::default_domain(), debug_alloc<std::vector<int>>{});
 }
 
 auto get_loop(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x) {
@@ -46,7 +46,7 @@ auto get_loop(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x) {
                 CHECK(var.size() == 1u);
                 pop(x);
             }
-        }, nullptr, debug_alloc<std::vector<int>>{});
+        }, lstm::default_domain(), debug_alloc<std::vector<int>>{});
     };
 }
 
