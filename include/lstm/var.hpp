@@ -12,7 +12,7 @@ LSTM_BEGIN
         using base = detail::var_alloc_policy<T, Alloc>;
         static_assert(!std::is_reference<T>{},
             "a var cannot contain a reference");
-        static_assert(std::is_same<std::remove_reference_t<T>, typename Alloc::value_type>{},
+        static_assert(std::is_same<T, typename Alloc::value_type>{},
             "invalid allocator for type T");
         static_assert(!std::is_array<T>{},
             "raw c arrays are not allowed. try using a std::array");
