@@ -7,7 +7,7 @@ LSTM_DETAIL_BEGIN
     struct thread_data;
     using gp_t = uword;
 
-    LSTM_INLINE_VAR(fast_rw_mutex thread_data_mut){};
+    LSTM_INLINE_VAR(fast_rw_mutex thread_data_mut){}; // already cache aligned
     LSTM_INLINE_VAR(LSTM_CACHE_ALIGNED std::atomic<thread_data*> thread_data_root){nullptr};
     LSTM_INLINE_VAR(LSTM_CACHE_ALIGNED std::atomic<gp_t> grace_period){1};
     
@@ -115,11 +115,14 @@ LSTM_DETAIL_BEGIN
         gp_t gp = acquire_gp_bit();
         
         LSTM_ACCESS_INLINE_VAR(thread_data_mut).lock_shared();
-        wait(gp, false);
         
-        // TODO: release seems unneeded
-        LSTM_ACCESS_INLINE_VAR(grace_period).fetch_xor(gp, LSTM_RELEASE);
-        wait(gp, true);
+            wait(gp, false);
+            
+            // TODO: release seems unneeded
+            LSTM_ACCESS_INLINE_VAR(grace_period).fetch_xor(gp, LSTM_RELEASE);
+            
+            wait(gp, true);
+        
         LSTM_ACCESS_INLINE_VAR(thread_data_mut).unlock_shared();
     }
 LSTM_DETAIL_END
