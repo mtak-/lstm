@@ -11,6 +11,7 @@ LSTM_DETAIL_BEGIN
     private:
         // TODO: maybe should be uint32_t on x64 and might save some registers
         static constexpr const uword write_bit = uword(1) << (sizeof(uword) * 8 - 1);
+        static constexpr const uword read_mask = ~write_bit;
         LSTM_CACHE_ALIGNED std::atomic<uword> read_count{0};
         
         static bool write_locked(const std::atomic<uword>& state) = delete;
@@ -19,7 +20,7 @@ LSTM_DETAIL_BEGIN
         
         static bool read_locked(const std::atomic<uword>& state) = delete;
         inline static constexpr bool read_locked(const uword state) noexcept
-        { return state & ~write_bit; }
+        { return state & read_mask; }
         
         static bool unlocked(const std::atomic<uword>& state) = delete;
         inline static constexpr bool unlocked(const uword state) noexcept { return state == 0; }
@@ -63,7 +64,7 @@ LSTM_DETAIL_BEGIN
         }
         
         inline void unlock() noexcept {
-            uword prev = read_count.fetch_and(~write_bit, LSTM_RELEASE);
+            uword prev = read_count.fetch_and(read_mask, LSTM_RELEASE);
             (void)prev;
             assert(write_locked(prev));
         }
@@ -72,12 +73,11 @@ LSTM_DETAIL_BEGIN
     template<typename Backoff>
     LSTM_NOINLINE void fast_rw_mutex::lock_shared_slow_path(Backoff& backoff) noexcept {
         // didn't succeed in acquiring read access, so undo the reader count increment
-        read_count.fetch_sub(1, LSTM_RELAXED);
+        uword read_state = read_count.fetch_sub(1, LSTM_RELAXED);
         
-        uword read_state;
         do {
             backoff();
-            read_state = 0;
+            read_state &= read_mask;
             // TODO: is CAS the best way to do this? it doesn't get run very often...
             while (!write_locked(read_state)
                 && !read_count.compare_exchange_weak(read_state,
