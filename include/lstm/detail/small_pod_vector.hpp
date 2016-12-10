@@ -66,7 +66,7 @@ LSTM_DETAIL_BEGIN
         // in release, leaves object in an invalid state
         // aka this is the real destructor, but explicit. because... i want that
         void reset() noexcept {
-            if (capacity() > N)
+            if (capacity_ > N)
                 alloc_traits::deallocate(alloc(), begin_, capacity_);
     #ifndef NDEBUG
             end_ = begin_ = buffer;
@@ -80,6 +80,7 @@ LSTM_DETAIL_BEGIN
         template<typename... Us>
         void emplace_back(const Us... us) noexcept(noexcept(reserve_more())) {
             static_assert(and_<std::is_pod<Us>...>{}, "");
+            
             if (LSTM_UNLIKELY(size() == capacity_))
                 reserve_more();
             ::new (end_++) T(us...);
