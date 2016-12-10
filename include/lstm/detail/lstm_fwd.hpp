@@ -151,17 +151,17 @@ LSTM_DETAIL_BEGIN
     struct callable<Func, void_<decltype(std::declval<Func>()())>>
         : std::true_type {};
     
-    template<typename Func, bool = callable_with_tx<Func, transaction&>{}(),
-                            bool = callable<Func>{}()>
+    template<typename Func, bool = callable_with_tx<Func&, transaction&>{}(),
+                            bool = callable<Func&>{}()>
     struct transact_result_impl;
 
     template<typename Func, bool b>
     struct transact_result_impl<Func, true, b>
-    { using type = decltype(std::declval<const Func&>()(std::declval<transaction&>())); };
+    { using type = decltype(std::declval<Func&>()(std::declval<transaction&>())); };
     
     template<typename Func>
     struct transact_result_impl<Func, false, true>
-    { using type = decltype(std::declval<const Func&>()()); };
+    { using type = decltype(std::declval<Func&>()()); };
 
     template<typename Func>
     using transact_result = typename transact_result_impl<Func>::type;

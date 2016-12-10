@@ -43,7 +43,7 @@ LSTM_DETAIL_BEGIN
         
         template<typename Func, typename Alloc, std::size_t ReadSize, std::size_t WriteSize,
             std::size_t DeleteSize>
-        static transact_result<Func> atomic_slow_path(Func func,
+        static transact_result<Func> atomic_slow_path(Func& func,
                                                       transaction_domain* domain,
                                                       const Alloc& alloc,
                                                       knobs<ReadSize, WriteSize, DeleteSize>,
@@ -98,7 +98,7 @@ LSTM_DETAIL_BEGIN
             std::size_t MaxStackWriteBuffSize = 4,
             std::size_t MaxStackDeleterBuffSize = 4,
             LSTM_REQUIRES_(detail::is_transact_function<Func>())>
-        transact_result<Func> operator()(Func func,
+        transact_result<Func> operator()(Func&& func,
                                          transaction_domain* domain = nullptr,
                                          const Alloc& alloc = {},
                                          knobs<MaxStackWriteBuffSize,
@@ -109,13 +109,13 @@ LSTM_DETAIL_BEGIN
             if (tls_td.tx)
                 return call(func, *tls_td.tx);
             
-            return atomic_fn::atomic_slow_path(std::move(func), domain, alloc, knobs, tls_td);
+            return atomic_fn::atomic_slow_path(func, domain, alloc, knobs, tls_td);
         }
         
 #ifndef LSTM_MAKE_SFINAE_FRIENDLY
         template<typename Func, typename... Args,
             LSTM_REQUIRES_(!detail::is_transact_function<Func>())>
-        void operator()(Func, Args&&...) const {
+        void operator()(Func&&, Args&&...) const {
             static_assert(detail::is_transact_function<Func>(),
                 "functions passed to lstm::atomic must either take no parameters, "
                 "lstm::transaction&, or auto&/T&");
