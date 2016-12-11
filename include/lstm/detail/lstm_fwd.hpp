@@ -97,6 +97,10 @@
     #define LSTM_CACHE_ALIGNED /**/
 #endif
 
+#ifndef LSTM_SIGNED_LOCKFREE_WORD
+    #define LSTM_SIGNED_LOCKFREE_WORD std::intptr_t;
+#endif
+
 LSTM_DETAIL_BEGIN
     using var_storage = void*;
     
@@ -123,8 +127,11 @@ LSTM_DETAIL_END
 
 LSTM_BEGIN
     // TODO verify lockfreeness of this on each platform
-    using word = std::intptr_t;
-    using uword = std::uintptr_t;
+    using word = LSTM_SIGNED_LOCKFREE_WORD;
+    using uword = std::make_unsigned_t<word>;
+    
+    static_assert(std::is_integral<word>{}, "type chosen for word must be an integral type");
+    static_assert(std::is_signed<word>{}, "type chosen for word must be signed");
     
     template<typename T, typename Alloc = std::allocator<std::remove_reference_t<T>>>
     struct var;

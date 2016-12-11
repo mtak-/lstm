@@ -7,10 +7,12 @@
 #include <cmath>
 
 LSTM_DETAIL_BEGIN
+    using hash_t = std::uint64_t;
+    
     template<typename T>
-    static constexpr std::uint64_t calcShift() noexcept {
-        std::uint64_t l = 0;
-        std::uint64_t foo = alignof(T);
+    static constexpr hash_t calcShift() noexcept {
+        hash_t l = 0;
+        hash_t foo = alignof(T);
         while (foo > 0) {
             foo >>= 1;
             ++l;
@@ -20,11 +22,12 @@ LSTM_DETAIL_BEGIN
     
     // dumb hash need to stress test it
     // constexpr std::uint64_t prime = 11400714819323198393ull;
-    inline std::uint64_t hash(const var_base& value) noexcept {
-        static_assert(sizeof(&value) <= sizeof(std::uint64_t));
-        constexpr std::uint64_t shift = calcShift<var_base>();
-        constexpr std::uint64_t one{1};
-        const auto raw_hash = (std::uint64_t(&value) >> shift);
+    inline hash_t hash(const var_base& value) noexcept {
+        constexpr hash_t shift = calcShift<var_base>();
+        static_assert(sizeof(hash_t) >= sizeof(std::uintptr_t) - shift,
+                      "type for hash_t is not large enough");
+        constexpr hash_t one{1};
+        const auto raw_hash = (std::uintptr_t(&value) >> shift);
         return (one << (raw_hash % 64));
     }
     
@@ -45,7 +48,7 @@ LSTM_DETAIL_BEGIN
     struct small_pod_hash_set {
     private:
         using data_t = small_pod_vector<T, N, Alloc>;
-        std::uint64_t filter_;
+        hash_t filter_;
         data_t data;
         
     public:
@@ -62,7 +65,7 @@ LSTM_DETAIL_BEGIN
         small_pod_hash_set(const small_pod_hash_set&) = delete;
         small_pod_hash_set& operator=(const small_pod_hash_set&) = delete;
         
-        std::uint64_t filter() const noexcept { return filter_; }
+        hash_t filter() const noexcept { return filter_; }
         
         void clear() noexcept { filter_ = 0; data.clear(); }
         void reset() noexcept { filter_ = 0; data.reset(); }
@@ -76,7 +79,7 @@ LSTM_DETAIL_BEGIN
         // first and make it a template (could cause registers to be swapped)
         void push_back(var_base* const value,
                        const var_storage pending_write,
-                       const std::uint64_t hash) {
+                       const hash_t hash) {
             data.emplace_back(value, pending_write);
             filter_ |= hash;
         }

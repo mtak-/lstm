@@ -2,6 +2,7 @@
 #define LSTM_TRANSACTION_HPP
 
 #include <lstm/detail/var_detail.hpp>
+#include <lstm/detail/small_pod_hash_set.hpp>
 #include <lstm/transaction_domain.hpp>
 
 #include <atomic>
@@ -35,7 +36,7 @@ LSTM_DETAIL_BEGIN
     
     struct write_set_lookup {
         var_storage* pending_write_;
-        std::uint64_t hash;
+        hash_t hash;
         
         inline constexpr bool success() const noexcept { return !hash; }
         inline constexpr var_storage& pending_write() const noexcept { return *pending_write_; }
@@ -95,7 +96,7 @@ LSTM_BEGIN
         virtual void add_read_set(const detail::var_base& src_var) = 0;
         virtual void add_write_set(detail::var_base& dest_var,
                                    detail::var_storage pending_write,
-                                   const std::uint64_t hash) = 0;
+                                   const detail::hash_t hash) = 0;
         
         virtual detail::write_set_lookup
         find_write_set(const detail::var_base& dest_var) noexcept = 0;

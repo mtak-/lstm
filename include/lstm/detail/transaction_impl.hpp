@@ -2,7 +2,6 @@
 #define LSTM_DETAIL_TRANSACTION_IMPL_HPP
 
 #include <lstm/detail/small_pod_vector.hpp>
-#include <lstm/detail/small_pod_hash_set.hpp>
 #include <lstm/detail/thread_data.hpp>
 
 #include <lstm/transaction.hpp>
@@ -223,7 +222,7 @@ LSTM_DETAIL_BEGIN
         
         void add_write_set(var_base& dest_var,
                            const var_storage pending_write,
-                           const std::uint64_t hash) override final {
+                           const hash_t hash) override final {
             // up to caller to ensure dest_var is not already in the write_set
             assert(!find_write_set(dest_var).success());
             write_set.push_back(&dest_var, pending_write, hash);
