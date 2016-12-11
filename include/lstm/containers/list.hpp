@@ -88,7 +88,7 @@ LSTM_BEGIN
             }
         }
         
-        void clear() noexcept {
+        void clear() {
             auto* node = lstm::atomic([&](auto& tx) {
                 tx.store(_size, 0);
                 auto result = tx.load(head);
@@ -106,21 +106,22 @@ LSTM_BEGIN
         }
         
         template<typename... Us>
-        void emplace_front(Us&&... us) noexcept(std::is_nothrow_constructible<T, Us&&...>{}) {
-            auto new_head = alloc_traits::allocate(alloc(), 1);
-            new (new_head) node_t((Us&&)us...);
+        void emplace_front(Us&&... us) {
+            std::unique_ptr<node_t> new_head{alloc_traits::allocate(alloc(), 1)};
+            new (&*new_head) node_t((Us&&)us...);
             lstm::atomic([&](auto& tx) {
                 auto _head = tx.load(head);
                 new_head->_next.unsafe_store(_head);
                 
                 if (_head)
-                    tx.store(_head->_prev, (void*)new_head);
+                    tx.store(_head->_prev, (void*)&*new_head);
                 tx.store(_size, tx.load(_size) + 1);
-                tx.store(head, new_head);
+                tx.store(head, &*new_head);
             }, lstm::default_domain(), alloc());
+            new_head.release();
         }
         
-        word size() const noexcept {
+        word size() const {
             return lstm::atomic([&](auto& tx) { return tx.load(_size); },
                                 lstm::default_domain(),
                                 alloc());
