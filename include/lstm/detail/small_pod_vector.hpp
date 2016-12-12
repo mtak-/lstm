@@ -11,8 +11,9 @@ LSTM_DETAIL_BEGIN
     template<typename T, uword N = 4, typename Alloc = std::allocator<T>>
     struct small_pod_vector : private Alloc {
     private:
-        static_assert(std::is_pod<T>{}, "oops");
+        static_assert(std::is_pod<T>{}, "only works with POD types");
         static_assert(N > 0, "small_pod_vector must have a buffer size greater than 0");
+        static_assert(std::is_same<T, typename Alloc::value_type>{}, "");
         
         T buffer[N];
         T* begin_; T* end_;
@@ -60,7 +61,8 @@ LSTM_DETAIL_BEGIN
         
     #ifndef NDEBUG
         // ensure reset has been called on destruction
-        ~small_pod_vector() noexcept { assert(begin_ == buffer && end_ == buffer); }
+        ~small_pod_vector() noexcept
+        { assert(begin_ == buffer && end_ == buffer && capacity_ == N); }
     #endif
         
         // in release, leaves object in an invalid state
@@ -70,6 +72,7 @@ LSTM_DETAIL_BEGIN
                 alloc_traits::deallocate(alloc(), begin_, capacity_);
     #ifndef NDEBUG
             end_ = begin_ = buffer;
+            capacity_ = N;
     #endif
         }
         
