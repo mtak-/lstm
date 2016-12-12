@@ -66,7 +66,7 @@ LSTM_DETAIL_BEGIN
     
     struct gp_callback_buf {
     private:
-        std::aligned_storage<gp_callback_sbo_size, alignof(std::max_align_t)> buf;
+        std::aligned_storage<gp_callback_sbo_size, gp_callback_align_size> buf;
     
     public:
         gp_callback_buf() noexcept = default;
