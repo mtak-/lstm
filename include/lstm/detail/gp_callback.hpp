@@ -14,7 +14,6 @@ LSTM_DETAIL_BEGIN
     struct gp_callback_base { virtual void operator()() const = 0; };
     
     template<typename F,
-             bool = std::is_empty<F>{} && !std::is_final<F>{}, // ebo
              bool = (sizeof(F) <= gp_callback_sbo_size) && // simple sbo
                     (alignof(F) <= gp_callback_align_size) &&
                     std::is_trivially_destructible<F>{} &&
@@ -23,17 +22,9 @@ LSTM_DETAIL_BEGIN
     struct gp_callback_impl;
     
     template<typename F>
-    struct gp_callback_impl<F, true, true> : gp_callback_base, private F {
-        template<typename FIn>
-        gp_callback_impl(FIn&& f) noexcept(std::is_nothrow_constructible<F, FIn&&>{})
-            : F((FIn&&)f)
-        {}
+    struct gp_callback_impl<F, true> : gp_callback_base {
+        static constexpr const bool SBO = true;
         
-        void operator()() const override final { static_cast<const F&>(*this)(); }
-    };
-    
-    template<typename F>
-    struct gp_callback_impl<F, false, true> : gp_callback_base {
     private:
         F f;
     
@@ -42,12 +33,14 @@ LSTM_DETAIL_BEGIN
         gp_callback_impl(FIn&& f_in) noexcept(std::is_nothrow_constructible<F, FIn&&>{})
             : f((FIn&&)f_in)
         {}
-        
+    
         void operator()() const override final { f(); }
     };
     
-    template<typename F, bool EBO, bool SBO>
+    template<typename F, bool SBO_>
     struct gp_callback_impl : gp_callback_base {
+        static constexpr const bool SBO = SBO_;
+        
     private:
         F* f;
     
