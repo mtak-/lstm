@@ -24,9 +24,13 @@ LSTM_DETAIL_BEGIN
         thread_data() noexcept
             : tx(nullptr)
         {
+            active.store(0, LSTM_RELEASE); // this must happen before locking
+                                           // otherwise deadlock could occur if
+                                           // a thread is synchronizing as it will read
+                                           // garbage otherwise
+            
             LSTM_ACCESS_INLINE_VAR(thread_data_mut).lock();
                 
-                active.store(0, LSTM_RELAXED);
                 next.store(LSTM_ACCESS_INLINE_VAR(thread_data_root).load(LSTM_RELAXED),
                            LSTM_RELAXED);
                 LSTM_ACCESS_INLINE_VAR(thread_data_root).store(this, LSTM_RELAXED);
