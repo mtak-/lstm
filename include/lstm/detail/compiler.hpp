@@ -240,9 +240,8 @@
 /**************** end thread_local ****************/
 
 /******************* inline var *******************/
-#  define LSTM_INLINE_VAR(...)                                                                     \
+#  define LSTM_INLINE_VAR                                                                          \
     template<std::nullptr_t = nullptr>                                                             \
-    __VA_ARGS__                                                                                    \
     /**/
 
 #  define LSTM_ACCESS_INLINE_VAR(...)                                                              \

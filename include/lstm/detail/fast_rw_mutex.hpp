@@ -73,18 +73,17 @@ LSTM_DETAIL_BEGIN
     template<typename Backoff>
     LSTM_NOINLINE void fast_rw_mutex::lock_shared_slow_path(Backoff& backoff) noexcept {
         // didn't succeed in acquiring read access, so undo the reader count increment
-        uword read_state = read_count.fetch_sub(1, LSTM_RELAXED);
+        read_count.fetch_sub(1, LSTM_RELAXED);
         
+        uword read_state;
         do {
             backoff();
-            read_state &= read_mask;
+            read_state = read_count.load(LSTM_RELAXED) & read_mask;
             // TODO: is CAS the best way to do this? it doesn't get run very often...
-            while (!write_locked(read_state)
-                && !read_count.compare_exchange_weak(read_state,
-                                                     read_state + 1,
-                                                     LSTM_RELAXED,
-                                                     LSTM_RELAXED));
-        } while (write_locked(read_state));
+        } while (LSTM_UNLIKELY(!read_count.compare_exchange_weak(read_state,
+                                                                 read_state + 1,
+                                                                 LSTM_RELAXED,
+                                                                 LSTM_RELAXED)));
         
         std::atomic_thread_fence(LSTM_ACQUIRE);
         
@@ -93,12 +92,14 @@ LSTM_DETAIL_BEGIN
     
     template<typename Backoff>
     uword fast_rw_mutex::request_write_lock(Backoff backoff) {
-        uword prev_read_count = read_count.fetch_or(write_bit, LSTM_RELAXED);
-        
+        uword prev_read_count = read_count.load(LSTM_RELAXED) & read_mask;
         // first come first serve
-        while (write_locked(prev_read_count)) {
+        while(LSTM_UNLIKELY(!read_count.compare_exchange_weak(prev_read_count,
+                                                              prev_read_count | write_bit,
+                                                              LSTM_RELAXED,
+                                                              LSTM_RELAXED))) {
             backoff();
-            prev_read_count = read_count.fetch_or(write_bit, LSTM_RELAXED);
+            prev_read_count = read_count.load(LSTM_RELAXED) & read_mask;
         }
         
         return prev_read_count;
@@ -106,7 +107,7 @@ LSTM_DETAIL_BEGIN
     
     template<typename Backoff>
     void fast_rw_mutex::wait_for_readers(Backoff backoff, uword prev_read_count) {
-        while (read_locked(prev_read_count)) {
+        while (LSTM_LIKELY(read_locked(prev_read_count))) {
             backoff();
             prev_read_count = read_count.load(LSTM_RELAXED);
         }

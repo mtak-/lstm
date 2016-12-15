@@ -2,22 +2,28 @@
 #define LSTM_DETAIL_THREAD_DATA_HPP
 
 #include <lstm/detail/fast_rw_mutex.hpp>
+#include <lstm/detail/gp_callback.hpp>
+#include <lstm/detail/small_pod_vector.hpp>
 
 LSTM_DETAIL_BEGIN
     struct thread_data;
     using gp_t = uword;
 
-    LSTM_INLINE_VAR(fast_rw_mutex thread_data_mut){}; // already cache aligned
-    LSTM_INLINE_VAR(LSTM_CACHE_ALIGNED std::atomic<thread_data*> thread_data_root){nullptr};
-    LSTM_INLINE_VAR(LSTM_CACHE_ALIGNED std::atomic<gp_t> grace_period){1};
+    LSTM_INLINE_VAR fast_rw_mutex thread_data_mut{}; // already cache aligned
+    LSTM_INLINE_VAR LSTM_CACHE_ALIGNED std::atomic<thread_data*> thread_data_root{nullptr};
+    LSTM_INLINE_VAR LSTM_CACHE_ALIGNED std::atomic<gp_t> grace_period{1};
     
     // with the guarantee of no nested critical sections only one bit is needed
     // to say a thread is active.
     // this means the remaining bits can be used for the grace period, resulting
     // in concurrent writes
-    // still not ideal, as writes should be batched
     struct LSTM_CACHE_ALIGNED thread_data {
         transaction* tx;
+        
+        // TODO: this is a terrible type for gp_callbacks
+        // need some type with an atomic swap
+        small_pod_vector<gp_callback_buf, 128, std::allocator<gp_callback_buf>> gp_callbacks;
+        
         LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
         LSTM_CACHE_ALIGNED std::atomic<thread_data*> next;
         
@@ -42,6 +48,9 @@ LSTM_DETAIL_BEGIN
             assert(tx == nullptr);
             assert(active.load(LSTM_RELAXED) == 0);
             
+            do_callbacks();
+            gp_callbacks.reset();
+            
             LSTM_ACCESS_INLINE_VAR(thread_data_mut).lock();
                 
                 std::atomic<thread_data*>* indirect = &LSTM_ACCESS_INLINE_VAR(thread_data_root);
@@ -56,6 +65,13 @@ LSTM_DETAIL_BEGIN
         thread_data(const thread_data&) = delete;
         thread_data& operator=(const thread_data&) = delete;
         
+        // TODO: when atomic swap on gp_callbacks is possible, this needs to do just that
+        void do_callbacks() noexcept {
+            for (auto& gp_callback : gp_callbacks)
+                gp_callback();
+            gp_callbacks.clear();
+        }
+        
         inline void access_lock() noexcept {
             assert(!active.load(LSTM_RELAXED));
             active.store(LSTM_ACCESS_INLINE_VAR(grace_period).load(LSTM_RELAXED), LSTM_RELAXED);
@@ -68,7 +84,8 @@ LSTM_DETAIL_BEGIN
         }
     };
     
-    LSTM_INLINE_VAR(LSTM_THREAD_LOCAL thread_data _tls_thread_data){};
+    // TODO: still feel like this garbage is overkill
+    LSTM_INLINE_VAR LSTM_THREAD_LOCAL thread_data _tls_thread_data{};
     
     LSTM_ALWAYS_INLINE thread_data& tls_thread_data() noexcept {
         auto* result = &LSTM_ACCESS_INLINE_VAR(_tls_thread_data);

@@ -6,12 +6,14 @@
 #include <cassert>
 
 LSTM_DETAIL_BEGIN
-    constexpr std::size_t gp_callback_sbo_size = 24;
+    constexpr std::size_t gp_callback_sbo_size = sizeof(void(*)()) * 2;
     constexpr std::size_t gp_callback_align_size = alignof(std::max_align_t);
+    using storage_requirements = std::aligned_storage_t<gp_callback_sbo_size,
+                                                        gp_callback_align_size>;
     static_assert(sizeof(void*) <= gp_callback_sbo_size);
     static_assert(alignof(void*) <= gp_callback_sbo_size);
     
-    struct gp_callback_base { virtual void operator()() const = 0; };
+    struct gp_callback_base { virtual void operator()() noexcept = 0; };
     
     template<typename F,
              bool = (sizeof(F) <= gp_callback_sbo_size) && // simple sbo
@@ -34,7 +36,7 @@ LSTM_DETAIL_BEGIN
             : f((FIn&&)f_in)
         {}
     
-        void operator()() const override final { f(); }
+        void operator()() noexcept override final { f(); }
     };
     
     template<typename F, bool SBO_>
@@ -50,7 +52,7 @@ LSTM_DETAIL_BEGIN
             : f(::new F((FIn&&)f_in))
         {}
         
-        void operator()() const override final {
+        void operator()() noexcept override final {
             F* f_copy = f;
             (*f_copy)();
             ::delete f_copy;
@@ -59,18 +61,29 @@ LSTM_DETAIL_BEGIN
     
     struct gp_callback_buf {
     private:
-        std::aligned_storage<gp_callback_sbo_size, gp_callback_align_size> buf;
+        using max_buf_t = gp_callback_impl<storage_requirements>;
+        static_assert(std::is_same<max_buf_t, gp_callback_impl<storage_requirements, true>>{});
+        static_assert(sizeof(max_buf_t) >= sizeof(gp_callback_impl<int, false>));
+        static_assert(alignof(max_buf_t) % alignof(gp_callback_impl<int, false>) == 0);
+        
+        uninitialized<max_buf_t> buf;
     
     public:
         gp_callback_buf() noexcept = default;
         
-        template<typename FIn>
+        template<typename FIn, typename CBType = gp_callback_impl<uncvref<FIn>>>
         gp_callback_buf(FIn&& f)
-            noexcept(std::is_nothrow_constructible<gp_callback_impl<uncvref<FIn>>, FIn&&>{})
-        { ::new(&buf) gp_callback_impl<uncvref<FIn>>((FIn&&)f); }
+            noexcept(std::is_nothrow_constructible<CBType, FIn&&>{})
+        {
+            static_assert(sizeof(CBType) <= sizeof(decltype(buf)));
+            static_assert(alignof(decltype(buf)) % alignof(CBType) == 0);
+            static_assert(noexcept(std::declval<uncvref<FIn>&>()()));
+            
+            ::new(&this->buf) CBType((FIn&&)f);
+        }
         
-        void operator()() const
-        { (*static_cast<const gp_callback_base*>(static_cast<const void*>(&buf)))(); }
+        void operator()() noexcept
+        { (*static_cast<gp_callback_base*>(static_cast<void*>(&buf)))(); }
     };
 LSTM_DETAIL_END
 

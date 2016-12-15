@@ -21,6 +21,8 @@ var<vec4> x{0, 0, 0, 0};
 
 struct destruct {
     ~destruct() noexcept(false) {
+        // TODO: this is stupid unsafe for client code, but a good test nonetheless
+        lstm::detail::tls_thread_data().gp_callbacks.clear();
         atomic([&](auto& tx) {
             auto y = tx.load(x);
             ++y.w;
@@ -71,8 +73,6 @@ int main() {
     CHECK(x.unsafe_load().x == loop_count);
     CHECK(x.unsafe_load().y == loop_count);
     CHECK(x.unsafe_load().z == loop_count);
-    
-    // really >=, but if it's ==, probly worth looking at?
     CHECK(x.unsafe_load().w == loop_count);
     
     return test_result();

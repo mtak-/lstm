@@ -34,11 +34,11 @@ LSTM_BEGIN
     };
     
     namespace detail {
-        LSTM_INLINE_VAR(transaction_domain _default_domain){};
+        LSTM_INLINE_VAR transaction_domain _default_domain{};
     }
     
     inline transaction_domain& default_domain() noexcept
-    { return detail::LSTM_ACCESS_INLINE_VAR(_default_domain); }
+    { return LSTM_ACCESS_INLINE_VAR(detail::_default_domain); }
 LSTM_END
 
 #endif /* LSTM_TRANSACTION_DOMAIN_HPP */

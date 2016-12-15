@@ -3,36 +3,50 @@
 
 #include <lstm/detail/var_detail.hpp>
 #include <lstm/detail/small_pod_hash_set.hpp>
+#include <lstm/detail/thread_data.hpp>
+
 #include <lstm/transaction_domain.hpp>
 
 #include <atomic>
 #include <cassert>
 
 LSTM_DETAIL_BEGIN
-    struct deleter_base { virtual void operator()() noexcept = 0; };
-    
     template<typename T, typename Alloc>
-    struct deleter : deleter_base, private Alloc {
+    struct deleter {
     private:
-        T* ptr; // TODO: probly move this into base class?
-        Alloc& alloc() noexcept { return *this; }
+        T* ptr;
+        Alloc* alloc;
         
         using alloc_traits = std::allocator_traits<Alloc>;
         
     public:
-        deleter(T* ptr_in, const Alloc& alloc) noexcept(std::is_nothrow_copy_constructible<Alloc>{})
-            : Alloc(alloc)
-            , ptr(ptr_in)
-        {}
+        deleter() noexcept = default;
         
-        void operator()() noexcept override final {
-            alloc_traits::destroy(alloc(), ptr);
-            alloc_traits::deallocate(alloc(), ptr, 1);
+        deleter(T* in_ptr, Alloc* in_alloc) noexcept
+            : ptr(in_ptr)
+            , alloc(in_alloc)
+        { assert(ptr && alloc); }
+        
+        void operator()() const noexcept {
+            alloc_traits::destroy(*alloc, ptr);
+            alloc_traits::deallocate(*alloc, ptr, 1);
         }
     };
     
-    using a_deleter_type = deleter<word, std::allocator<word>>;
-    using deleter_storage = uninitialized<a_deleter_type>;
+    template<typename T>
+    struct deleter<T, void> {
+    private:
+        T* ptr;
+        
+    public:
+        deleter() noexcept = default;
+        
+        deleter(T* in_ptr, void*) noexcept
+            : ptr(in_ptr)
+        { assert(ptr); }
+        
+        void operator()() const noexcept { delete ptr; }
+    };
     
     struct write_set_lookup {
         var_storage* pending_write_;
@@ -55,6 +69,7 @@ LSTM_BEGIN
         friend test::transaction_tester;
         
         transaction_domain* _domain;
+        detail::thread_data* tls_td;
         word read_version;
         
         inline transaction_domain& domain() noexcept { return *_domain; }
@@ -62,9 +77,18 @@ LSTM_BEGIN
         
         inline void reset_read_version() noexcept { read_version = domain().get_clock(); }
 
-        inline transaction(transaction_domain& in_domain) noexcept
+        inline transaction(transaction_domain& in_domain, detail::thread_data& in_tls_td) noexcept
             : _domain(&in_domain)
-        { reset_read_version(); }
+            , tls_td(&in_tls_td)
+        {
+            reset_read_version();
+            assert(&detail::tls_thread_data() == tls_td);
+            assert(tls_td->tx == nullptr);
+        }
+        
+    #ifndef NDEBUG
+        inline ~transaction() noexcept { assert(tls_td->tx == nullptr); }
+    #endif
         
         static inline bool locked(word version) noexcept { return version & 1; }
         static inline word as_locked(word version) noexcept { return version | 1; }
@@ -100,8 +124,6 @@ LSTM_BEGIN
         
         virtual detail::write_set_lookup
         find_write_set(const detail::var_base& dest_var) noexcept = 0;
-        
-        virtual detail::deleter_storage& delete_set_push_back_storage() = 0;
 
     public:
         // transactions can only be passed by non-const lvalue reference
@@ -159,15 +181,9 @@ LSTM_BEGIN
             if (!read_valid(dest_var)) detail::internal_retry();
         }
 
-        template<typename T, typename Alloc = std::allocator<T>>
-        void delete_(T* dest_var, const Alloc& alloc = {}) {
-            static_assert(sizeof(detail::deleter<T, Alloc>) == sizeof(detail::deleter_storage));
-            static_assert(alignof(detail::deleter<T, Alloc>) == alignof(detail::deleter_storage));
-            static_assert(std::is_trivially_destructible<detail::deleter<T, Alloc>>{});
-            
-            detail::deleter_storage& storage = delete_set_push_back_storage();
-            ::new (&storage) detail::deleter<T, Alloc>(dest_var, alloc);
-        }
+        template<typename T, typename Alloc = void>
+        void delete_(T* dest_var, Alloc* alloc = nullptr)
+        { tls_td->gp_callbacks.emplace_back(detail::deleter<T, Alloc>(dest_var, alloc)); }
 
         // reading/writing an rvalue probably never makes sense
         template<typename T>

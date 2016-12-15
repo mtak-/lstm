@@ -1,9 +1,6 @@
 #ifndef LSTM_DETAIL_TRANSACTION_IMPL_HPP
 #define LSTM_DETAIL_TRANSACTION_IMPL_HPP
 
-#include <lstm/detail/small_pod_vector.hpp>
-#include <lstm/detail/thread_data.hpp>
-
 #include <lstm/transaction.hpp>
 
 #include <algorithm>
@@ -19,6 +16,8 @@ LSTM_DETAIL_BEGIN
             : var_ptr(in_var_ptr)
             , storage(in_storage)
         {}
+        
+        void operator()() const noexcept { var_ptr->destroy_deallocate(storage); }
     };
 
     struct read_set_value_type {
@@ -77,27 +76,20 @@ LSTM_DETAIL_BEGIN
         using alloc_traits = std::allocator_traits<Alloc>;
         using read_alloc = typename alloc_traits::template rebind_alloc<read_set_value_type>;
         using write_alloc = typename alloc_traits::template rebind_alloc<write_set_value_type>;
-        using deleter_alloc = typename alloc_traits::template rebind_alloc<deleter_storage>;
-        using write_deleter_alloc = typename alloc_traits::template rebind_alloc<write_set_deleter>;
         using read_set_t = small_pod_vector<read_set_value_type, ReadSize, read_alloc>;
         using write_set_t = small_pod_hash_set<write_set_value_type, WriteSize, write_alloc>;
-        using deleter_set_t = small_pod_vector<deleter_storage, DeleteSize, deleter_alloc>;
-        using write_set_deleters_t = small_pod_vector<write_set_deleter,
-                                                      WriteSize,
-                                                      write_deleter_alloc>;
         using read_set_const_iter = typename read_set_t::const_iterator;
         using write_set_iter = typename write_set_t::iterator;
         
         read_set_t read_set;
         write_set_t write_set;
-        deleter_set_t deleter_set;
-        write_set_deleters_t write_set_deleters;
         
-        inline transaction_impl(transaction_domain& domain, const Alloc& alloc) noexcept
-            : transaction(domain)
+        inline transaction_impl(transaction_domain& domain,
+                                thread_data& tls_td,
+                                const Alloc& alloc) noexcept
+            : transaction(domain, tls_td)
             , read_set(alloc)
             , write_set(alloc)
-            , deleter_set(alloc)
         {}
         
         static void unlock_write_set(write_set_iter begin, write_set_iter end) noexcept {
@@ -147,29 +139,31 @@ LSTM_DETAIL_BEGIN
             return true;
         }
         
+        // TODO: emplace_back can throw exceptions...
         void commit_publish(const word write_version) noexcept {
             for (auto& write_set_value : write_set) {
                 // TODO: possibly could reduce overhead here by adding to the write_set_deleters
                 // in "store" calls
-                if (write_set_value.dest_var().kind != var_type::atomic)
-                    write_set_deleters.emplace_back(
-                        &write_set_value.dest_var(),
-                        write_set_value.dest_var().storage.load(LSTM_RELAXED));
+                if (write_set_value.dest_var().kind != var_type::atomic) {
+                    write_set_deleter dler(&write_set_value.dest_var(),
+                                           write_set_value.dest_var().storage.load(LSTM_RELAXED));
+                    tls_td->gp_callbacks.emplace_back(std::move(dler));
+                }
                 write_set_value.dest_var().storage.store(std::move(write_set_value.pending_write()),
                                                          LSTM_RELAXED);
                 unlock(write_version, write_set_value.dest_var());
             }
         }
         
+        LSTM_NOINLINE void commit_reclaim_slow_path() noexcept {
+            synchronize();
+            tls_td->do_callbacks();
+        }
+        
         void commit_reclaim() noexcept {
-            if (!deleter_set.empty() || !write_set_deleters.empty()) {
-                synchronize();
-                for (auto& dler : deleter_set)
-                    (*static_cast<deleter_base*>(static_cast<a_deleter_type*>((void*)&dler)))();
-                for (const auto& dler : write_set_deleters)
-                    dler.var_ptr->destroy_deallocate(dler.storage);
-                write_set_deleters.reset();
-            }
+            // TODO: batching
+            if (!tls_td->gp_callbacks.empty())
+                commit_reclaim_slow_path();
         }
         
         LSTM_NOINLINE bool commit_slow_path() noexcept {
@@ -208,13 +202,14 @@ LSTM_DETAIL_BEGIN
                 write_set_value.dest_var().destroy_deallocate(write_set_value.pending_write());
             write_set.clear();
             read_set.clear();
-            deleter_set.clear();
+            
+            // TODO: batching
+            tls_td->gp_callbacks.clear();
         }
         
         void reset_heap() noexcept {
             write_set.reset();
             read_set.reset();
-            deleter_set.reset();
         }
         
         void add_read_set(const var_base& src_var) override final
@@ -237,11 +232,6 @@ LSTM_DETAIL_BEGIN
             return iter != write_set.end()
                 ? write_set_lookup{&iter->pending_write(), 0}
                 : lookup;
-        }
-        
-        deleter_storage& delete_set_push_back_storage() override final {
-            deleter_set.emplace_back();
-            return deleter_set.back();
         }
         
     public:
@@ -292,16 +282,6 @@ LSTM_DETAIL_BEGIN
                 var<T>::store(lookup.pending_write(), (U&&)u);
             
             if (!read_valid(dest_var)) detail::internal_retry();
-        }
-
-        template<typename T, typename Alloc0 = std::allocator<T>>
-        void delete_(T* dest_var, const Alloc0& alloc = {}) {
-            static_assert(sizeof(detail::deleter<T, Alloc0>) == sizeof(detail::deleter_storage));
-            static_assert(alignof(detail::deleter<T, Alloc0>) == alignof(detail::deleter_storage));
-            static_assert(std::is_trivially_destructible<detail::deleter<T, Alloc0>>{});
-            
-            detail::deleter_storage& storage = delete_set_push_back_storage();
-            ::new (&storage) detail::deleter<T, Alloc0>(dest_var, alloc);
         }
 
         // reading/writing an rvalue probably never makes sense

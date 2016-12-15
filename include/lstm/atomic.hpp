@@ -60,6 +60,7 @@ LSTM_DETAIL_BEGIN
         template<typename Tx>
         LSTM_ALWAYS_INLINE static void tx_success(Tx& tx, thread_data& tls_td) noexcept {
             tls_td.access_unlock();
+            tls_td.tx = nullptr;
             tx.commit_reclaim();
             tx.reset_heap();
         }
@@ -72,7 +73,7 @@ LSTM_DETAIL_BEGIN
                                                       knobs<ReadSize, WriteSize, DeleteSize>,
                                                       thread_data& tls_td) {
             tx_result_buffer<transact_result<Func>> buf;
-            transaction_impl<Alloc, ReadSize, WriteSize, DeleteSize> tx{domain, alloc};
+            transaction_impl<Alloc, ReadSize, WriteSize, DeleteSize> tx{domain, tls_td, alloc};
             
             while(true) {
                 tls_td.tx = &tx;

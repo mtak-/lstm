@@ -99,7 +99,7 @@ LSTM_BEGIN
                 lstm::atomic([&](auto& tx) {
                     while (node) {
                         auto next_ = next(*node, tx);
-                        tx.delete_(node, alloc());
+                        tx.delete_(node, &alloc());
                         node = next_;
                     }
                 }, lstm::default_domain(), alloc());

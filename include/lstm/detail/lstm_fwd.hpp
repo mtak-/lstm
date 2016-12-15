@@ -141,6 +141,8 @@ LSTM_BEGIN
 LSTM_END
 
 LSTM_DETAIL_BEGIN
+    struct write_set_deleter;
+    
     template<typename...>
     using void_ = void;
     
