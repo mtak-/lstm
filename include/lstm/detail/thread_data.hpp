@@ -27,7 +27,7 @@ LSTM_DETAIL_BEGIN
         LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
         LSTM_CACHE_ALIGNED std::atomic<thread_data*> next;
         
-        thread_data() noexcept
+        LSTM_NOINLINE thread_data() noexcept
             : tx(nullptr)
         {
             active.store(0, LSTM_RELEASE); // this must happen before locking
@@ -44,7 +44,7 @@ LSTM_DETAIL_BEGIN
             LSTM_ACCESS_INLINE_VAR(thread_data_mut).unlock();
         }
         
-        ~thread_data() noexcept {
+        LSTM_NOINLINE ~thread_data() noexcept {
             assert(tx == nullptr);
             assert(active.load(LSTM_RELAXED) == 0);
             
@@ -112,21 +112,24 @@ LSTM_DETAIL_BEGIN
         }
     }
     
-    // TODO: kill the CAS operation? (speculative or, might actually decrease grace period times)
+    // TODO: kill the CAS operation?
     // TODO: write a better less confusing implementation
     inline gp_t acquire_gp_bit() noexcept {
-        gp_t gp2 = 0;
-        gp_t gp;
+        std::atomic<gp_t>& grace_period_ref = LSTM_ACCESS_INLINE_VAR(grace_period);
+        gp_t gp = grace_period_ref.load(LSTM_RELAXED);
+        gp_t gp_bit;
+        default_backoff backoff{};
         
         do {
-            if (!gp2) gp = LSTM_ACCESS_INLINE_VAR(grace_period).load(LSTM_RELAXED);
-            gp2 = ~gp & -~gp;
-        } while (!gp2 || !LSTM_ACCESS_INLINE_VAR(grace_period)
-                            .compare_exchange_weak(gp,
-                                                   gp ^ gp2,
-                                                   LSTM_RELAXED,
-                                                   LSTM_RELEASE));
-        return gp2;
+            while (LSTM_UNLIKELY(gp == std::numeric_limits<gp_t>::max())) {
+                backoff();
+                gp = grace_period_ref.load(LSTM_RELAXED);
+            }
+            
+            gp_bit = ~gp & -~gp;
+        } while (!grace_period_ref.compare_exchange_weak(gp, gp | gp_bit,
+                                                         LSTM_RELAXED, LSTM_RELAXED));
+        return gp_bit;
     }
     
     // TODO: allow specifying a backoff strategy
