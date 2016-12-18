@@ -127,8 +127,10 @@ LSTM_DETAIL_BEGIN
             }
             
             gp_bit = ~gp & -~gp;
-        } while (!grace_period_ref.compare_exchange_weak(gp, gp | gp_bit,
-                                                         LSTM_RELAXED, LSTM_RELAXED));
+        } while (!LSTM_UNLIKELY(grace_period_ref.compare_exchange_weak(gp,
+                                                                       gp | gp_bit,
+                                                                       LSTM_RELAXED,
+                                                                       LSTM_RELAXED)));
         return gp_bit;
     }
     
