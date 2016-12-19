@@ -1,7 +1,7 @@
 #ifndef LSTM_DETAIL_THREAD_DATA_HPP
 #define LSTM_DETAIL_THREAD_DATA_HPP
 
-#include <lstm/detail/fast_rw_mutex.hpp>
+#include <lstm/detail/spin_lock.hpp>
 #include <lstm/detail/gp_callback.hpp>
 #include <lstm/detail/small_pod_vector.hpp>
 
@@ -9,9 +9,12 @@ LSTM_DETAIL_BEGIN
     struct thread_data;
     using gp_t = uword;
 
-    LSTM_INLINE_VAR fast_rw_mutex thread_data_mut{}; // already cache aligned
+    LSTM_INLINE_VAR spin_lock thread_data_mut{};
     LSTM_INLINE_VAR LSTM_CACHE_ALIGNED std::atomic<thread_data*> thread_data_root{nullptr};
     LSTM_INLINE_VAR LSTM_CACHE_ALIGNED std::atomic<gp_t> grace_period{1};
+    
+    inline void lock_all_thread_data() noexcept;
+    inline void unlock_all_thread_data() noexcept;
     
     // with the guarantee of no nested critical sections only one bit is needed
     // to say a thread is active.
@@ -24,24 +27,24 @@ LSTM_DETAIL_BEGIN
         // need some type with an atomic swap
         small_pod_vector<gp_callback_buf, 128, std::allocator<gp_callback_buf>> gp_callbacks;
         
+        LSTM_CACHE_ALIGNED spin_lock mut;
         LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
         LSTM_CACHE_ALIGNED std::atomic<thread_data*> next;
         
         LSTM_NOINLINE thread_data() noexcept
             : tx(nullptr)
         {
-            active.store(0, LSTM_RELEASE); // this must happen before locking
-                                           // otherwise deadlock could occur if
-                                           // a thread is synchronizing as it will read
-                                           // garbage otherwise
+            active.store(0, LSTM_RELEASE);
             
-            LSTM_ACCESS_INLINE_VAR(thread_data_mut).lock();
+            mut.lock();
+            
+            lock_all_thread_data();
                 
                 next.store(LSTM_ACCESS_INLINE_VAR(thread_data_root).load(LSTM_RELAXED),
                            LSTM_RELAXED);
                 LSTM_ACCESS_INLINE_VAR(thread_data_root).store(this, LSTM_RELAXED);
                 
-            LSTM_ACCESS_INLINE_VAR(thread_data_mut).unlock();
+            unlock_all_thread_data();
         }
         
         LSTM_NOINLINE ~thread_data() noexcept {
@@ -51,15 +54,18 @@ LSTM_DETAIL_BEGIN
             do_callbacks();
             gp_callbacks.reset();
             
-            LSTM_ACCESS_INLINE_VAR(thread_data_mut).lock();
+            lock_all_thread_data();
                 
                 std::atomic<thread_data*>* indirect = &LSTM_ACCESS_INLINE_VAR(thread_data_root);
                 while (indirect->load(LSTM_RELAXED) != this)
                     indirect = &indirect->load(LSTM_RELAXED)->next;
-                
                 indirect->store(next.load(LSTM_RELAXED), LSTM_RELAXED);
                 
-            LSTM_ACCESS_INLINE_VAR(thread_data_mut).unlock();
+            #ifndef NDEBUG
+                mut.unlock();
+            #endif
+                
+            unlock_all_thread_data();
         }
         
         thread_data(const thread_data&) = delete;
@@ -91,6 +97,26 @@ LSTM_DETAIL_BEGIN
         auto* result = &LSTM_ACCESS_INLINE_VAR(_tls_thread_data);
         LSTM_ESCAPE_VAR(result); // atleast on darwin, this helps significantly
         return *result;
+    }
+    
+    inline void lock_all_thread_data() noexcept {
+        LSTM_ACCESS_INLINE_VAR(thread_data_mut).lock();
+        
+        thread_data* current = LSTM_ACCESS_INLINE_VAR(thread_data_root).load(LSTM_RELAXED);
+        while (current) {
+            current->mut.lock();
+            current = current->next.load(LSTM_RELAXED);
+        }
+    }
+    
+    inline void unlock_all_thread_data() noexcept {
+        thread_data* current = LSTM_ACCESS_INLINE_VAR(thread_data_root).load(LSTM_RELAXED);
+        while (current) {
+            current->mut.unlock();
+            current = current->next.load(LSTM_RELAXED);
+        }
+        
+        LSTM_ACCESS_INLINE_VAR(thread_data_mut).unlock();
     }
     
     inline bool not_in_grace_period(const thread_data& q,
@@ -127,7 +153,7 @@ LSTM_DETAIL_BEGIN
             }
             
             gp_bit = ~gp & -~gp;
-        } while (!LSTM_UNLIKELY(grace_period_ref.compare_exchange_weak(gp,
+        } while (LSTM_UNLIKELY(!grace_period_ref.compare_exchange_weak(gp,
                                                                        gp | gp_bit,
                                                                        LSTM_RELAXED,
                                                                        LSTM_RELAXED)));
@@ -135,12 +161,12 @@ LSTM_DETAIL_BEGIN
     }
     
     // TODO: allow specifying a backoff strategy
-    inline void synchronize() noexcept {
-        assert(!tls_thread_data().active.load(LSTM_RELAXED));
+    inline void synchronize(spin_lock& mut) noexcept {
+        assert(!tls_td.active.load(LSTM_RELAXED));
         
         gp_t gp = acquire_gp_bit();
         
-        LSTM_ACCESS_INLINE_VAR(thread_data_mut).lock_shared();
+        mut.lock();
         
             wait(gp, false);
             
@@ -149,7 +175,7 @@ LSTM_DETAIL_BEGIN
             
             wait(gp, true);
         
-        LSTM_ACCESS_INLINE_VAR(thread_data_mut).unlock_shared();
+        mut.unlock();
     }
 LSTM_DETAIL_END
 

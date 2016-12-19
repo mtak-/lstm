@@ -1,4 +1,4 @@
-#include <lstm/lstm.hpp>
+#include <lstm/detail/fast_rw_mutex.hpp>
 
 #include "simple_test.hpp"
 #include "thread_manager.hpp"

@@ -156,7 +156,7 @@ LSTM_DETAIL_BEGIN
         }
         
         LSTM_NOINLINE void commit_reclaim_slow_path() noexcept {
-            synchronize();
+            synchronize(tls_td->mut);
             tls_td->do_callbacks();
         }
         
