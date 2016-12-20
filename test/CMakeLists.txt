@@ -24,6 +24,3 @@ add_test(test.exception exception)
 
 add_executable(destructor_transaction destructor_transaction.cpp)
 add_test(test.destructor_transaction destructor_transaction)
-
-add_executable(fast_rw_mutex fast_rw_mutex.cpp)
-add_test(test.fast_rw_mutex fast_rw_mutex)

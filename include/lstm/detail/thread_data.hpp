@@ -1,15 +1,19 @@
 #ifndef LSTM_DETAIL_THREAD_DATA_HPP
 #define LSTM_DETAIL_THREAD_DATA_HPP
 
-#include <lstm/detail/spin_lock.hpp>
+#include <lstm/detail/backoff.hpp>
 #include <lstm/detail/gp_callback.hpp>
-#include <lstm/detail/small_pod_vector.hpp>
+#include <lstm/detail/atomic_swap_pod_vector.hpp>
+
+#include <mutex>
 
 LSTM_DETAIL_BEGIN
     struct thread_data;
     using gp_t = uword;
+    
+    using mutex_type = std::mutex;
 
-    LSTM_INLINE_VAR spin_lock thread_data_mut{};
+    LSTM_INLINE_VAR mutex_type thread_data_mut{};
     LSTM_INLINE_VAR LSTM_CACHE_ALIGNED std::atomic<thread_data*> thread_data_root{nullptr};
     LSTM_INLINE_VAR LSTM_CACHE_ALIGNED std::atomic<gp_t> grace_period{1};
     
@@ -27,7 +31,7 @@ LSTM_DETAIL_BEGIN
         // need some type with an atomic swap
         small_pod_vector<gp_callback_buf, 128, std::allocator<gp_callback_buf>> gp_callbacks;
         
-        LSTM_CACHE_ALIGNED spin_lock mut;
+        LSTM_CACHE_ALIGNED mutex_type mut;
         LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
         LSTM_CACHE_ALIGNED std::atomic<thread_data*> next;
         
@@ -161,8 +165,8 @@ LSTM_DETAIL_BEGIN
     }
     
     // TODO: allow specifying a backoff strategy
-    inline void synchronize(spin_lock& mut) noexcept {
-        assert(!tls_td.active.load(LSTM_RELAXED));
+    inline void synchronize(mutex_type& mut) noexcept {
+        assert(!tls_thread_data().active.load(LSTM_RELAXED));
         
         gp_t gp = acquire_gp_bit();
         
