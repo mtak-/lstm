@@ -15,7 +15,7 @@ LSTM_DETAIL_BEGIN
     
     struct global_data {
         mutex_type thread_data_mut{};
-        std::atomic<thread_data*> thread_data_root{nullptr};
+        thread_data* thread_data_root{nullptr};
         LSTM_CACHE_ALIGNED std::atomic<gp_t> grace_period{1};
     };
     
@@ -38,7 +38,7 @@ LSTM_DETAIL_BEGIN
         
         LSTM_CACHE_ALIGNED mutex_type mut;
         LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
-        LSTM_CACHE_ALIGNED std::atomic<thread_data*> next;
+        LSTM_CACHE_ALIGNED thread_data* next;
         
         LSTM_NOINLINE thread_data() noexcept
             : tx(nullptr)
@@ -49,9 +49,8 @@ LSTM_DETAIL_BEGIN
             
             lock_all_thread_data();
                 
-                next.store(LSTM_ACCESS_INLINE_VAR(globals).thread_data_root.load(LSTM_RELAXED),
-                           LSTM_RELAXED);
-                LSTM_ACCESS_INLINE_VAR(globals).thread_data_root.store(this, LSTM_RELAXED);
+                next = LSTM_ACCESS_INLINE_VAR(globals).thread_data_root;
+                LSTM_ACCESS_INLINE_VAR(globals).thread_data_root = this;
                 
             unlock_all_thread_data();
         }
@@ -66,14 +65,12 @@ LSTM_DETAIL_BEGIN
             lock_all_thread_data();
             
                 global_data& globals_ = LSTM_ACCESS_INLINE_VAR(globals);
-                std::atomic<thread_data*>* indirect = &globals_.thread_data_root;
-                while (indirect->load(LSTM_RELAXED) != this)
-                    indirect = &indirect->load(LSTM_RELAXED)->next;
-                indirect->store(next.load(LSTM_RELAXED), LSTM_RELAXED);
+                thread_data** indirect = &globals_.thread_data_root;
+                while (*indirect != this)
+                    indirect = &(*indirect)->next;
+                *indirect = next;
                 
-            #ifndef NDEBUG
                 mut.unlock();
-            #endif
                 
             unlock_all_thread_data();
         }
@@ -113,18 +110,18 @@ LSTM_DETAIL_BEGIN
     inline void lock_all_thread_data() noexcept {
         LSTM_ACCESS_INLINE_VAR(globals).thread_data_mut.lock();
         
-        thread_data* current = LSTM_ACCESS_INLINE_VAR(globals).thread_data_root.load(LSTM_RELAXED);
+        thread_data* current = LSTM_ACCESS_INLINE_VAR(globals).thread_data_root;
         while (current) {
             current->mut.lock();
-            current = current->next.load(LSTM_RELAXED);
+            current = current->next;
         }
     }
     
     inline void unlock_all_thread_data() noexcept {
-        thread_data* current = LSTM_ACCESS_INLINE_VAR(globals).thread_data_root.load(LSTM_RELAXED);
+        thread_data* current = LSTM_ACCESS_INLINE_VAR(globals).thread_data_root;
         while (current) {
             current->mut.unlock();
-            current = current->next.load(LSTM_RELAXED);
+            current = current->next;
         }
         
         LSTM_ACCESS_INLINE_VAR(globals).thread_data_mut.unlock();
@@ -140,9 +137,9 @@ LSTM_DETAIL_BEGIN
     
     // TODO: allow specifying a backoff strategy
     inline void wait(const gp_t gp, const bool desired) noexcept {
-        for (thread_data* q = LSTM_ACCESS_INLINE_VAR(globals).thread_data_root.load(LSTM_RELAXED);
+        for (thread_data* q = LSTM_ACCESS_INLINE_VAR(globals).thread_data_root;
                 q != nullptr;
-                q = q->next.load(LSTM_RELAXED)) {
+                q = q->next) {
             default_backoff backoff;
             while (not_in_grace_period(*q, gp, desired))
                 backoff();
