@@ -12,13 +12,18 @@ LSTM_DETAIL_BEGIN
     using gp_t = uword;
     
     using mutex_type = std::mutex;
-
-    LSTM_INLINE_VAR mutex_type thread_data_mut{};
-    LSTM_INLINE_VAR LSTM_CACHE_ALIGNED std::atomic<thread_data*> thread_data_root{nullptr};
-    LSTM_INLINE_VAR LSTM_CACHE_ALIGNED std::atomic<gp_t> grace_period{1};
+    
+    struct global_data {
+        mutex_type thread_data_mut{};
+        std::atomic<thread_data*> thread_data_root{nullptr};
+        LSTM_CACHE_ALIGNED std::atomic<gp_t> grace_period{1};
+    };
+    
+    LSTM_INLINE_VAR LSTM_CACHE_ALIGNED global_data globals{};
     
     inline void lock_all_thread_data() noexcept;
     inline void unlock_all_thread_data() noexcept;
+    inline void do_all_callbacks(thread_data& tls_td);
     
     // with the guarantee of no nested critical sections only one bit is needed
     // to say a thread is active.
@@ -44,9 +49,9 @@ LSTM_DETAIL_BEGIN
             
             lock_all_thread_data();
                 
-                next.store(LSTM_ACCESS_INLINE_VAR(thread_data_root).load(LSTM_RELAXED),
+                next.store(LSTM_ACCESS_INLINE_VAR(globals).thread_data_root.load(LSTM_RELAXED),
                            LSTM_RELAXED);
-                LSTM_ACCESS_INLINE_VAR(thread_data_root).store(this, LSTM_RELAXED);
+                LSTM_ACCESS_INLINE_VAR(globals).thread_data_root.store(this, LSTM_RELAXED);
                 
             unlock_all_thread_data();
         }
@@ -59,8 +64,9 @@ LSTM_DETAIL_BEGIN
             gp_callbacks.reset();
             
             lock_all_thread_data();
-                
-                std::atomic<thread_data*>* indirect = &LSTM_ACCESS_INLINE_VAR(thread_data_root);
+            
+                global_data& globals_ = LSTM_ACCESS_INLINE_VAR(globals);
+                std::atomic<thread_data*>* indirect = &globals_.thread_data_root;
                 while (indirect->load(LSTM_RELAXED) != this)
                     indirect = &indirect->load(LSTM_RELAXED)->next;
                 indirect->store(next.load(LSTM_RELAXED), LSTM_RELAXED);
@@ -84,7 +90,8 @@ LSTM_DETAIL_BEGIN
         
         inline void access_lock() noexcept {
             assert(!active.load(LSTM_RELAXED));
-            active.store(LSTM_ACCESS_INLINE_VAR(grace_period).load(LSTM_RELAXED), LSTM_RELAXED);
+            active.store(LSTM_ACCESS_INLINE_VAR(globals).grace_period.load(LSTM_RELAXED),
+                         LSTM_RELAXED);
             std::atomic_thread_fence(LSTM_ACQUIRE);
         }
         
@@ -104,9 +111,9 @@ LSTM_DETAIL_BEGIN
     }
     
     inline void lock_all_thread_data() noexcept {
-        LSTM_ACCESS_INLINE_VAR(thread_data_mut).lock();
+        LSTM_ACCESS_INLINE_VAR(globals).thread_data_mut.lock();
         
-        thread_data* current = LSTM_ACCESS_INLINE_VAR(thread_data_root).load(LSTM_RELAXED);
+        thread_data* current = LSTM_ACCESS_INLINE_VAR(globals).thread_data_root.load(LSTM_RELAXED);
         while (current) {
             current->mut.lock();
             current = current->next.load(LSTM_RELAXED);
@@ -114,13 +121,13 @@ LSTM_DETAIL_BEGIN
     }
     
     inline void unlock_all_thread_data() noexcept {
-        thread_data* current = LSTM_ACCESS_INLINE_VAR(thread_data_root).load(LSTM_RELAXED);
+        thread_data* current = LSTM_ACCESS_INLINE_VAR(globals).thread_data_root.load(LSTM_RELAXED);
         while (current) {
             current->mut.unlock();
             current = current->next.load(LSTM_RELAXED);
         }
         
-        LSTM_ACCESS_INLINE_VAR(thread_data_mut).unlock();
+        LSTM_ACCESS_INLINE_VAR(globals).thread_data_mut.unlock();
     }
     
     inline bool not_in_grace_period(const thread_data& q,
@@ -133,7 +140,7 @@ LSTM_DETAIL_BEGIN
     
     // TODO: allow specifying a backoff strategy
     inline void wait(const gp_t gp, const bool desired) noexcept {
-        for (thread_data* q = LSTM_ACCESS_INLINE_VAR(thread_data_root).load(LSTM_RELAXED);
+        for (thread_data* q = LSTM_ACCESS_INLINE_VAR(globals).thread_data_root.load(LSTM_RELAXED);
                 q != nullptr;
                 q = q->next.load(LSTM_RELAXED)) {
             default_backoff backoff;
@@ -145,7 +152,7 @@ LSTM_DETAIL_BEGIN
     // TODO: kill the CAS operation?
     // TODO: write a better less confusing implementation
     inline gp_t acquire_gp_bit() noexcept {
-        std::atomic<gp_t>& grace_period_ref = LSTM_ACCESS_INLINE_VAR(grace_period);
+        std::atomic<gp_t>& grace_period_ref = LSTM_ACCESS_INLINE_VAR(globals).grace_period;
         gp_t gp = grace_period_ref.load(LSTM_RELAXED);
         gp_t gp_bit;
         default_backoff backoff{};
@@ -175,7 +182,7 @@ LSTM_DETAIL_BEGIN
             wait(gp, false);
             
             // TODO: release seems unneeded
-            LSTM_ACCESS_INLINE_VAR(grace_period).fetch_xor(gp, LSTM_RELEASE);
+            LSTM_ACCESS_INLINE_VAR(globals).grace_period.fetch_xor(gp, LSTM_RELEASE);
             
             wait(gp, true);
         
