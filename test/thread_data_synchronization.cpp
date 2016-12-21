@@ -6,7 +6,6 @@
 #include <random>
 
 static constexpr auto loop_count0 = LSTM_TEST_INIT(5000000, 50000);
-static constexpr auto loop_count1 = LSTM_TEST_INIT(100, 100);
 
 using lstm::uword;
 
