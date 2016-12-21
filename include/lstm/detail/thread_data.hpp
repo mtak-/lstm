@@ -60,13 +60,9 @@ LSTM_DETAIL_BEGIN
             assert(tx == nullptr);
             assert(active.load(LSTM_RELAXED) == off_state);
             
-            do_callbacks();
-            gp_callbacks.reset();
-            
             lock_all_thread_data();
-            
-                global_data& globals_ = LSTM_ACCESS_INLINE_VAR(globals);
-                thread_data** indirect = &globals_.thread_data_root;
+                
+                thread_data** indirect = &LSTM_ACCESS_INLINE_VAR(globals).thread_data_root;
                 while (*indirect != this)
                     indirect = &(*indirect)->next;
                 *indirect = next;
@@ -74,6 +70,8 @@ LSTM_DETAIL_BEGIN
                 mut.unlock();
                 
             unlock_all_thread_data();
+            
+            gp_callbacks.reset();
         }
         
         thread_data(const thread_data&) = delete;
@@ -150,6 +148,7 @@ LSTM_DETAIL_BEGIN
         assert(tls_thread_data().active.load(LSTM_RELAXED) == off_state);
         
         gp_t gp = LSTM_ACCESS_INLINE_VAR(globals).grace_period.fetch_add(1, LSTM_RELEASE);
+        assert(gp != off_state);
         
         mut.lock();
         
