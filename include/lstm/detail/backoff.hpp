@@ -47,6 +47,15 @@ LSTM_DETAIL_BEGIN
             is_backoff_strategy<exponential_delay<std::chrono::nanoseconds, 100000, 10000000>>{},
             "");
     
+    struct yield {
+        LSTM_ALWAYS_INLINE void operator()() noexcept
+        { std::this_thread::yield(); }
+        
+        LSTM_ALWAYS_INLINE void reset() noexcept {}
+    };
+    
+    static_assert(is_backoff_strategy<yield>{}, "");
+    
     using default_backoff = exponential_delay<std::chrono::nanoseconds, 100000, 10000000>;
 LSTM_DETAIL_END
 
