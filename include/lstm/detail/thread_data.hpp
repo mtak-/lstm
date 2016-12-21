@@ -32,8 +32,9 @@ LSTM_DETAIL_BEGIN
         transaction* tx;
         
         // TODO: this is a terrible type for gp_callbacks
-        // need some type with an atomic swap
-        small_pod_vector<gp_callback_buf, 128, std::allocator<gp_callback_buf>> gp_callbacks;
+        // also probly should be a few different kinds of callbacks (succ/fail/always)
+        // sharing of gp_callbacks would be nice, but how could it be made fast for small tx's?
+        small_pod_vector<gp_callback_buf, 1> gp_callbacks;
         
         LSTM_CACHE_ALIGNED mutex_type mut;
         LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
@@ -126,61 +127,32 @@ LSTM_DETAIL_BEGIN
         LSTM_ACCESS_INLINE_VAR(globals).thread_data_mut.unlock();
     }
     
-    inline bool not_in_grace_period(const thread_data& q,
-                                    const gp_t gp,
-                                    const bool desired) noexcept {
+    inline bool not_in_grace_period(const thread_data& q, const gp_t gp) noexcept {
         // TODO: acquire seems unneeded
         const gp_t thread_gp = q.active.load(LSTM_ACQUIRE);
-        return thread_gp && !!(thread_gp & gp) == desired;
+        return thread_gp && thread_gp < gp;
     }
     
     // TODO: allow specifying a backoff strategy
-    inline void wait(const gp_t gp, const bool desired) noexcept {
+    inline void wait(const gp_t gp) noexcept {
         for (thread_data* q = LSTM_ACCESS_INLINE_VAR(globals).thread_data_root;
                 q != nullptr;
                 q = q->next) {
             default_backoff backoff;
-            while (not_in_grace_period(*q, gp, desired))
+            while (not_in_grace_period(*q, gp))
                 backoff();
         }
-    }
-    
-    // TODO: kill the CAS operation?
-    // TODO: write a better less confusing implementation
-    inline gp_t acquire_gp_bit() noexcept {
-        std::atomic<gp_t>& grace_period_ref = LSTM_ACCESS_INLINE_VAR(globals).grace_period;
-        gp_t gp = grace_period_ref.load(LSTM_RELAXED);
-        gp_t gp_bit;
-        default_backoff backoff{};
-        
-        do {
-            while (LSTM_UNLIKELY(gp == ~gp_t(0))) {
-                backoff();
-                gp = grace_period_ref.load(LSTM_RELAXED);
-            }
-            
-            gp_bit = ~gp & -~gp;
-        } while (LSTM_UNLIKELY(!grace_period_ref.compare_exchange_weak(gp,
-                                                                       gp | gp_bit,
-                                                                       LSTM_RELAXED,
-                                                                       LSTM_RELAXED)));
-        return gp_bit;
     }
     
     // TODO: allow specifying a backoff strategy
     inline void synchronize(mutex_type& mut) noexcept {
         assert(!tls_thread_data().active.load(LSTM_RELAXED));
         
-        gp_t gp = acquire_gp_bit();
+        gp_t gp = LSTM_ACCESS_INLINE_VAR(globals).grace_period.fetch_add(1, LSTM_RELEASE) + 1;
         
         mut.lock();
         
-            wait(gp, false);
-            
-            // TODO: release seems unneeded
-            LSTM_ACCESS_INLINE_VAR(globals).grace_period.fetch_xor(gp, LSTM_RELEASE);
-            
-            wait(gp, true);
+            wait(gp);
         
         mut.unlock();
     }
