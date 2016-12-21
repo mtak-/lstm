@@ -3,7 +3,7 @@
 
 #include <lstm/detail/backoff.hpp>
 #include <lstm/detail/gp_callback.hpp>
-#include <lstm/detail/atomic_swap_pod_vector.hpp>
+#include <lstm/detail/small_pod_vector.hpp>
 
 #include <mutex>
 
@@ -23,7 +23,6 @@ LSTM_DETAIL_BEGIN
     
     inline void lock_all_thread_data() noexcept;
     inline void unlock_all_thread_data() noexcept;
-    inline void do_all_callbacks(thread_data& tls_td);
     
     // with the guarantee of no nested critical sections only one bit is needed
     // to say a thread is active.
@@ -155,7 +154,7 @@ LSTM_DETAIL_BEGIN
         default_backoff backoff{};
         
         do {
-            while (LSTM_UNLIKELY(gp == std::numeric_limits<gp_t>::max())) {
+            while (LSTM_UNLIKELY(gp == ~gp_t(0))) {
                 backoff();
                 gp = grace_period_ref.load(LSTM_RELAXED);
             }
