@@ -184,7 +184,7 @@ LSTM_DETAIL_BEGIN
         // write_set.size() == 1 && (read_set.empty() ||
         //                           read_set.size() == 1 && read_set[0] == write_set[0])
         bool commit() noexcept {
-            if (!write_set.empty() && !commit_slow_path()) {
+            if ((!write_set.empty() || !tls_td->gp_callbacks.empty()) && !commit_slow_path()) {
                 LSTM_INTERNAL_FAIL_TX();
                 return false;
             }
