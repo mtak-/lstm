@@ -41,7 +41,7 @@ LSTM_DETAIL_BEGIN
         LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
         LSTM_CACHE_ALIGNED thread_data* next;
         
-        LSTM_NOINLINE thread_data() noexcept
+        thread_data() noexcept
             : tx(nullptr)
         {
             active.store(off_state, LSTM_RELEASE);
@@ -56,7 +56,7 @@ LSTM_DETAIL_BEGIN
             unlock_all_thread_data();
         }
         
-        LSTM_NOINLINE ~thread_data() noexcept {
+        ~thread_data() noexcept {
             assert(tx == nullptr);
             assert(active.load(LSTM_RELAXED) == off_state);
             
@@ -97,13 +97,17 @@ LSTM_DETAIL_BEGIN
         }
     };
     
-    // TODO: still feel like this garbage is overkill
-    LSTM_INLINE_VAR LSTM_THREAD_LOCAL thread_data _tls_thread_data{};
+    // TODO: still feel like this garbage is overkill, maybe this only applies to darwin
+    LSTM_NOINLINE inline void tls_data_init(thread_data*& data) noexcept {
+        static LSTM_THREAD_LOCAL thread_data _tls_thread_data{};
+        data = &_tls_thread_data;
+    }
     
     LSTM_ALWAYS_INLINE thread_data& tls_thread_data() noexcept {
-        auto* result = &LSTM_ACCESS_INLINE_VAR(_tls_thread_data);
-        LSTM_ESCAPE_VAR(result); // atleast on darwin, this helps significantly
-        return *result;
+        static LSTM_THREAD_LOCAL thread_data* data = nullptr;
+        if (LSTM_UNLIKELY(!data))
+            tls_data_init(data);
+        return *data;
     }
     
     inline void lock_all_thread_data() noexcept {
