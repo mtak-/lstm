@@ -15,8 +15,8 @@ LSTM_BEGIN
         LSTM_CACHE_ALIGNED std::atomic<word> clock{0};
         
         inline word bump_clock() noexcept {
-            word result = clock.fetch_add(clock_bump_size, LSTM_RELEASE) + clock_bump_size;
-            assert(result < max_version);
+            word result = clock.fetch_add(clock_bump_size, LSTM_RELEASE);
+            assert(result < max_version - 2);
             return result;
         }
         

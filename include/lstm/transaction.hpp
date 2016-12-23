@@ -75,13 +75,13 @@ LSTM_BEGIN
         inline transaction_domain& domain() noexcept { return *_domain; }
         inline const transaction_domain& domain() const noexcept { return *_domain; }
         
-        inline void reset_read_version() noexcept { read_version = domain().get_clock(); }
+        inline void reset_read_version() noexcept
+        { tls_td->access_lock(read_version = domain().get_clock()); }
 
         inline transaction(transaction_domain& in_domain, detail::thread_data& in_tls_td) noexcept
             : _domain(&in_domain)
             , tls_td(&in_tls_td)
         {
-            reset_read_version();
             assert(&detail::tls_thread_data() == tls_td);
             assert(tls_td->tx == nullptr);
         }

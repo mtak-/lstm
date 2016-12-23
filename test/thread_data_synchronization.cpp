@@ -11,14 +11,15 @@ using lstm::uword;
 
 int main() {
     thread_manager manager;
+    std::atomic<lstm::detail::gp_t> gp{0};
     
     for (int j = 0; j < 5; ++j) {
-        manager.queue_thread([] {
+        manager.queue_thread([&] {
             auto& tls_td = lstm::detail::tls_thread_data();
             for (uword i = 0; i < loop_count0; ++i) {
-                tls_td.access_lock();
+                tls_td.access_lock(gp.load(LSTM_RELAXED));
                 tls_td.access_unlock();
-                lstm::detail::synchronize(tls_td.mut);
+                lstm::detail::synchronize(tls_td.mut, gp.fetch_add(1, LSTM_RELAXED));
             }
         });
     }

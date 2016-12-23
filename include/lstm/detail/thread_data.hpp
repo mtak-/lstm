@@ -17,7 +17,6 @@ LSTM_DETAIL_BEGIN
     struct global_data {
         mutex_type thread_data_mut{};
         thread_data* thread_data_root{nullptr};
-        LSTM_CACHE_ALIGNED std::atomic<gp_t> grace_period{0};
     };
     
     LSTM_INLINE_VAR LSTM_CACHE_ALIGNED global_data globals{};
@@ -67,9 +66,9 @@ LSTM_DETAIL_BEGIN
                     indirect = &(*indirect)->next;
                 *indirect = next;
                 
-                mut.unlock();
-                
             unlock_all_thread_data();
+            
+            mut.unlock();
             
             gp_callbacks.reset();
         }
@@ -79,15 +78,15 @@ LSTM_DETAIL_BEGIN
         
         // TODO: when atomic swap on gp_callbacks is possible, this needs to do just that
         void do_callbacks() noexcept {
+            // TODO: if a callback adds a callback, this fails, again need a different type
             for (auto& gp_callback : gp_callbacks)
                 gp_callback();
             gp_callbacks.clear();
         }
         
-        inline void access_lock() noexcept {
+        inline void access_lock(const gp_t gp) noexcept {
             assert(active.load(LSTM_RELAXED) == off_state);
-            active.store(LSTM_ACCESS_INLINE_VAR(globals).grace_period.load(LSTM_RELAXED),
-                         LSTM_RELAXED);
+            active.store(gp, LSTM_RELAXED);
             std::atomic_thread_fence(LSTM_ACQUIRE);
         }
         
@@ -97,17 +96,19 @@ LSTM_DETAIL_BEGIN
         }
     };
     
+    LSTM_INLINE_VAR LSTM_THREAD_LOCAL thread_data* _tls_thread_data_ptr = nullptr;
+    
     // TODO: still feel like this garbage is overkill, maybe this only applies to darwin
-    LSTM_NOINLINE inline void tls_data_init(thread_data*& data) noexcept {
+    LSTM_NOINLINE inline thread_data& tls_data_init() noexcept {
         static LSTM_THREAD_LOCAL thread_data _tls_thread_data{};
-        data = &_tls_thread_data;
+        LSTM_ACCESS_INLINE_VAR(_tls_thread_data_ptr) = &_tls_thread_data;
+        return *LSTM_ACCESS_INLINE_VAR(_tls_thread_data_ptr);
     }
     
     LSTM_ALWAYS_INLINE thread_data& tls_thread_data() noexcept {
-        static LSTM_THREAD_LOCAL thread_data* data = nullptr;
-        if (LSTM_UNLIKELY(!data))
-            tls_data_init(data);
-        return *data;
+        if (LSTM_UNLIKELY(!LSTM_ACCESS_INLINE_VAR(_tls_thread_data_ptr)))
+            return tls_data_init();
+        return *LSTM_ACCESS_INLINE_VAR(_tls_thread_data_ptr);
     }
     
     inline void lock_all_thread_data() noexcept {
@@ -148,10 +149,8 @@ LSTM_DETAIL_BEGIN
     }
     
     // TODO: allow specifying a backoff strategy
-    inline void synchronize(mutex_type& mut) noexcept {
+    inline void synchronize(mutex_type& mut, const gp_t gp) noexcept {
         assert(tls_thread_data().active.load(LSTM_RELAXED) == off_state);
-        
-        gp_t gp = LSTM_ACCESS_INLINE_VAR(globals).grace_period.fetch_add(1, LSTM_RELEASE);
         assert(gp != off_state);
         
         mut.lock();

@@ -156,7 +156,7 @@ LSTM_DETAIL_BEGIN
         }
         
         LSTM_NOINLINE void commit_reclaim_slow_path() noexcept {
-            synchronize(tls_td->mut);
+            synchronize(tls_td->mut, read_version);
             tls_td->do_callbacks();
         }
         
@@ -172,10 +172,12 @@ LSTM_DETAIL_BEGIN
             
             word write_version = domain().bump_clock();
             
-            if (write_version != read_version + 2 && !commit_validate_reads())
+            if (write_version != read_version && !commit_validate_reads())
                 return false;
             
-            commit_publish(write_version);
+            read_version = write_version;
+            
+            commit_publish(write_version + 2);
             
             return true;
         }

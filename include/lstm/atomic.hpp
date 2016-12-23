@@ -51,10 +51,8 @@ LSTM_DETAIL_BEGIN
         }
         
         template<typename Tx>
-        LSTM_ALWAYS_INLINE static void tx_internal_failed(Tx& tx, thread_data& tls_td) noexcept {
+        LSTM_ALWAYS_INLINE static void tx_internal_failed(Tx& tx) noexcept {
             tx.cleanup();
-            tls_td.access_unlock();
-            tx.reset_read_version();
         }
         
         template<typename Tx>
@@ -75,15 +73,15 @@ LSTM_DETAIL_BEGIN
             tx_result_buffer<transact_result<Func>> buf;
             transaction_impl<Alloc, ReadSize, WriteSize, DeleteSize> tx{domain, tls_td, alloc};
             
+            tls_td.tx = &tx;
+            
             while(true) {
-                tls_td.tx = &tx;
-                tls_td.access_lock();
+                tx.reset_read_version();
                 try {
                     assert(tx.read_set.size() == 0);
                     assert(tx.write_set.size() == 0);
                     
                     atomic_fn::try_transact(func, tx, buf);
-                    tls_td.tx = nullptr;
                     
                     // commit does not throw
                     if (tx.commit()) {
@@ -96,7 +94,7 @@ LSTM_DETAIL_BEGIN
                 } catch(...) {
                     unhandled_exception(tx, tls_td);
                 }
-                tx_internal_failed(tx, tls_td);
+                tx_internal_failed(tx);
             }
         }
         
