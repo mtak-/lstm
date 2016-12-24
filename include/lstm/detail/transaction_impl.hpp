@@ -243,6 +243,11 @@ LSTM_DETAIL_BEGIN
             detail::write_set_lookup lookup = find_write_set(src_var);
             if (LSTM_LIKELY(!lookup.success())) {
                 const gp_t src_version = src_var.version_lock.load(LSTM_ACQUIRE);
+                
+                static_assert(std::is_reference<
+                                decltype(var<T>::load(src_var.storage.load(LSTM_ACQUIRE)))>{},
+                                "");
+                
                 const T& result = var<T>::load(src_var.storage.load(LSTM_ACQUIRE));
                 if (rw_valid(src_version)
                         && src_var.version_lock.load(LSTM_RELAXED) == src_version) {
