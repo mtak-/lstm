@@ -131,7 +131,7 @@ LSTM_DETAIL_BEGIN
         bool commit_validate_reads() noexcept {
             // reads do not need to be locked to be validated
             for (auto& read_set_vaue : read_set) {
-                if (!read_valid(read_set_vaue.src_var())) {
+                if (!rw_valid(read_set_vaue.src_var())) {
                     unlock_write_set(std::begin(write_set), std::end(write_set));
                     return false;
                 }
