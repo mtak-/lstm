@@ -17,7 +17,7 @@ LSTM_END
 LSTM_DETAIL_BEGIN
     struct LSTM_CACHE_ALIGNED var_base {
     protected:
-        mutable std::atomic<word> version_lock;
+        mutable std::atomic<gp_t> version_lock;
         std::atomic<var_storage> storage;
         const var_type kind;
         

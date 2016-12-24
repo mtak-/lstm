@@ -62,22 +62,24 @@ LSTM_BEGIN
         LSTM_USER_FAIL_TX();
         throw detail::_tx_retry{};
     }
-
+    
     struct transaction {
     protected:
         friend detail::atomic_fn;
         friend test::transaction_tester;
         
+        static constexpr gp_t lock_bit = gp_t(1) << (sizeof(gp_t) * 8 - 1);
+        
         transaction_domain* _domain;
         detail::thread_data* tls_td;
-        word read_version;
+        gp_t read_version;
         
         inline transaction_domain& domain() noexcept { return *_domain; }
         inline const transaction_domain& domain() const noexcept { return *_domain; }
         
         inline void reset_read_version() noexcept
         { tls_td->access_lock(read_version = domain().get_clock()); }
-
+        
         inline transaction(transaction_domain& in_domain, detail::thread_data& in_tls_td) noexcept
             : _domain(&in_domain)
             , tls_td(&in_tls_td)
@@ -90,33 +92,36 @@ LSTM_BEGIN
         inline ~transaction() noexcept { assert(tls_td->tx == nullptr); }
     #endif
         
-        static inline bool locked(word version) noexcept { return version & 1; }
-        static inline word as_locked(word version) noexcept { return version | 1; }
-
+        static inline bool locked(const gp_t version) noexcept { return version & lock_bit; }
+        static inline gp_t as_locked(const gp_t version) noexcept { return version | lock_bit; }
+        
+        inline bool rw_valid(const gp_t version) const noexcept
+        { return version <= read_version; }
+        
+        inline bool rw_valid(const detail::var_base& v) const noexcept
+        { return rw_valid(v.version_lock.load(LSTM_RELAXED)); }
+        
         bool lock(const detail::var_base& v) const noexcept {
-            word version_buf = v.version_lock.load(LSTM_RELAXED);
+            gp_t version_buf = v.version_lock.load(LSTM_RELAXED);
             // TODO: not convinced of this ordering
-            return version_buf <= read_version && !locked(version_buf) &&
+            return rw_valid(version_buf) &&
                     v.version_lock.compare_exchange_strong(version_buf,
                                                            as_locked(version_buf),
                                                            LSTM_RELEASE);
         }
-
+        
         static inline
-        void unlock(const word version_to_set, const detail::var_base& v) noexcept {
+        void unlock(const gp_t version_to_set, const detail::var_base& v) noexcept {
             assert(locked(v.version_lock.load(LSTM_RELAXED)));
             assert(!locked(version_to_set));
             v.version_lock.store(version_to_set, LSTM_RELEASE);
         }
-
+        
         static inline void unlock(const detail::var_base& v) noexcept {
             assert(locked(v.version_lock.load(LSTM_RELAXED)));
-            v.version_lock.fetch_sub(1, LSTM_RELEASE);
+            v.version_lock.fetch_xor(lock_bit, LSTM_RELEASE);
         }
-
-        inline bool read_valid(const detail::var_base& v) const noexcept
-        { return v.version_lock.load(LSTM_ACQUIRE) <= read_version; }
-
+        
         virtual void add_read_set(const detail::var_base& src_var) = 0;
         virtual void add_write_set(detail::var_base& dest_var,
                                    detail::var_storage pending_write,
@@ -124,7 +129,7 @@ LSTM_BEGIN
         
         virtual detail::write_set_lookup
         find_write_set(const detail::var_base& dest_var) noexcept = 0;
-
+        
     public:
         // transactions can only be passed by non-const lvalue reference
         transaction(const transaction&) = delete;
@@ -137,15 +142,14 @@ LSTM_BEGIN
         const T& load(const var<T, Alloc0>& src_var) {
             detail::write_set_lookup lookup = find_write_set(src_var);
             if (LSTM_LIKELY(!lookup.success())) {
-                const word src_version = src_var.version_lock.load(LSTM_ACQUIRE);
+                const gp_t src_version = src_var.version_lock.load(LSTM_ACQUIRE);
                 const T& result = var<T>::load(src_var.storage.load(LSTM_ACQUIRE));
-                if (src_version <= read_version
-                        && !locked(src_version)
+                if (rw_valid(src_version)
                         && src_var.version_lock.load(LSTM_RELAXED) == src_version) {
                     add_read_set(src_var);
                     return result;
                 }
-            } else if (src_var.version_lock.load(LSTM_RELAXED) <= read_version)
+            } else if (rw_valid(src_var))
                 return var<T>::load(lookup.pending_write());
             detail::internal_retry();
         }
@@ -153,18 +157,17 @@ LSTM_BEGIN
         template<typename T, typename Alloc0,
             LSTM_REQUIRES_(var<T, Alloc0>::atomic)>
         T load(const var<T, Alloc0>& src_var) {
-             detail::write_set_lookup lookup = find_write_set(src_var);
-             if (LSTM_LIKELY(!lookup.success())) {
-                const word src_version = src_var.version_lock.load(LSTM_ACQUIRE);
+            detail::write_set_lookup lookup = find_write_set(src_var);
+            if (LSTM_LIKELY(!lookup.success())) {
+                const gp_t src_version = src_var.version_lock.load(LSTM_ACQUIRE);
                 const T result = var<T>::load(src_var.storage.load(LSTM_ACQUIRE));
-                if (src_version <= read_version
-                        && !locked(src_version)
+                if (rw_valid(src_version)
                         && src_var.version_lock.load(LSTM_RELAXED) == src_version) {
                     add_read_set(src_var);
                     return result;
                 }
-             } else if (src_var.version_lock.load(LSTM_RELAXED) <= read_version)
-                 return var<T>::load(lookup.pending_write());
+            } else if (rw_valid(src_var))
+                return var<T>::load(lookup.pending_write());
             detail::internal_retry();
         }
         
@@ -178,17 +181,17 @@ LSTM_BEGIN
             else
                 var<T>::store(lookup.pending_write(), (U&&)u);
             
-            if (!read_valid(dest_var)) detail::internal_retry();
+            if (!rw_valid(dest_var)) detail::internal_retry();
         }
-
+        
         template<typename T, typename Alloc = void>
         void delete_(T* dest_var, Alloc* alloc = nullptr)
         { tls_td->gp_callbacks.emplace_back(detail::deleter<T, Alloc>(dest_var, alloc)); }
-
+        
         // reading/writing an rvalue probably never makes sense
         template<typename T>
         void load(const var<T>&& v) = delete;
-
+        
         template<typename T>
         void store(var<T>&& v) = delete;
     };

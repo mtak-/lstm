@@ -140,7 +140,7 @@ LSTM_DETAIL_BEGIN
         }
         
         // TODO: emplace_back can throw exceptions...
-        void commit_publish(const word write_version) noexcept {
+        void commit_publish(const gp_t write_version) noexcept {
             for (auto& write_set_value : write_set) {
                 // TODO: possibly could reduce overhead here by adding to the write_set_deleters
                 // in "store" calls
@@ -170,14 +170,14 @@ LSTM_DETAIL_BEGIN
             if (!commit_lock_writes())
                 return false;
             
-            word write_version = domain().bump_clock();
+            gp_t write_version = domain().bump_clock();
             
             if (write_version != read_version && !commit_validate_reads())
                 return false;
             
             read_version = write_version;
             
-            commit_publish(write_version + 2);
+            commit_publish(write_version + 1);
             
             return true;
         }
@@ -242,15 +242,14 @@ LSTM_DETAIL_BEGIN
         const T& load(const var<T, Alloc0>& src_var) {
             detail::write_set_lookup lookup = find_write_set(src_var);
             if (LSTM_LIKELY(!lookup.success())) {
-                const word src_version = src_var.version_lock.load(LSTM_ACQUIRE);
+                const gp_t src_version = src_var.version_lock.load(LSTM_ACQUIRE);
                 const T& result = var<T>::load(src_var.storage.load(LSTM_ACQUIRE));
-                if (src_version <= read_version
-                        && !locked(src_version)
+                if (rw_valid(src_version)
                         && src_var.version_lock.load(LSTM_RELAXED) == src_version) {
                     add_read_set(src_var);
                     return result;
                 }
-            } else if (src_var.version_lock.load(LSTM_RELAXED) <= read_version)
+            } else if (rw_valid(src_var))
                 return var<T>::load(lookup.pending_write());
             detail::internal_retry();
         }
@@ -258,21 +257,20 @@ LSTM_DETAIL_BEGIN
         template<typename T, typename Alloc0,
             LSTM_REQUIRES_(var<T, Alloc0>::atomic)>
         T load(const var<T, Alloc0>& src_var) {
-             detail::write_set_lookup lookup = find_write_set(src_var);
-             if (LSTM_LIKELY(!lookup.success())) {
-                const word src_version = src_var.version_lock.load(LSTM_ACQUIRE);
+            detail::write_set_lookup lookup = find_write_set(src_var);
+            if (LSTM_LIKELY(!lookup.success())) {
+                const gp_t src_version = src_var.version_lock.load(LSTM_ACQUIRE);
                 const T result = var<T>::load(src_var.storage.load(LSTM_ACQUIRE));
-                if (src_version <= read_version
-                        && !locked(src_version)
+                if (rw_valid(src_version)
                         && src_var.version_lock.load(LSTM_RELAXED) == src_version) {
                     add_read_set(src_var);
                     return result;
                 }
-             } else if (src_var.version_lock.load(LSTM_RELAXED) <= read_version)
-                 return var<T>::load(lookup.pending_write());
+            } else if (rw_valid(src_var))
+                return var<T>::load(lookup.pending_write());
             detail::internal_retry();
         }
-
+        
         template<typename T, typename Alloc0, typename U,
             LSTM_REQUIRES_(std::is_assignable<T&, U&&>() &&
                            std::is_constructible<T, U&&>())>
@@ -283,13 +281,13 @@ LSTM_DETAIL_BEGIN
             else
                 var<T>::store(lookup.pending_write(), (U&&)u);
             
-            if (!read_valid(dest_var)) detail::internal_retry();
+            if (!rw_valid(dest_var)) detail::internal_retry();
         }
-
+        
         // reading/writing an rvalue probably never makes sense
         template<typename T>
         void load(const var<T>&& v) = delete;
-
+        
         template<typename T>
         void store(var<T>&& v) = delete;
     };

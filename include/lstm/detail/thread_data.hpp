@@ -9,8 +9,8 @@
 
 LSTM_DETAIL_BEGIN
     struct thread_data;
-    using gp_t = uword;
-    static constexpr gp_t off_state = ~gp_t(0);
+    
+    namespace { static constexpr gp_t off_state = ~gp_t(0); }
     
     using mutex_type = std::mutex;
     
@@ -85,8 +85,11 @@ LSTM_DETAIL_BEGIN
         }
         
         inline void access_lock(const gp_t gp) noexcept {
-            assert(active.load(LSTM_RELAXED) == off_state);
-            active.store(gp, LSTM_RELAXED);
+            // commented out, as this can be used to reset the grace period resulting
+            // in one less atomic store operation
+            // assert(active.load(LSTM_RELAXED) == off_state);
+            // TODO: have separate lock, and relock, functions
+            active.store(gp, LSTM_RELEASE);
             std::atomic_thread_fence(LSTM_ACQUIRE);
         }
         
