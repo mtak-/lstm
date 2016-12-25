@@ -32,7 +32,9 @@ LSTM_DETAIL_BEGIN
         using read_alloc = typename alloc_traits::template rebind_alloc<read_set_value_type>;
         using write_alloc = typename alloc_traits::template rebind_alloc<write_set_value_type>;
         using read_set_t = small_pod_vector<read_set_value_type, ReadSize, read_alloc>;
-        using write_set_t = small_pod_hash_set<write_set_value_type, WriteSize, write_alloc>;
+        using write_set_t = pod_hash_set<small_pod_vector<write_set_value_type,
+                                                          WriteSize,
+                                                          write_alloc>>;
         using read_set_const_iter = typename read_set_t::const_iterator;
         using write_set_iter = typename write_set_t::iterator;
         

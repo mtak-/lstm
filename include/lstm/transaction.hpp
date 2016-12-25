@@ -2,7 +2,7 @@
 #define LSTM_TRANSACTION_HPP
 
 #include <lstm/detail/var_detail.hpp>
-#include <lstm/detail/small_pod_hash_set.hpp>
+#include <lstm/detail/pod_hash_set.hpp>
 #include <lstm/detail/thread_data.hpp>
 
 #include <lstm/transaction_domain.hpp>

@@ -1,5 +1,5 @@
-#ifndef LSTM_DETAIL_READ_SET_HPP
-#define LSTM_DETAIL_READ_SET_HPP
+#ifndef LSTM_DETAIL_POD_HASH_SET_HPP
+#define LSTM_DETAIL_POD_HASH_SET_HPP
 
 #include <lstm/detail/small_pod_vector.hpp>
 
@@ -42,28 +42,31 @@ LSTM_DETAIL_BEGIN
     }
     
     // TODO: this class is only designed to work with write_set_value_type
-    template<typename T,
-             uword N,
-             typename Alloc = std::allocator<T>>
-    struct small_pod_hash_set {
+    template<typename Underlying>
+    struct pod_hash_set {
+        using data_t = Underlying;
+        using allocator_type = typename data_t::allocator_type;
+        using value_type = typename data_t::value_type;
+        using reference = typename data_t::reference;
+        using const_reference = typename data_t::const_reference;
+        using pointer = typename data_t::pointer;
+        using const_pointer = typename data_t::const_pointer;
+        using iterator = typename data_t::iterator;
+        using const_iterator = typename data_t::const_iterator;
+        
     private:
-        using data_t = small_pod_vector<T, N, Alloc>;
         hash_t filter_;
         data_t data;
         
     public:
-        using iterator = typename data_t::iterator;
-        using const_iterator = typename data_t::const_iterator;
-        static_assert(std::is_same<iterator, T*>{});
-        
-        small_pod_hash_set(const Alloc& alloc = {})
-            noexcept(std::is_nothrow_copy_constructible<Alloc>{})
+        pod_hash_set(const allocator_type& alloc = {})
+            noexcept(std::is_nothrow_copy_constructible<allocator_type>{})
             : filter_(0)
             , data(alloc)
         {}
             
-        small_pod_hash_set(const small_pod_hash_set&) = delete;
-        small_pod_hash_set& operator=(const small_pod_hash_set&) = delete;
+        pod_hash_set(const pod_hash_set&) = delete;
+        pod_hash_set& operator=(const pod_hash_set&) = delete;
         
         hash_t filter() const noexcept { return filter_; }
         
@@ -80,14 +83,14 @@ LSTM_DETAIL_BEGIN
         void push_back(var_base* const value,
                        const var_storage pending_write,
                        const hash_t hash) {
-            data.emplace_back(value, pending_write);
             filter_ |= hash;
+            data.emplace_back(value, pending_write);
         }
         
-        void unordered_erase(T* const ptr) noexcept
+        void unordered_erase(const pointer ptr) noexcept
         { data.unordered_erase(ptr); }
         
-        void unordered_erase(const T* const ptr) noexcept
+        void unordered_erase(const const_pointer ptr) noexcept
         { data.unordered_erase(ptr); }
             
         iterator begin() noexcept { return data.begin(); }
@@ -97,12 +100,12 @@ LSTM_DETAIL_BEGIN
         const_iterator cbegin() const noexcept { return data.cbegin(); }
         const_iterator cend() const noexcept { return data.cend(); }
         
-        T& operator[](const int i) noexcept { return data[i]; }
-        const T& operator[](const int i) const noexcept { return data[i]; }
+        reference operator[](const int i) noexcept { return data[i]; }
+        const_reference operator[](const int i) const noexcept { return data[i]; }
         
-        T& back() noexcept { return data.back(); }
-        const T& back() const noexcept { return data.back(); }
+        reference back() noexcept { return data.back(); }
+        const_reference back() const noexcept { return data.back(); }
     };
 LSTM_DETAIL_END
 
-#endif /* LSTM_DETAIL_READ_SET_HPP */
+#endif /* LSTM_DETAIL_POD_HASH_SET_HPP */
