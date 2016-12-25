@@ -1,5 +1,7 @@
 # lstm
 
+_WIP: This library is definitely not ready for... much of anything_
+
 `lstm` is an implementation of Software Transactional Memory designed to be simple to use, and flexible.
 
 Techniques used include:
