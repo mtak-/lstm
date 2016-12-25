@@ -112,9 +112,8 @@ LSTM_DETAIL_BEGIN
                                          const Alloc& alloc = {},
                                          knobs<MaxStackWriteBuffSize,
                                                MaxStackReadBuffSize,
-                                               MaxStackDeleterBuffSize> knobs = {}) const {
-            auto& tls_td = tls_thread_data();
-            
+                                               MaxStackDeleterBuffSize> knobs = {},
+                                         thread_data& tls_td = tls_thread_data()) const {
             if (tls_td.tx)
                 return call(func, *tls_td.tx);
             
