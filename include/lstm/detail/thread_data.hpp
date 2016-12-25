@@ -40,7 +40,7 @@ LSTM_DETAIL_BEGIN
         LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
         LSTM_CACHE_ALIGNED thread_data* next;
         
-        thread_data() noexcept
+        LSTM_NOINLINE thread_data() noexcept
             : tx(nullptr)
         {
             active.store(off_state, LSTM_RELEASE);
@@ -55,7 +55,7 @@ LSTM_DETAIL_BEGIN
             unlock_all_thread_data();
         }
         
-        ~thread_data() noexcept {
+        LSTM_NOINLINE ~thread_data() noexcept {
             assert(tx == nullptr);
             assert(active.load(LSTM_RELAXED) == off_state);
             
