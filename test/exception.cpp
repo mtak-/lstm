@@ -6,7 +6,7 @@
 using lstm::atomic;
 using lstm::var;
 
-static constexpr auto loop_count = LSTM_TEST_INIT(200000, 40000);
+static constexpr auto loop_count = LSTM_TEST_INIT(200000, 4000);
 
 int main() {
     var<int> x{0};
