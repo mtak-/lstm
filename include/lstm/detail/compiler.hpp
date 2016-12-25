@@ -263,7 +263,7 @@
 #      define LSTM_UNLIKELY(...) (__VA_ARGS__)
 #    elif LSTM_COMPILER_IS_Clang || LSTM_COMPILER_IS_GNU || LSTM_COMPILER_IS_AppleClang
 #      define LSTM_ALWAYS_INLINE inline __attribute__((always_inline))
-#      define LSTM_NOINLINE __attribute__((noinline))
+#      define LSTM_NOINLINE __attribute__((noinline, cold))
 #      define LSTM_LIKELY(...) __builtin_expect(!!(__VA_ARGS__), 1)
 #      define LSTM_UNLIKELY(...) __builtin_expect(!!(__VA_ARGS__), 0)
 #    else
