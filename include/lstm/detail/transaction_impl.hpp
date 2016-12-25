@@ -155,7 +155,7 @@ LSTM_DETAIL_BEGIN
             }
         }
         
-        LSTM_NOINLINE void commit_reclaim_slow_path() noexcept {
+        void commit_reclaim_slow_path() noexcept {
             synchronize(tls_td->mut, read_version);
             tls_td->do_callbacks();
         }
@@ -166,7 +166,7 @@ LSTM_DETAIL_BEGIN
                 commit_reclaim_slow_path();
         }
         
-        LSTM_NOINLINE bool commit_slow_path() noexcept {
+        bool commit_slow_path() noexcept {
             if (!commit_lock_writes())
                 return false;
             
