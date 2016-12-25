@@ -1,6 +1,9 @@
 #ifndef LSTM_DETAIL_TRANSACTION_IMPL_HPP
 #define LSTM_DETAIL_TRANSACTION_IMPL_HPP
 
+#include <lstm/detail/read_set_value_type.hpp>
+#include <lstm/detail/write_set_value_type.hpp>
+
 #include <lstm/transaction.hpp>
 
 #include <algorithm>
@@ -18,54 +21,6 @@ LSTM_DETAIL_BEGIN
         {}
         
         void operator()() const noexcept { var_ptr->destroy_deallocate(storage); }
-    };
-
-    struct read_set_value_type {
-    private:
-        const var_base* _src_var;
-        
-    public:
-        inline read_set_value_type() noexcept = default;
-        inline constexpr read_set_value_type(const var_base* const in_src_var) noexcept
-            : _src_var(in_src_var)
-        {}
-        
-        inline constexpr const var_base& src_var() const noexcept { return *_src_var; }
-        
-        inline constexpr bool is_src_var(const var_base& rhs) const noexcept
-        { return _src_var == &rhs; }
-        
-        inline constexpr bool operator<(const read_set_value_type& rhs) const noexcept
-        { return _src_var < rhs._src_var; }
-        
-        inline constexpr bool operator==(const read_set_value_type& rhs) const noexcept
-        { return _src_var == rhs._src_var; }
-    };
-    
-    struct write_set_value_type {
-    private:
-        var_base* _dest_var;
-        var_storage _pending_write;
-        
-    public:
-        inline write_set_value_type() noexcept = default;
-        
-        inline constexpr
-        write_set_value_type(var_base* const in_dest_var, var_storage in_pending_write) noexcept
-            : _dest_var(in_dest_var)
-            , _pending_write(std::move(in_pending_write))
-        {}
-        
-        inline constexpr var_base& dest_var() const noexcept { return *_dest_var; }
-        inline constexpr var_storage& pending_write() noexcept { return _pending_write; }
-        inline constexpr const var_storage& pending_write() const noexcept
-        { return _pending_write; }
-        
-        inline constexpr bool is_dest_var(const var_base& rhs) const noexcept
-        { return _dest_var == &rhs; }
-        
-        inline constexpr bool operator<(const write_set_value_type& rhs) const noexcept
-        { return _dest_var < rhs._dest_var; }
     };
     
     template<typename Alloc, std::size_t ReadSize, std::size_t WriteSize, std::size_t DeleteSize>
