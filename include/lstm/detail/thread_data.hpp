@@ -136,8 +136,7 @@ LSTM_DETAIL_BEGIN
     
     inline bool not_in_grace_period(const thread_data& q, const gp_t gp) noexcept {
         // TODO: acquire seems unneeded
-        const gp_t thread_gp = q.active.load(LSTM_ACQUIRE);
-        return thread_gp <= gp;
+        return q.active.load(LSTM_ACQUIRE) <= gp;
     }
     
     // TODO: allow specifying a backoff strategy
