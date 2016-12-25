@@ -8,7 +8,7 @@
 #include <iostream>
 
 static constexpr auto thread_count = 1;
-static constexpr auto loop_count = 400000008 / thread_count;
+static constexpr auto loop_count = 800000008 / thread_count;
 
 int main() {
     lstm::var<int> x{0};
