@@ -119,24 +119,6 @@ LSTM_DETAIL_BEGIN
         T& back() noexcept { return end_[-1]; }
         const T& back() const noexcept { return end_[-1]; }
     };
-    
-    template<typename T> typename small_pod_vector<T>::iterator
-    begin(small_pod_vector<T>& v) noexcept { return v.begin(); }
-    
-    template<typename T> typename small_pod_vector<T>::iterator
-    end(small_pod_vector<T>& v) noexcept { return v.end(); }
-    
-    template<typename T> typename small_pod_vector<T>::const_iterator
-    begin(const small_pod_vector<T>& v) noexcept { return v.begin(); }
-    
-    template<typename T> typename small_pod_vector<T>::const_iterator
-    end(const small_pod_vector<T>& v) noexcept { return v.end(); }
-    
-    template<typename T> typename small_pod_vector<T>::const_iterator
-    cbegin(const small_pod_vector<T>& v) noexcept { return v.cbegin(); }
-    
-    template<typename T> typename small_pod_vector<T>::const_iterator
-    cend(const small_pod_vector<T>& v) noexcept { return v.cend(); }
 LSTM_DETAIL_END
 
 #endif /* LSTM_DETAIL_SMALL_POD_VECTOR_HPP */
