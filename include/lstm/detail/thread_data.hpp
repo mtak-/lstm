@@ -3,7 +3,7 @@
 
 #include <lstm/detail/backoff.hpp>
 #include <lstm/detail/gp_callback.hpp>
-#include <lstm/detail/small_pod_vector.hpp>
+#include <lstm/detail/pod_vector.hpp>
 
 #include <mutex>
 
@@ -34,7 +34,7 @@ LSTM_DETAIL_BEGIN
         // TODO: this is a terrible type for gp_callbacks
         // also probly should be a few different kinds of callbacks (succ/fail/always)
         // sharing of gp_callbacks would be nice, but how could it be made fast for small tx's?
-        small_pod_vector<gp_callback, 1> gp_callbacks;
+        pod_vector<gp_callback> gp_callbacks;
         
         LSTM_CACHE_ALIGNED mutex_type mut;
         LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
