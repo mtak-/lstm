@@ -139,14 +139,11 @@ LSTM_BEGIN
         template<typename T, typename Alloc0,
             LSTM_REQUIRES_(!var<T, Alloc0>::atomic)>
         const T& load(const var<T, Alloc0>& src_var) {
+            static_assert(std::is_reference<decltype(var<T>::load(src_var.storage.load()))>{}, "");
+                      
             detail::write_set_lookup lookup = find_write_set(src_var);
             if (LSTM_LIKELY(!lookup.success())) {
                 const gp_t src_version = src_var.version_lock.load(LSTM_ACQUIRE);
-                
-                static_assert(std::is_reference<
-                                decltype(var<T>::load(src_var.storage.load(LSTM_ACQUIRE)))>{},
-                                "");
-                
                 const T& result = var<T>::load(src_var.storage.load(LSTM_ACQUIRE));
                 if (rw_valid(src_version)
                         && src_var.version_lock.load(LSTM_RELAXED) == src_version) {
@@ -161,6 +158,8 @@ LSTM_BEGIN
         template<typename T, typename Alloc0,
             LSTM_REQUIRES_(var<T, Alloc0>::atomic)>
         T load(const var<T, Alloc0>& src_var) {
+            static_assert(!std::is_reference<decltype(var<T>::load(src_var.storage.load()))>{}, "");
+            
             detail::write_set_lookup lookup = find_write_set(src_var);
             if (LSTM_LIKELY(!lookup.success())) {
                 const gp_t src_version = src_var.version_lock.load(LSTM_ACQUIRE);
