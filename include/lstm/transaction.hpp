@@ -78,7 +78,7 @@ LSTM_BEGIN
         inline const transaction_domain& domain() const noexcept { return *_domain; }
         
         inline void reset_read_version() noexcept
-        { tls_td->access_lock(read_version = domain().get_clock()); }
+        { tls_td->access_relock(read_version = domain().get_clock()); }
         
         inline transaction(transaction_domain& in_domain, thread_data& in_tls_td) noexcept
             : _domain(&in_domain)
@@ -86,6 +86,9 @@ LSTM_BEGIN
         {
             assert(&tls_thread_data() == tls_td);
             assert(tls_td->tx == nullptr);
+            assert(tls_td->active.load(LSTM_RELAXED) == detail::off_state);
+            
+            tls_td->access_lock(read_version = domain().get_clock());
         }
         
     #ifndef NDEBUG

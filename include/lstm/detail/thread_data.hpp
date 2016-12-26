@@ -81,10 +81,15 @@ LSTM_BEGIN
         }
         
         inline void access_lock(const gp_t gp) noexcept {
-            // commented out, as this can be used to reset the grace period resulting
-            // in one less atomic store operation
-            // assert(active.load(LSTM_RELAXED) == off_state);
-            // TODO: have separate lock, and relock, functions
+            assert(active.load(LSTM_RELAXED) == detail::off_state);
+            assert(gp != detail::off_state);
+            active.store(gp, LSTM_RELEASE);
+            std::atomic_thread_fence(LSTM_ACQUIRE);
+        }
+        
+        inline void access_relock(const gp_t gp) noexcept {
+            assert(active.load(LSTM_RELAXED) != detail::off_state);
+            assert(gp != detail::off_state);
             active.store(gp, LSTM_RELEASE);
             std::atomic_thread_fence(LSTM_ACQUIRE);
         }

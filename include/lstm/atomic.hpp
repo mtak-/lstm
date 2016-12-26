@@ -53,6 +53,7 @@ LSTM_DETAIL_BEGIN
         template<typename Tx>
         LSTM_ALWAYS_INLINE static void tx_internal_failed(Tx& tx) noexcept {
             tx.cleanup();
+            tx.reset_read_version();
         }
         
         template<typename Tx>
@@ -76,7 +77,6 @@ LSTM_DETAIL_BEGIN
             tls_td.tx = &tx;
             
             while(true) {
-                tx.reset_read_version();
                 try {
                     assert(tx.read_set.size() == 0);
                     assert(tx.write_set.size() == 0);
