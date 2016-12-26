@@ -19,7 +19,7 @@ int main() {
             for (uword i = 0; i < loop_count0; ++i) {
                 tls_td.access_lock(gp.load(LSTM_RELAXED));
                 tls_td.access_unlock();
-                lstm::detail::synchronize(tls_td.mut, gp.fetch_add(1, LSTM_RELAXED));
+                tls_td.synchronize(gp.fetch_add(1, LSTM_RELAXED));
             }
         });
     }

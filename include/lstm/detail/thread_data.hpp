@@ -14,17 +14,26 @@ LSTM_DETAIL_BEGIN
     };
     
     LSTM_INLINE_VAR LSTM_CACHE_ALIGNED global_data globals{};
-    
-    inline void lock_all_thread_data() noexcept;
-    inline void unlock_all_thread_data() noexcept;
+
+    LSTM_NOINLINE inline thread_data& tls_data_init() noexcept;
 LSTM_DETAIL_END
 
 LSTM_BEGIN
+    LSTM_ALWAYS_INLINE thread_data& tls_thread_data() noexcept;
+    
     // with the guarantee of no nested critical sections only one bit is needed
     // to say a thread is active.
     // this means the remaining bits can be used for the grace period, resulting
     // in concurrent writes
     struct LSTM_CACHE_ALIGNED thread_data {
+    private:
+        friend LSTM_NOINLINE inline thread_data& detail::tls_data_init() noexcept;
+        
+        template<typename, std::size_t, std::size_t, std::size_t>
+        friend struct detail::transaction_impl;
+        friend struct detail::atomic_fn;
+        friend transaction;
+        
         transaction* tx;
         
         // TODO: this is a terrible type for gp_callbacks
@@ -36,6 +45,37 @@ LSTM_BEGIN
         LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
         LSTM_CACHE_ALIGNED thread_data* next;
         
+        static void lock_all() noexcept {
+            LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_mut.lock();
+            
+            thread_data* current = LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
+            while (current) {
+                current->mut.lock();
+                current = current->next;
+            }
+        }
+        
+        static void unlock_all() noexcept {
+            thread_data* current = LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
+            while (current) {
+                current->mut.unlock();
+                current = current->next;
+            }
+            
+            LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_mut.unlock();
+        }
+        
+        // TODO: allow specifying a backoff strategy
+        static void wait(const gp_t gp) noexcept {
+            for (thread_data* q = LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
+                    q != nullptr;
+                    q = q->next) {
+                detail::default_backoff backoff;
+                while (q->not_in_grace_period(gp))
+                    backoff();
+            }
+        }
+        
         LSTM_NOINLINE thread_data() noexcept
             : tx(nullptr)
         {
@@ -43,26 +83,26 @@ LSTM_BEGIN
             
             mut.lock();
             
-            detail::lock_all_thread_data();
+            lock_all();
                 
                 next = LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
                 LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root = this;
                 
-            detail::unlock_all_thread_data();
+            unlock_all();
         }
         
         LSTM_NOINLINE ~thread_data() noexcept {
             assert(tx == nullptr);
             assert(active.load(LSTM_RELAXED) == detail::off_state);
             
-            detail::lock_all_thread_data();
+            lock_all();
                 
                 thread_data** indirect = &LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
                 while (*indirect != this)
                     indirect = &(*indirect)->next;
                 *indirect = next;
                 
-            detail::unlock_all_thread_data();
+            unlock_all();
             
             mut.unlock();
             
@@ -80,6 +120,7 @@ LSTM_BEGIN
             gp_callbacks.clear();
         }
         
+    public:
         inline void access_lock(const gp_t gp) noexcept {
             assert(active.load(LSTM_RELAXED) == detail::off_state);
             assert(gp != detail::off_state);
@@ -97,6 +138,24 @@ LSTM_BEGIN
         inline void access_unlock() noexcept {
             assert(active.load(LSTM_RELAXED) != detail::off_state);
             active.store(detail::off_state, LSTM_RELEASE);
+        }
+        
+        inline bool not_in_grace_period(const gp_t gp) const noexcept {
+            // TODO: acquire seems unneeded
+            return active.load(LSTM_ACQUIRE) <= gp;
+        }
+        
+        // TODO: allow specifying a backoff strategy
+        inline void synchronize(const gp_t gp) noexcept {
+            assert(tls_thread_data().active.load(LSTM_RELAXED) == detail::off_state);
+            assert(&tls_thread_data().mut == &mut);
+            assert(gp != detail::off_state);
+            
+            mut.lock();
+            
+                wait(gp);
+            
+            mut.unlock();
         }
     };
     
@@ -117,55 +176,5 @@ LSTM_BEGIN
         return *LSTM_ACCESS_INLINE_VAR(detail::_tls_thread_data_ptr);
     }
 LSTM_END
-    
-LSTM_DETAIL_BEGIN
-    inline void lock_all_thread_data() noexcept {
-        LSTM_ACCESS_INLINE_VAR(globals).thread_data_mut.lock();
-        
-        thread_data* current = LSTM_ACCESS_INLINE_VAR(globals).thread_data_root;
-        while (current) {
-            current->mut.lock();
-            current = current->next;
-        }
-    }
-    
-    inline void unlock_all_thread_data() noexcept {
-        thread_data* current = LSTM_ACCESS_INLINE_VAR(globals).thread_data_root;
-        while (current) {
-            current->mut.unlock();
-            current = current->next;
-        }
-        
-        LSTM_ACCESS_INLINE_VAR(globals).thread_data_mut.unlock();
-    }
-    
-    inline bool not_in_grace_period(const thread_data& q, const gp_t gp) noexcept {
-        // TODO: acquire seems unneeded
-        return q.active.load(LSTM_ACQUIRE) <= gp;
-    }
-    
-    // TODO: allow specifying a backoff strategy
-    inline void wait(const gp_t gp) noexcept {
-        for (thread_data* q = LSTM_ACCESS_INLINE_VAR(globals).thread_data_root;
-                q != nullptr;
-                q = q->next) {
-            default_backoff backoff;
-            while (not_in_grace_period(*q, gp))
-                backoff();
-        }
-    }
-    
-    // TODO: allow specifying a backoff strategy
-    inline void synchronize(mutex_type& mut, const gp_t gp) noexcept {
-        assert(tls_thread_data().active.load(LSTM_RELAXED) == off_state);
-        assert(gp != off_state);
-        
-        mut.lock();
-        
-            wait(gp);
-        
-        mut.unlock();
-    }
-LSTM_DETAIL_END
 
 #endif /* LSTM_DETAIL_THREAD_DATA_HPP */
