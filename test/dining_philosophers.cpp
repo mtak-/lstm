@@ -41,25 +41,19 @@ int main() {
     for (std::size_t i = 0; i < repeat_count; ++i) {
         thread_manager manager;
         
-        philosopher phil, sami, eric, aimy, joey;
+        philosopher phils[5];
         fork forks[5];
         
-        manager.queue_thread(get_loop(phil, forks[0], forks[1]));
-        manager.queue_thread(get_loop(sami, forks[1], forks[2]));
-        manager.queue_thread(get_loop(eric, forks[2], forks[3]));
-        manager.queue_thread(get_loop(aimy, forks[3], forks[4]));
-        manager.queue_thread(get_loop(joey, forks[4], forks[0]));
+        for (int i = 0; i < 5; ++i)
+            manager.queue_thread(get_loop(phils[i], forks[i], forks[(i + 1) % 5]));
             
         manager.run();
             
         for(auto& fork : forks)
             CHECK(fork.in_use.unsafe_load() == false);
         
-        CHECK(phil.food == 0u);
-        CHECK(sami.food == 0u);
-        CHECK(eric.food == 0u);
-        CHECK(aimy.food == 0u);
-        CHECK(joey.food == 0u);
+        for (auto& phil : phils)
+            CHECK(phil.food == 0u);
         CHECK(debug_live_allocations<> == 0);
     }
     return test_result();
