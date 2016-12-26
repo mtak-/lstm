@@ -17,13 +17,16 @@ int main() {
     for (int i = 0; i < thread_count; ++i) {
         thread_manager.queue_thread([&x, i] {
             int j = 0;
+            auto& tls_td = lstm::tls_thread_data();
             while (j++ < loop_count) {
-                lstm::atomic([&](auto& tx) {
-                    if (j % 100 >= i*25 && j % 100 < i*25 + 5)
+                if (j % 100 >= i*25 && j % 100 < i*25 + 5) {
+                    lstm::atomic([&](auto& tx) {
                         tx.store(x, tx.load(x) + 1);
-                    else
-                        tx.load(x);
-                });
+                    }, lstm::default_domain(), {}, {}, tls_td);
+                } else {
+                    tls_td.access_lock(lstm::default_domain().get_clock());
+                    tls_td.access_unlock();
+                }
             }});
     }
     auto start = std::chrono::high_resolution_clock::now();

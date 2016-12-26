@@ -5,14 +5,8 @@
 #include <lstm/detail/gp_callback.hpp>
 #include <lstm/detail/pod_vector.hpp>
 
-#include <mutex>
-
 LSTM_DETAIL_BEGIN
-    struct thread_data;
-    
     namespace { static constexpr gp_t off_state = ~gp_t(0); }
-    
-    using mutex_type = std::mutex;
     
     struct global_data {
         mutex_type thread_data_mut{};
@@ -23,7 +17,9 @@ LSTM_DETAIL_BEGIN
     
     inline void lock_all_thread_data() noexcept;
     inline void unlock_all_thread_data() noexcept;
-    
+LSTM_DETAIL_END
+
+LSTM_BEGIN
     // with the guarantee of no nested critical sections only one bit is needed
     // to say a thread is active.
     // this means the remaining bits can be used for the grace period, resulting
@@ -34,7 +30,7 @@ LSTM_DETAIL_BEGIN
         // TODO: this is a terrible type for gp_callbacks
         // also probly should be a few different kinds of callbacks (succ/fail/always)
         // sharing of gp_callbacks would be nice, but how could it be made fast for small tx's?
-        pod_vector<gp_callback> gp_callbacks;
+        detail::pod_vector<detail::gp_callback> gp_callbacks;
         
         LSTM_CACHE_ALIGNED mutex_type mut;
         LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
@@ -43,30 +39,30 @@ LSTM_DETAIL_BEGIN
         LSTM_NOINLINE thread_data() noexcept
             : tx(nullptr)
         {
-            active.store(off_state, LSTM_RELEASE);
+            active.store(detail::off_state, LSTM_RELEASE);
             
             mut.lock();
             
-            lock_all_thread_data();
+            detail::lock_all_thread_data();
                 
-                next = LSTM_ACCESS_INLINE_VAR(globals).thread_data_root;
-                LSTM_ACCESS_INLINE_VAR(globals).thread_data_root = this;
+                next = LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
+                LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root = this;
                 
-            unlock_all_thread_data();
+            detail::unlock_all_thread_data();
         }
         
         LSTM_NOINLINE ~thread_data() noexcept {
             assert(tx == nullptr);
-            assert(active.load(LSTM_RELAXED) == off_state);
+            assert(active.load(LSTM_RELAXED) == detail::off_state);
             
-            lock_all_thread_data();
+            detail::lock_all_thread_data();
                 
-                thread_data** indirect = &LSTM_ACCESS_INLINE_VAR(globals).thread_data_root;
+                thread_data** indirect = &LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
                 while (*indirect != this)
                     indirect = &(*indirect)->next;
                 *indirect = next;
                 
-            unlock_all_thread_data();
+            detail::unlock_all_thread_data();
             
             mut.unlock();
             
@@ -94,26 +90,30 @@ LSTM_DETAIL_BEGIN
         }
         
         inline void access_unlock() noexcept {
-            assert(active.load(LSTM_RELAXED) != off_state);
-            active.store(off_state, LSTM_RELEASE);
+            assert(active.load(LSTM_RELAXED) != detail::off_state);
+            active.store(detail::off_state, LSTM_RELEASE);
         }
     };
     
-    LSTM_INLINE_VAR LSTM_THREAD_LOCAL thread_data* _tls_thread_data_ptr = nullptr;
-    
-    // TODO: still feel like this garbage is overkill, maybe this only applies to darwin
-    LSTM_NOINLINE inline thread_data& tls_data_init() noexcept {
-        static LSTM_THREAD_LOCAL thread_data _tls_thread_data{};
-        LSTM_ACCESS_INLINE_VAR(_tls_thread_data_ptr) = &_tls_thread_data;
-        return *LSTM_ACCESS_INLINE_VAR(_tls_thread_data_ptr);
+    namespace detail {
+        LSTM_INLINE_VAR LSTM_THREAD_LOCAL thread_data* _tls_thread_data_ptr = nullptr;
+        
+        // TODO: still feel like this garbage is overkill, maybe this only applies to darwin
+        LSTM_NOINLINE inline thread_data& tls_data_init() noexcept {
+            static LSTM_THREAD_LOCAL thread_data _tls_thread_data{};
+            LSTM_ACCESS_INLINE_VAR(_tls_thread_data_ptr) = &_tls_thread_data;
+            return *LSTM_ACCESS_INLINE_VAR(_tls_thread_data_ptr);
+        }
     }
     
     LSTM_ALWAYS_INLINE thread_data& tls_thread_data() noexcept {
-        if (LSTM_UNLIKELY(!LSTM_ACCESS_INLINE_VAR(_tls_thread_data_ptr)))
-            return tls_data_init();
-        return *LSTM_ACCESS_INLINE_VAR(_tls_thread_data_ptr);
+        if (LSTM_UNLIKELY(!LSTM_ACCESS_INLINE_VAR(detail::_tls_thread_data_ptr)))
+            return detail::tls_data_init();
+        return *LSTM_ACCESS_INLINE_VAR(detail::_tls_thread_data_ptr);
     }
+LSTM_END
     
+LSTM_DETAIL_BEGIN
     inline void lock_all_thread_data() noexcept {
         LSTM_ACCESS_INLINE_VAR(globals).thread_data_mut.lock();
         

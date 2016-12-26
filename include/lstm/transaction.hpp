@@ -71,7 +71,7 @@ LSTM_BEGIN
         static constexpr gp_t lock_bit = gp_t(1) << (sizeof(gp_t) * 8 - 1);
         
         transaction_domain* _domain;
-        detail::thread_data* tls_td;
+        thread_data* tls_td;
         gp_t read_version;
         
         inline transaction_domain& domain() noexcept { return *_domain; }
@@ -80,11 +80,11 @@ LSTM_BEGIN
         inline void reset_read_version() noexcept
         { tls_td->access_lock(read_version = domain().get_clock()); }
         
-        inline transaction(transaction_domain& in_domain, detail::thread_data& in_tls_td) noexcept
+        inline transaction(transaction_domain& in_domain, thread_data& in_tls_td) noexcept
             : _domain(&in_domain)
             , tls_td(&in_tls_td)
         {
-            assert(&detail::tls_thread_data() == tls_td);
+            assert(&tls_thread_data() == tls_td);
             assert(tls_td->tx == nullptr);
         }
         

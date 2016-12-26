@@ -22,7 +22,7 @@ var<vec4> x{0, 0, 0, 0};
 struct destruct {
     ~destruct() noexcept(false) {
         // TODO: this is stupid unsafe for client code, but a good test nonetheless
-        lstm::detail::tls_thread_data().gp_callbacks.clear();
+        lstm::tls_thread_data().gp_callbacks.clear();
         atomic([&](auto& tx) {
             auto y = tx.load(x);
             ++y.w;
