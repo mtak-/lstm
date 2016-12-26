@@ -41,14 +41,12 @@ LSTM_DETAIL_BEGIN
                 unlock(begin->dest_var());
         }
         
-        bool commit_lock_writes() noexcept {
-            write_set_iter write_begin = std::begin(write_set);
-            write_set_iter write_end = std::end(write_set);
-            
-            // sorting ensures a thread always makes progress...
-            std::sort(write_begin, write_end);
-            
-            for (write_set_iter write_iter = write_begin; write_iter != write_end; ++write_iter) {
+        void commit_sort_writes() noexcept
+        { std::sort(std::begin(write_set), std::end(write_set)); }
+        
+        void commit_remove_writes_from_reads() noexcept {
+            // using the bloom filter seemed to be mostly unhelpful
+            for (auto& write_elem : write_set) {
                 // TODO: weird to have this here
                 // typical usage patterns would probly be:
                 //   read shared variable
@@ -59,9 +57,17 @@ LSTM_DETAIL_BEGIN
                 read_set.set_end(std::remove_if(std::begin(read_set),
                                                 std::end(read_set),
                                                 [&](const read_set_value_type& rsv) noexcept {
-                                                    return rsv.is_src_var(write_iter->dest_var());
+                                                    return rsv.is_src_var(write_elem.dest_var());
                                                 }));
             }
+        }
+        
+        bool commit_lock_writes() noexcept {
+            commit_sort_writes();
+            commit_remove_writes_from_reads();
+            
+            write_set_iter write_begin = std::begin(write_set);
+            write_set_iter write_end = std::end(write_set);
             
             for (write_set_iter write_iter = write_begin; write_iter != write_end; ++write_iter) {
                 // TODO: only care what version the var is, if it's also a read?

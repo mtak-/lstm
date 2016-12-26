@@ -33,7 +33,7 @@ LSTM_DETAIL_BEGIN
     
     template<typename T>
     LSTM_NOINLINE inline T* slow_find(T* begin,
-                                      const T* const end,
+                                      const uncvref<T>* const end,
                                       const var_base& value) noexcept {
         for (; begin != end; ++begin)
             if (&begin->dest_var() == &value)
