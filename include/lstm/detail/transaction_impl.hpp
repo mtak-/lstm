@@ -62,12 +62,6 @@ LSTM_DETAIL_BEGIN
             std::sort(write_begin, write_end);
             
             for (write_set_iter write_iter = write_begin; write_iter != write_end; ++write_iter) {
-                // TODO: only care what version the var is, if it's also a read?
-                if (!lock(write_iter->dest_var())) {
-                    unlock_write_set(std::move(write_begin), std::move(write_iter));
-                    return false;
-                }
-                
                 // TODO: weird to have this here
                 // typical usage patterns would probly be:
                 //   read shared variable
@@ -80,6 +74,14 @@ LSTM_DETAIL_BEGIN
                                                 [&](const read_set_value_type& rsv) noexcept {
                                                     return rsv.is_src_var(write_iter->dest_var());
                                                 }));
+            }
+            
+            for (write_set_iter write_iter = write_begin; write_iter != write_end; ++write_iter) {
+                // TODO: only care what version the var is, if it's also a read?
+                if (!lock(write_iter->dest_var())) {
+                    unlock_write_set(std::move(write_begin), std::move(write_iter));
+                    return false;
+                }
             }
             
             return true;
@@ -132,9 +134,9 @@ LSTM_DETAIL_BEGIN
             if (write_version != read_version && !commit_validate_reads())
                 return false;
             
-            read_version = write_version;
-            
             commit_publish(write_version + 1);
+            
+            read_version = write_version;
             
             return true;
         }

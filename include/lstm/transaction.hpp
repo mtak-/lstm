@@ -110,8 +110,7 @@ LSTM_BEGIN
                                                            LSTM_RELEASE);
         }
         
-        static inline
-        void unlock(const gp_t version_to_set, const detail::var_base& v) noexcept {
+        static inline void unlock(const gp_t version_to_set, const detail::var_base& v) noexcept {
             assert(locked(v.version_lock.load(LSTM_RELAXED)));
             assert(!locked(version_to_set));
             v.version_lock.store(version_to_set, LSTM_RELEASE);
