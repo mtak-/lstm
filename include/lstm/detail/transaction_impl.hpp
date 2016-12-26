@@ -2,6 +2,7 @@
 #define LSTM_DETAIL_TRANSACTION_IMPL_HPP
 
 #include <lstm/detail/read_set_value_type.hpp>
+#include <lstm/detail/write_set_deleter.hpp>
 #include <lstm/detail/write_set_value_type.hpp>
 
 #include <lstm/transaction.hpp>
@@ -9,20 +10,6 @@
 #include <algorithm>
 
 LSTM_DETAIL_BEGIN
-    struct write_set_deleter {
-        var_base* var_ptr;
-        var_storage storage;
-        
-        inline write_set_deleter() noexcept = default;
-        inline constexpr write_set_deleter(var_base* const in_var_ptr,
-                                           const var_storage in_storage) noexcept
-            : var_ptr(in_var_ptr)
-            , storage(in_storage)
-        {}
-        
-        void operator()() const noexcept { var_ptr->destroy_deallocate(storage); }
-    };
-    
     template<typename Alloc, std::size_t ReadSize, std::size_t WriteSize, std::size_t DeleteSize>
     struct transaction_impl : lstm::transaction {
         friend detail::atomic_fn;
