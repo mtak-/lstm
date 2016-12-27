@@ -1,9 +1,8 @@
 #ifndef LSTM_READ_WRITE_HPP
 #define LSTM_READ_WRITE_HPP
 
+#include <lstm/detail/transaction_impl.hpp>
 #include <lstm/detail/tx_result_buffer.hpp>
-
-#include <lstm/transaction.hpp>
 
 LSTM_BEGIN
     // optional knobs

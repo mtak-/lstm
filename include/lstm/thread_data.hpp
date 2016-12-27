@@ -132,10 +132,10 @@ LSTM_BEGIN
             fail_callbacks.clear();
         }
         
-        template<typename T, typename Alloc = void>
-        void add_allocate_rollback(T* ptr, Alloc* alloc) {
+        template<typename T, typename Alloc>
+        void add_allocate_rollback(T* ptr, Alloc& alloc) {
             using alloc_traits = std::allocator_traits<Alloc>;
-            fail_callbacks.emplace_back([alloc, ptr] {
+            fail_callbacks.emplace_back([alloc = &alloc, ptr] {
                 alloc_traits::deallocate(*alloc, ptr, 1);
             });
         }
@@ -145,10 +145,11 @@ LSTM_BEGIN
         inline bool in_critical_section() const
         { return active.load(LSTM_RELAXED) != detail::off_state; }
         
-        template<typename T, typename Alloc = void>
-        T* allocate(Alloc* alloc = nullptr) {
+        template<typename T, typename Alloc,
+            LSTM_REQUIRES_(!std::is_const<Alloc>{})>
+        T* allocate(Alloc& alloc) {
             using alloc_traits = std::allocator_traits<Alloc>;
-            T* result = alloc_traits::allocate(*alloc, 1);
+            T* result = alloc_traits::allocate(alloc, 1);
             if (in_transaction())
                 add_allocate_rollback(result, alloc);
             return result;
