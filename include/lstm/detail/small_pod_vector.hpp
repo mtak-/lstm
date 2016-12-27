@@ -89,7 +89,11 @@ LSTM_DETAIL_BEGIN
         
         template<typename... Us>
         void emplace_back(const Us... us) noexcept(noexcept(reserve_more())) {
-            static_assert(and_<std::is_pod<Us>...>{}, "");
+            static_assert(and_<std::integral_constant<bool, !std::is_polymorphic<Us>{}>...>{}, "");
+            static_assert(and_<std::is_standard_layout<Us>...>{}, "");
+            static_assert(and_<std::is_trivially_copy_constructible<Us>...>{}, "");
+            static_assert(and_<std::is_trivially_move_constructible<Us>...>{}, "");
+            static_assert(and_<std::is_trivially_destructible<Us>...>{}, "");
             
             if (LSTM_UNLIKELY(size() == capacity_))
                 reserve_more();
