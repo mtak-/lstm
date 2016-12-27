@@ -39,10 +39,12 @@ LSTM_DETAIL_BEGIN
     constexpr var_type var_type_switch() noexcept {
         if (sizeof(T) <= sizeof(word) && alignof(T) <= alignof(word) &&
                 std::is_trivially_copy_constructible<T>{}() &&
-                std::is_trivially_move_constructible<T>{}())
+                std::is_trivially_move_constructible<T>{}() &&
+                std::is_trivially_destructible<T>{}())
             return var_type::atomic;
         else if (std::is_trivially_copy_constructible<T>{}() &&
-                 std::is_trivially_move_constructible<T>{}())
+                 std::is_trivially_move_constructible<T>{}() &&
+                 std::is_trivially_destructible<T>{}())
             return var_type::trivial;
         return var_type::locking;
     }
