@@ -83,26 +83,29 @@ LSTM_BEGIN
             
             mut.lock();
             
-            lock_all();
+            lock_all(); // this->mut does not get locked here
                 
                 next = LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
                 LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root = this;
                 
-            unlock_all();
+            unlock_all(); // this->mut gets unlocked here
         }
         
         LSTM_NOINLINE ~thread_data() noexcept {
             assert(tx == nullptr);
             assert(active.load(LSTM_RELAXED) == detail::off_state);
             
-            lock_all();
+            lock_all(); // this->mut gets locked here
                 
                 thread_data** indirect = &LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
-                while (*indirect != this)
+                assert(*indirect);
+                while (*indirect != this) {
                     indirect = &(*indirect)->next;
+                    assert(*indirect);
+                }
                 *indirect = next;
                 
-            unlock_all();
+            unlock_all(); // this->mut does not get unlocked here
             
             mut.unlock();
             
