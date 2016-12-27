@@ -133,19 +133,11 @@ LSTM_BEGIN
         }
         
         template<typename T, typename Alloc = void>
-        T* allocate_slow(Alloc* alloc = nullptr, const std::size_t count = 1) {
+        void add_allocate_rollback(T* ptr, Alloc* alloc) {
             using alloc_traits = std::allocator_traits<Alloc>;
-            T* result = alloc_traits::allocate(*alloc, count);
-            fail_callbacks.emplace_back([alloc, result] {
-                alloc_traits::deallocate(*alloc, result, 1);
+            fail_callbacks.emplace_back([alloc, ptr] {
+                alloc_traits::deallocate(*alloc, ptr, 1);
             });
-            return result;
-        }
-        
-        template<typename T, typename Alloc = void>
-        T* allocate_fast(Alloc* alloc = nullptr, const std::size_t count = 1) {
-            using alloc_traits = std::allocator_traits<Alloc>;
-            return alloc_traits::allocate(*alloc, count);
         }
         
     public:
@@ -154,10 +146,12 @@ LSTM_BEGIN
         { return active.load(LSTM_RELAXED) != detail::off_state; }
         
         template<typename T, typename Alloc = void>
-        T* allocate(Alloc* alloc = nullptr, const std::size_t count = 1) {
-            if (LSTM_UNLIKELY(in_transaction()))
-                return allocate_slow<T>(alloc, count);
-            return allocate_fast<T>(alloc, count);
+        T* allocate(Alloc* alloc = nullptr) {
+            using alloc_traits = std::allocator_traits<Alloc>;
+            T* result = alloc_traits::allocate(*alloc, 1);
+            if (in_transaction())
+                add_allocate_rollback(result, alloc);
+            return result;
         }
         
         inline void access_lock(const gp_t gp) noexcept {
