@@ -34,6 +34,8 @@ LSTM_BEGIN
         friend struct detail::read_write_fn;
         friend transaction;
         
+        LSTM_CACHE_ALIGNED mutex_type mut;
+        LSTM_CACHE_ALIGNED thread_data* next;
         transaction* tx;
         
         // TODO: this is a terrible type for gp_callbacks
@@ -41,10 +43,7 @@ LSTM_BEGIN
         // sharing of gp_callbacks would be nice, but how could it be made fast for small tx's?
         detail::pod_vector<detail::gp_callback> gp_callbacks;
         detail::pod_vector<detail::gp_callback> fail_callbacks;
-        
-        LSTM_CACHE_ALIGNED mutex_type mut;
         LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
-        LSTM_CACHE_ALIGNED thread_data* next;
         
         static void lock_all() noexcept {
             LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_mut.lock();
@@ -191,6 +190,8 @@ LSTM_BEGIN
             return detail::tls_data_init();
         return *LSTM_ACCESS_INLINE_VAR(detail::_tls_thread_data_ptr);
     }
+    
+    static_assert(std::is_standard_layout<thread_data>{}, "");
 LSTM_END
 
 #endif /* LSTM_THREAD_DATA_HPP */
