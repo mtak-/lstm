@@ -5,9 +5,7 @@
 
 LSTM_BEGIN
     template<typename T, typename Alloc>
-    struct var
-        : detail::var_alloc_policy<T, Alloc>
-    {
+    struct var : private detail::var_alloc_policy<T, Alloc> {
     private:
         using base = detail::var_alloc_policy<T, Alloc>;
         static_assert(!std::is_reference<T>{},
@@ -16,8 +14,18 @@ LSTM_BEGIN
             "invalid allocator for type T");
         static_assert(!std::is_array<T>{},
             "raw c arrays are not allowed. try using a std::array");
+            
+        template<typename, std::size_t, std::size_t, std::size_t>
+        friend struct ::lstm::detail::transaction_impl;
+        friend struct ::lstm::detail::write_set_deleter;
+        friend struct ::lstm::transaction;
+        friend test::transaction_tester;
         
     public:
+        using base::trivial;
+        using base::atomic;
+        using base::type;
+        
         // TODO: support construction from initializer_lists
         template<typename U, typename... Us,
             LSTM_REQUIRES_(std::is_constructible<T, U&&, Us&&...>() &&
