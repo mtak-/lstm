@@ -63,6 +63,7 @@ LSTM_DETAIL_BEGIN
         }
         
         bool commit_lock_writes() noexcept {
+            // TODO: substantial performance hit from these two calls :(
             commit_sort_writes();
             commit_remove_writes_from_reads();
             
