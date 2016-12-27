@@ -141,7 +141,7 @@ LSTM_BEGIN
         
         template<typename T, typename Alloc0,
             LSTM_REQUIRES_(!var<T, Alloc0>::atomic)>
-        const T& load(const var<T, Alloc0>& src_var) {
+        const T& read(const var<T, Alloc0>& src_var) {
             static_assert(std::is_reference<decltype(var<T>::load(src_var.storage.load()))>{}, "");
                       
             detail::write_set_lookup lookup = find_write_set(src_var);
@@ -160,7 +160,7 @@ LSTM_BEGIN
         
         template<typename T, typename Alloc0,
             LSTM_REQUIRES_(var<T, Alloc0>::atomic)>
-        T load(const var<T, Alloc0>& src_var) {
+        T read(const var<T, Alloc0>& src_var) {
             static_assert(!std::is_reference<decltype(var<T>::load(src_var.storage.load()))>{}, "");
             
             detail::write_set_lookup lookup = find_write_set(src_var);
@@ -180,7 +180,7 @@ LSTM_BEGIN
         template<typename T, typename Alloc0, typename U,
             LSTM_REQUIRES_(std::is_assignable<T&, U&&>() &&
                            std::is_constructible<T, U&&>())>
-        void store(var<T, Alloc0>& dest_var, U&& u) {
+        void write(var<T, Alloc0>& dest_var, U&& u) {
             detail::write_set_lookup lookup = find_write_set(dest_var);
             if (LSTM_LIKELY(!lookup.success()))
                 add_write_set(dest_var, dest_var.allocate_construct((U&&)u), lookup.hash);
@@ -195,11 +195,10 @@ LSTM_BEGIN
         { tls_td->gp_callbacks.emplace_back(detail::deleter<T, Alloc>(dest_var, alloc)); }
         
         // reading/writing an rvalue probably never makes sense
-        template<typename T>
-        void load(const var<T>&& v) = delete;
-        
-        template<typename T>
-        void store(var<T>&& v) = delete;
+        template<typename T, typename Alloc0> void read(var<T, Alloc0>&& v) = delete;
+        template<typename T, typename Alloc0> void read(const var<T, Alloc0>&& v) = delete;
+        template<typename T, typename Alloc0> void write(var<T, Alloc0>&& v) = delete;
+        template<typename T, typename Alloc0> void write(const var<T, Alloc0>&& v) = delete;
     };
 LSTM_END
 

@@ -22,9 +22,9 @@ var<vec4> x{0, 0, 0, 0};
 struct destruct {
     ~destruct() noexcept(false) {
         read_write([&](auto& tx) {
-            auto y = tx.load(x);
+            auto y = tx.read(x);
             ++y.w;
-            tx.store(x, y);
+            tx.write(x, y);
         });
     }
 };
@@ -36,9 +36,9 @@ int main() {
         tm.queue_thread([&] {
             for (int j = 0; j < loop_count; ++j) {
                 read_write([&](auto& tx) {
-                    auto foo = tx.load(x);
+                    auto foo = tx.read(x);
                     ++foo.x;
-                    tx.store(x, foo);
+                    tx.write(x, foo);
                 });
             }
         });
@@ -46,9 +46,9 @@ int main() {
         tm.queue_thread([&] {
             for (int j = 0; j < loop_count; ++j) {
                 read_write([&](auto& tx) {
-                    auto foo = tx.load(x);
+                    auto foo = tx.read(x);
                     ++foo.y;
-                    tx.store(x, foo);
+                    tx.write(x, foo);
                 });
             }
         });
@@ -58,9 +58,9 @@ int main() {
                 auto b = new destruct();
                 read_write([&](auto& tx) {
                     tx.delete_(b);
-                    auto foo = tx.load(x);
+                    auto foo = tx.read(x);
                     ++foo.z;
-                    tx.store(x, foo);
+                    tx.write(x, foo);
                 });
             }
         });
@@ -68,10 +68,10 @@ int main() {
         tm.run();
     }
     
-    CHECK(x.unsafe_load().x == loop_count);
-    CHECK(x.unsafe_load().y == loop_count);
-    CHECK(x.unsafe_load().z == loop_count);
-    CHECK(x.unsafe_load().w == loop_count);
+    CHECK(x.unsafe_read().x == loop_count);
+    CHECK(x.unsafe_read().y == loop_count);
+    CHECK(x.unsafe_read().z == loop_count);
+    CHECK(x.unsafe_read().w == loop_count);
     
     return test_result();
 }

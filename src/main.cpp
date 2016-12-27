@@ -21,7 +21,7 @@ int main() {
             while (j++ < loop_count) {
                 if (j % 100 >= i*25 && j % 100 < i*25 + 5) {
                     lstm::read_write([&](auto& tx) {
-                        tx.store(x, tx.load(x) + 1);
+                        tx.write(x, tx.read(x) + 1);
                     }, lstm::default_domain(), {}, {}, tls_td);
                 } else {
                     tls_td.access_lock(lstm::default_domain().get_clock());

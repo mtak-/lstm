@@ -22,17 +22,17 @@ auto get_loop(philosopher& p, fork& f0, fork& f1) {
     return [&] {
         while (p.food != 0) {
             read_write([&](auto& tx) {
-                if (!tx.load(f0.in_use) && !tx.load(f1.in_use)) {
-                    tx.store(f0.in_use, true);
-                    tx.store(f1.in_use, true);
+                if (!tx.read(f0.in_use) && !tx.read(f1.in_use)) {
+                    tx.write(f0.in_use, true);
+                    tx.write(f1.in_use, true);
                 } else
                     lstm::retry();
             });
             
             --p.food;
             
-            f0.in_use.unsafe_store(false);
-            f1.in_use.unsafe_store(false);
+            f0.in_use.unsafe_write(false);
+            f1.in_use.unsafe_write(false);
         }
     };
 }
@@ -50,7 +50,7 @@ int main() {
         manager.run();
             
         for(auto& fork : forks)
-            CHECK(fork.in_use.unsafe_load() == false);
+            CHECK(fork.in_use.unsafe_read() == false);
         
         for (auto& phil : phils)
             CHECK(phil.food == 0u);

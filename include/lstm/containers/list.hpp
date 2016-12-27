@@ -45,31 +45,31 @@ LSTM_BEGIN
         
         template<typename Transaction>
         static node_t* prev(node_t& n, Transaction& tx)
-        { return reinterpret_cast<node_t*>(tx.load(n._prev)); }
+        { return reinterpret_cast<node_t*>(tx.read(n._prev)); }
         
         template<typename Transaction>
         static const node_t* prev(const node_t& n, Transaction& tx)
-        { return reinterpret_cast<const node_t*>(tx.load(n._prev)); }
+        { return reinterpret_cast<const node_t*>(tx.read(n._prev)); }
         
         template<typename Transaction>
         static node_t* next(node_t& n, Transaction& tx)
-        { return reinterpret_cast<node_t*>(tx.load(n._next)); }
+        { return reinterpret_cast<node_t*>(tx.read(n._next)); }
         
         template<typename Transaction>
         static const node_t* next(const node_t& n, Transaction& tx)
-        { return reinterpret_cast<const node_t*>(tx.load(n._next)); }
+        { return reinterpret_cast<const node_t*>(tx.read(n._next)); }
         
         static node_t* unsafe_prev(node_t& n) noexcept
-        { return reinterpret_cast<node_t*>(n._prev.unsafe_load()); }
+        { return reinterpret_cast<node_t*>(n._prev.unsafe_read()); }
         
         static const node_t* unsafe_prev(const node_t& n) noexcept
-        { return reinterpret_cast<const node_t*>(n._prev.unsafe_load()); }
+        { return reinterpret_cast<const node_t*>(n._prev.unsafe_read()); }
         
         static node_t* unsafe_next(node_t& n) noexcept
-        { return reinterpret_cast<node_t*>(n._next.unsafe_load()); }
+        { return reinterpret_cast<node_t*>(n._next.unsafe_read()); }
         
         static const node_t* unsafe_next(const node_t& n) noexcept
-        { return reinterpret_cast<const node_t*>(n._next.unsafe_load()); }
+        { return reinterpret_cast<const node_t*>(n._next.unsafe_read()); }
         
     public:
         constexpr list() noexcept(std::is_nothrow_default_constructible<Alloc>{}) = default;
@@ -79,7 +79,7 @@ LSTM_BEGIN
         {}
         
         ~list() {
-            auto node = head.unsafe_load();
+            auto node = head.unsafe_read();
             while (node) {
                 auto next_ = unsafe_next(*node);
                 alloc_traits::destroy(alloc(), node);
@@ -90,9 +90,9 @@ LSTM_BEGIN
         
         void clear() {
             auto* node = lstm::read_write([&](auto& tx) {
-                tx.store(_size, 0);
-                auto result = tx.load(head);
-                tx.store(head, nullptr);
+                tx.write(_size, 0);
+                auto result = tx.read(head);
+                tx.write(head, nullptr);
                 return result;
             }, lstm::default_domain(), alloc());
             if (node)
@@ -110,19 +110,19 @@ LSTM_BEGIN
             std::unique_ptr<node_t> new_head{alloc_traits::allocate(alloc(), 1)};
             new (&*new_head) node_t((Us&&)us...);
             lstm::read_write([&](auto& tx) {
-                auto _head = tx.load(head);
-                new_head->_next.unsafe_store(_head);
+                auto _head = tx.read(head);
+                new_head->_next.unsafe_write(_head);
                 
                 if (_head)
-                    tx.store(_head->_prev, (void*)&*new_head);
-                tx.store(_size, tx.load(_size) + 1);
-                tx.store(head, &*new_head);
+                    tx.write(_head->_prev, (void*)&*new_head);
+                tx.write(_size, tx.read(_size) + 1);
+                tx.write(head, &*new_head);
             }, lstm::default_domain(), alloc());
             new_head.release();
         }
         
         word size() const {
-            return lstm::read_write([&](auto& tx) { return tx.load(_size); },
+            return lstm::read_write([&](auto& tx) { return tx.read(_size); },
                                     lstm::default_domain(),
                                     alloc());
         }

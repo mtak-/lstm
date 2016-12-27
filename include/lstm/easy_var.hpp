@@ -20,24 +20,24 @@ LSTM_BEGIN
         easy_var(const easy_var& rhs) : base(rhs.get()) {}
         
         easy_var& operator=(const easy_var& rhs) {
-            lstm::read_write([&](auto& tx) { tx.store(var, tx.load(rhs.var)); });
+            lstm::read_write([&](auto& tx) { tx.write(var, tx.read(rhs.var)); });
             return *this;
         }
         
         template<typename U,
             LSTM_REQUIRES_(std::is_assignable<T&, const U&>())>
         easy_var& operator=(const U& rhs) {
-            lstm::read_write([&](auto& tx) { tx.store(var, rhs); });
+            lstm::read_write([&](auto& tx) { tx.write(var, rhs); });
             return *this;
         }
         
-        T get() const { return lstm::read_write([this](auto& tx) { return tx.load(var); }); }
+        T get() const { return lstm::read_write([this](auto& tx) { return tx.read(var); }); }
         
         inline operator T() const { return get(); }
         
-        T unsafe_load() const noexcept { return var.unsafe_load(); }
-        void unsafe_store(const T& t) noexcept { return var.unsafe_store(t); }
-        void unsafe_store(T&& t) noexcept { return var.unsafe_store(std::move(t)); }
+        T unsafe_read() const noexcept { return var.unsafe_read(); }
+        void unsafe_write(const T& t) noexcept { return var.unsafe_write(t); }
+        void unsafe_write(T&& t) noexcept { return var.unsafe_write(std::move(t)); }
     };
 LSTM_END
 

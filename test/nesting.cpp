@@ -20,9 +20,9 @@ void push(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x, int val
     CHECK(lstm::tls_thread_data().in_transaction());
     
     lstm::read_write([&](lstm::transaction& tx) {
-        auto var = tx.load(x);
+        auto var = tx.read(x);
         var.push_back(val);
-        tx.store(x, std::move(var));
+        tx.write(x, std::move(var));
     }, lstm::default_domain(), debug_alloc<std::vector<int>>{});
 }
 
@@ -30,16 +30,16 @@ void pop(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x) {
     CHECK(lstm::tls_thread_data().in_transaction());
     
     lstm::read_write([&](lstm::transaction& tx) {
-        auto var = tx.load(x);
+        auto var = tx.read(x);
         var.pop_back();
-        tx.store(x, std::move(var));
+        tx.write(x, std::move(var));
     }, lstm::default_domain(), debug_alloc<std::vector<int>>{});
 }
 
 auto get_loop(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x) {
     return [&] {
         lstm::read_write([&](auto& tx) {
-            auto& var = tx.load(x);
+            auto& var = tx.read(x);
             if (var.empty())
                 push(x, 5);
             else {
@@ -60,7 +60,7 @@ int main() {
             manager.queue_loop_n(get_loop(x), loop_count);
         manager.run();
         
-        CHECK(x.unsafe_load().empty());
+        CHECK(x.unsafe_read().empty());
     }
     CHECK(debug_live_allocations<> == 0);
     

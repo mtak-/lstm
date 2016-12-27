@@ -42,13 +42,13 @@ LSTM_BEGIN
         ~var() noexcept override final
         { base::destroy_deallocate(detail::var_base::storage.load(LSTM_RELAXED)); }
         
-        T unsafe_load() const noexcept
+        T unsafe_read() const noexcept
         { return base::load(detail::var_base::storage.load(LSTM_RELAXED)); }
         
-        void unsafe_store(const T& t) noexcept
+        void unsafe_write(const T& t) noexcept
         { return base::store(detail::var_base::storage, t); }
         
-        void unsafe_store(T&& t) noexcept
+        void unsafe_write(T&& t) noexcept
         { return base::store(detail::var_base::storage, std::move(t)); }
     };
 LSTM_END

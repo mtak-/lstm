@@ -12,37 +12,37 @@ int main() {
     // value tests
     {
         var<int> x;
-        x.unsafe_store(42);
+        x.unsafe_write(42);
 
-        NOEXCEPT_CHECK(x.unsafe_load() == 42);
+        NOEXCEPT_CHECK(x.unsafe_read() == 42);
     }
     {
         var<int> x{42};
-        NOEXCEPT_CHECK(x.unsafe_load() == 42);
+        NOEXCEPT_CHECK(x.unsafe_read() == 42);
 
-        x.unsafe_store(43);
-        // static_assert(Same<int&, decltype(x.unsafe_load())>, "");
-        NOEXCEPT_CHECK(x.unsafe_load() == 43);
+        x.unsafe_write(43);
+        // static_assert(Same<int&, decltype(x.unsafe_read())>, "");
+        NOEXCEPT_CHECK(x.unsafe_read() == 43);
 
-        // static_assert(Same<int&&, decltype(std::move(x).unsafe_load())>, "");
+        // static_assert(Same<int&&, decltype(std::move(x).unsafe_read())>, "");
     }
     {
         const var<int> x{42};
-        NOEXCEPT_CHECK(x.unsafe_load() == 42);
+        NOEXCEPT_CHECK(x.unsafe_read() == 42);
 
         // static_assert(Same<const int&, decltype(x.unsafe())>, "");
         // static_assert(Same<const int&&, decltype(std::move(x).unsafe())>, "");
     }
     {
         var<const int> x{42};
-        NOEXCEPT_CHECK(x.unsafe_load() == 42);
+        NOEXCEPT_CHECK(x.unsafe_read() == 42);
 
         // static_assert(Same<const int&, decltype(x.unsafe())>, "");
         // static_assert(Same<const int&&, decltype(std::move(x).unsafe())>, "");
     }
     {
         const var<const int> x{42};
-        NOEXCEPT_CHECK(x.unsafe_load() == 42);
+        NOEXCEPT_CHECK(x.unsafe_read() == 42);
 
         // static_assert(Same<const int&, decltype(x.unsafe())>, "");
         // static_assert(Same<const int&&, decltype(std::move(x).unsafe())>, "");
@@ -109,36 +109,36 @@ int main() {
     // allocators
     {
         var<std::vector<int>, std::scoped_allocator_adaptor<std::allocator<std::vector<int>>>> x;
-        auto foo = x.unsafe_load();
+        auto foo = x.unsafe_read();
         foo.push_back(42);
-        x.unsafe_store(std::move(foo));
+        x.unsafe_write(std::move(foo));
 
-        CHECK(x.unsafe_load().size() == 1u);
-        CHECK(x.unsafe_load()[0] == 42);
+        CHECK(x.unsafe_read().size() == 1u);
+        CHECK(x.unsafe_read()[0] == 42);
     }
     {
         using alloc = std::scoped_allocator_adaptor<std::allocator<std::vector<int>>>;
         var<std::vector<int>, alloc> x{alloc{}};
-        auto foo = x.unsafe_load();
+        auto foo = x.unsafe_read();
         foo.push_back(42);
-        x.unsafe_store(std::move(foo));
+        x.unsafe_write(std::move(foo));
 
-        CHECK(x.unsafe_load().size() == 1u);
-        CHECK(x.unsafe_load()[0] == 42);
+        CHECK(x.unsafe_read().size() == 1u);
+        CHECK(x.unsafe_read()[0] == 42);
     }
     {
         using alloc = std::scoped_allocator_adaptor<std::allocator<std::vector<int>>>;
         var<std::vector<int>, alloc> x{alloc{}, std::vector<int>{0,1,2,3}};
-        auto foo = x.unsafe_load();
+        auto foo = x.unsafe_read();
         foo.push_back(42);
-        x.unsafe_store(std::move(foo));
+        x.unsafe_write(std::move(foo));
 
-        CHECK(x.unsafe_load().size() == 5u);
-        CHECK(x.unsafe_load()[0] == 0);
-        CHECK(x.unsafe_load()[1] == 1);
-        CHECK(x.unsafe_load()[2] == 2);
-        CHECK(x.unsafe_load()[3] == 3);
-        CHECK(x.unsafe_load()[4] == 42);
+        CHECK(x.unsafe_read().size() == 5u);
+        CHECK(x.unsafe_read()[0] == 0);
+        CHECK(x.unsafe_read()[1] == 1);
+        CHECK(x.unsafe_read()[2] == 2);
+        CHECK(x.unsafe_read()[3] == 3);
+        CHECK(x.unsafe_read()[4] == 42);
     }
 
     // non const

@@ -20,8 +20,8 @@ int main() {
                 for (int j = 0; j < loop_count; ++j) {
                     try {
                         read_write([&](auto& tx) {
-                            int foo = tx.load(x);
-                            tx.store(x, foo + 5);
+                            int foo = tx.read(x);
+                            tx.write(x, foo + 5);
                             if (foo + 5 >= 10000)
                                 throw std::exception{};
                         });
@@ -35,7 +35,7 @@ int main() {
         tm.run();
     }
     
-    CHECK(x.unsafe_load() == 10000 - 5);
+    CHECK(x.unsafe_read() == 10000 - 5);
     CHECK(y == 5 * loop_count - 9995 / 5);
     
     return test_result();
