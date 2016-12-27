@@ -40,6 +40,7 @@ LSTM_BEGIN
         // also probly should be a few different kinds of callbacks (succ/fail/always)
         // sharing of gp_callbacks would be nice, but how could it be made fast for small tx's?
         detail::pod_vector<detail::gp_callback> gp_callbacks;
+        detail::pod_vector<detail::gp_callback> fail_callbacks;
         
         LSTM_CACHE_ALIGNED mutex_type mut;
         LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
@@ -110,6 +111,7 @@ LSTM_BEGIN
             mut.unlock();
             
             gp_callbacks.reset();
+            fail_callbacks.reset();
         }
         
         thread_data(const thread_data&) = delete;
@@ -121,6 +123,14 @@ LSTM_BEGIN
             for (auto& gp_callback : gp_callbacks)
                 gp_callback();
             gp_callbacks.clear();
+        }
+        
+        // TODO: when atomic swap on gp_callbacks is possible, this needs to do just that
+        void do_fail_callbacks() noexcept {
+            // TODO: if a callback adds a callback, this fails, again need a different type
+            for (auto& fail_callback : fail_callbacks)
+                fail_callback();
+            fail_callbacks.clear();
         }
         
     public:
