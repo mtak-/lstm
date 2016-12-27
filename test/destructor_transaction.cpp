@@ -3,7 +3,7 @@
 #include "simple_test.hpp"
 #include "thread_manager.hpp"
 
-using lstm::atomic;
+using lstm::read_write;
 using lstm::var;
 
 static constexpr auto loop_count = LSTM_TEST_INIT(1000000, 40000);
@@ -21,7 +21,7 @@ var<vec4> x{0, 0, 0, 0};
 
 struct destruct {
     ~destruct() noexcept(false) {
-        atomic([&](auto& tx) {
+        read_write([&](auto& tx) {
             auto y = tx.load(x);
             ++y.w;
             tx.store(x, y);
@@ -35,7 +35,7 @@ int main() {
         
         tm.queue_thread([&] {
             for (int j = 0; j < loop_count; ++j) {
-                atomic([&](auto& tx) {
+                read_write([&](auto& tx) {
                     auto foo = tx.load(x);
                     ++foo.x;
                     tx.store(x, foo);
@@ -45,7 +45,7 @@ int main() {
         
         tm.queue_thread([&] {
             for (int j = 0; j < loop_count; ++j) {
-                atomic([&](auto& tx) {
+                read_write([&](auto& tx) {
                     auto foo = tx.load(x);
                     ++foo.y;
                     tx.store(x, foo);
@@ -56,7 +56,7 @@ int main() {
         tm.queue_thread([&] {
             for (int j = 0; j < loop_count; ++j) {
                 auto b = new destruct();
-                atomic([&](auto& tx) {
+                read_write([&](auto& tx) {
                     tx.delete_(b);
                     auto foo = tx.load(x);
                     ++foo.z;

@@ -89,14 +89,14 @@ LSTM_BEGIN
         }
         
         void clear() {
-            auto* node = lstm::atomic([&](auto& tx) {
+            auto* node = lstm::read_write([&](auto& tx) {
                 tx.store(_size, 0);
                 auto result = tx.load(head);
                 tx.store(head, nullptr);
                 return result;
             }, lstm::default_domain(), alloc());
             if (node)
-                lstm::atomic([&](auto& tx) {
+                lstm::read_write([&](auto& tx) {
                     while (node) {
                         auto next_ = next(*node, tx);
                         tx.delete_(node, &alloc());
@@ -109,7 +109,7 @@ LSTM_BEGIN
         void emplace_front(Us&&... us) {
             std::unique_ptr<node_t> new_head{alloc_traits::allocate(alloc(), 1)};
             new (&*new_head) node_t((Us&&)us...);
-            lstm::atomic([&](auto& tx) {
+            lstm::read_write([&](auto& tx) {
                 auto _head = tx.load(head);
                 new_head->_next.unsafe_store(_head);
                 
@@ -122,9 +122,9 @@ LSTM_BEGIN
         }
         
         word size() const {
-            return lstm::atomic([&](auto& tx) { return tx.load(_size); },
-                                lstm::default_domain(),
-                                alloc());
+            return lstm::read_write([&](auto& tx) { return tx.load(_size); },
+                                    lstm::default_domain(),
+                                    alloc());
         }
     };
 LSTM_END

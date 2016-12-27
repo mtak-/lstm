@@ -20,18 +20,18 @@ LSTM_BEGIN
         easy_var(const easy_var& rhs) : base(rhs.get()) {}
         
         easy_var& operator=(const easy_var& rhs) {
-            lstm::atomic([&](auto& tx) { tx.store(var, tx.load(rhs.var)); });
+            lstm::read_write([&](auto& tx) { tx.store(var, tx.load(rhs.var)); });
             return *this;
         }
         
         template<typename U,
             LSTM_REQUIRES_(std::is_assignable<T&, const U&>())>
         easy_var& operator=(const U& rhs) {
-            lstm::atomic([&](auto& tx) { tx.store(var, rhs); });
+            lstm::read_write([&](auto& tx) { tx.store(var, rhs); });
             return *this;
         }
         
-        T get() const { return lstm::atomic([this](auto& tx) { return tx.load(var); }); }
+        T get() const { return lstm::read_write([this](auto& tx) { return tx.load(var); }); }
         
         inline operator T() const { return get(); }
         

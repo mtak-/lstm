@@ -31,7 +31,7 @@ LSTM_BEGIN
         
         template<typename, std::size_t, std::size_t, std::size_t>
         friend struct detail::transaction_impl;
-        friend struct detail::atomic_fn;
+        friend struct detail::read_write_fn;
         friend transaction;
         
         transaction* tx;
@@ -121,6 +121,9 @@ LSTM_BEGIN
         }
         
     public:
+        inline bool in_critical_section() const { return active.load(LSTM_RELAXED); }
+        inline bool in_transaction() const { return tx != nullptr; }
+        
         inline void access_lock(const gp_t gp) noexcept {
             assert(active.load(LSTM_RELAXED) == detail::off_state);
             assert(gp != detail::off_state);

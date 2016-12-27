@@ -7,7 +7,6 @@
 static constexpr auto loop_count0 = LSTM_TEST_INIT(5000000, 50000);
 static constexpr auto loop_count1 = LSTM_TEST_INIT(666666 * 5 + 4, 6666 * 5 + 4);
 
-using lstm::atomic;
 using lstm::easy_var;
 
 static easy_var<int, debug_alloc<int>> account0{300};
@@ -19,7 +18,7 @@ int main() {
         
         manager.queue_thread([] {
             for (int i = 0; i < loop_count0; ++i) {
-                lstm::atomic([] {
+                lstm::read_write([] {
                     if (account1 >= 20) {
                         account0 += 20;
                         account1 -= 20;
@@ -31,7 +30,7 @@ int main() {
         
         manager.queue_thread([] {
             for (int i = 0; i < loop_count1; ++i) {
-                lstm::atomic([] {
+                lstm::read_write([] {
                     if (account0 >= 30) {
                         account1 += 30;
                         account0 -= 30;

@@ -65,7 +65,7 @@ LSTM_BEGIN
     
     struct transaction {
     protected:
-        friend detail::atomic_fn;
+        friend detail::read_write_fn;
         friend test::transaction_tester;
         
         static constexpr gp_t lock_bit = gp_t(1) << (sizeof(gp_t) * 8 - 1);

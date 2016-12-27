@@ -12,7 +12,7 @@
 LSTM_DETAIL_BEGIN
     template<typename Alloc, std::size_t ReadSize, std::size_t WriteSize, std::size_t DeleteSize>
     struct transaction_impl : lstm::transaction {
-        friend detail::atomic_fn;
+        friend detail::read_write_fn;
         friend test::transaction_tester;
     private:
         using alloc_traits = std::allocator_traits<Alloc>;

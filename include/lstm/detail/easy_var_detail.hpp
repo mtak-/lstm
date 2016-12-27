@@ -7,24 +7,24 @@
     template<typename U,                                                                           \
         LSTM_REQUIRES_(concept <U>{})>                                                             \
     derived& operator symbol##= (const U u) {                                                      \
-        lstm::atomic([&](auto& tx) { tx.store(var, tx.load(var) symbol u); });                     \
+        lstm::read_write([&](auto& tx) { tx.store(var, tx.load(var) symbol u); });                 \
         return static_cast<derived&>(*this);                                                       \
     }                                                                                              \
     template<typename U, typename UAlloc,                                                          \
         LSTM_REQUIRES_(concept <U>{})>                                                             \
     derived& operator symbol##= (const easy_var<U, UAlloc>& uvar) {                                \
-        lstm::atomic([&](auto& tx) { tx.store(var, tx.load(var) symbol tx.load(uvar)); });         \
+        lstm::read_write([&](auto& tx) { tx.store(var, tx.load(var) symbol tx.load(uvar)); });     \
         return static_cast<derived&>(*this);                                                       \
     }                                                                                              \
     /**/
     
 #define LSTM_RMW_UNARY_OP(symbol)                                                                  \
     derived& operator symbol##symbol () {                                                          \
-        lstm::atomic([&](auto& tx) { tx.store(var, tx.load(var) symbol T(1)); });                  \
+        lstm::read_write([&](auto& tx) { tx.store(var, tx.load(var) symbol T(1)); });              \
         return static_cast<derived&>(*this);                                                       \
     }                                                                                              \
     T operator symbol##symbol (int) {                                                              \
-        return lstm::atomic([&](auto& tx) {                                                        \
+        return lstm::read_write([&](auto& tx) {                                                    \
             auto result = tx.load(var);                                                            \
             tx.store(var, result symbol T(1));                                                     \
             return result;                                                                         \

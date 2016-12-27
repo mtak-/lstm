@@ -1,5 +1,5 @@
-#ifndef LSTM_ATOMIC_HPP
-#define LSTM_ATOMIC_HPP
+#ifndef LSTM_READ_WRITE_HPP
+#define LSTM_READ_WRITE_HPP
 
 #include <lstm/detail/tx_result_buffer.hpp>
 
@@ -14,13 +14,13 @@ LSTM_BEGIN
 LSTM_END
 
 LSTM_DETAIL_BEGIN
-    struct atomic_fn {
+    struct read_write_fn {
     private:
         template<typename Func, typename Tx,
             LSTM_REQUIRES_(callable_with_tx<Func, Tx&>())>
         static auto call(Func& func, Tx& tx) -> decltype(func(tx)) {
             static_assert(!noexcept(func(tx)),
-                "functions passed to atomic must not be marked noexcept");
+                "functions passed to read_write must not be marked noexcept");
             return func(tx);
         }
         
@@ -28,7 +28,7 @@ LSTM_DETAIL_BEGIN
             LSTM_REQUIRES_(!callable_with_tx<Func, Tx&>())>
         static auto call(Func& func, Tx&) -> decltype(func()) {
             static_assert(!noexcept(func()),
-                "functions passed to atomic must not be marked noexcept");
+                "functions passed to read_write must not be marked noexcept");
             return func();
         }
         
@@ -65,11 +65,11 @@ LSTM_DETAIL_BEGIN
         
         template<typename Func, typename Alloc, std::size_t ReadSize, std::size_t WriteSize,
             std::size_t DeleteSize>
-        static transact_result<Func> atomic_slow_path(Func& func,
-                                                      transaction_domain& domain,
-                                                      const Alloc& alloc,
-                                                      knobs<ReadSize, WriteSize, DeleteSize>,
-                                                      thread_data& tls_td) {
+        static transact_result<Func> slow_path(Func& func,
+                                               transaction_domain& domain,
+                                               const Alloc& alloc,
+                                               knobs<ReadSize, WriteSize, DeleteSize>,
+                                               thread_data& tls_td) {
             tx_result_buffer<transact_result<Func>> buf;
             transaction_impl<Alloc, ReadSize, WriteSize, DeleteSize> tx{domain, tls_td, alloc};
             
@@ -80,7 +80,7 @@ LSTM_DETAIL_BEGIN
                     assert(tx.read_set.size() == 0);
                     assert(tx.write_set.size() == 0);
                     
-                    atomic_fn::try_transact(func, tx, buf);
+                    read_write_fn::try_transact(func, tx, buf);
                     
                     // commit does not throw
                     if (tx.commit()) {
@@ -98,9 +98,6 @@ LSTM_DETAIL_BEGIN
         }
         
     public:
-        inline bool in_transaction() const noexcept
-        { return tls_thread_data().tx != nullptr; }
-        
         template<typename Func, typename Alloc = std::allocator<detail::var_base*>,
             std::size_t MaxStackReadBuffSize = 4,
             std::size_t MaxStackWriteBuffSize = 4,
@@ -116,7 +113,7 @@ LSTM_DETAIL_BEGIN
             if (tls_td.tx)
                 return call(func, *tls_td.tx);
             
-            return atomic_fn::atomic_slow_path(func, domain, alloc, knobs, tls_td);
+            return read_write_fn::slow_path(func, domain, alloc, knobs, tls_td);
         }
         
 #ifndef LSTM_MAKE_SFINAE_FRIENDLY
@@ -124,7 +121,7 @@ LSTM_DETAIL_BEGIN
             LSTM_REQUIRES_(!detail::is_transact_function<Func>())>
         void operator()(Func&&, Args&&...) const {
             static_assert(detail::is_transact_function<Func>(),
-                "functions passed to lstm::atomic must either take no parameters, "
+                "functions passed to lstm::read_write must either take no parameters, "
                 "lstm::transaction&, or auto&/T&");
         }
 #endif
@@ -134,9 +131,7 @@ LSTM_DETAIL_BEGIN
 LSTM_DETAIL_END
 
 LSTM_BEGIN
-    namespace { constexpr auto&& atomic = detail::static_const<detail::atomic_fn>; }
-    
-    inline bool in_transaction() noexcept { return detail::atomic_fn{}.in_transaction(); }
+    namespace { constexpr auto&& read_write = detail::static_const<detail::read_write_fn>; }
 LSTM_END
 
-#endif /* LSTM_ATOMIC_HPP */
+#endif /* LSTM_READ_WRITE_HPP */

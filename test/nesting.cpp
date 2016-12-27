@@ -17,9 +17,9 @@
 static constexpr auto loop_count = LSTM_TEST_INIT(500000, 5000);
 
 void push(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x, int val) {
-    CHECK(lstm::in_transaction());
+    CHECK(lstm::tls_thread_data().in_transaction());
     
-    lstm::atomic([&](lstm::transaction& tx) {
+    lstm::read_write([&](lstm::transaction& tx) {
         auto var = tx.load(x);
         var.push_back(val);
         tx.store(x, std::move(var));
@@ -27,9 +27,9 @@ void push(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x, int val
 }
 
 void pop(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x) {
-    CHECK(lstm::in_transaction());
+    CHECK(lstm::tls_thread_data().in_transaction());
     
-    lstm::atomic([&](lstm::transaction& tx) {
+    lstm::read_write([&](lstm::transaction& tx) {
         auto var = tx.load(x);
         var.pop_back();
         tx.store(x, std::move(var));
@@ -38,7 +38,7 @@ void pop(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x) {
 
 auto get_loop(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x) {
     return [&] {
-        lstm::atomic([&](auto& tx) {
+        lstm::read_write([&](auto& tx) {
             auto& var = tx.load(x);
             if (var.empty())
                 push(x, 5);

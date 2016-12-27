@@ -105,7 +105,7 @@
 LSTM_DETAIL_BEGIN
     using var_storage = void*;
     
-    struct atomic_fn;
+    struct read_write_fn;
     struct var_base;
     
     template<typename Alloc, std::size_t ReadSize, std::size_t WriteSize, std::size_t DeleteSize>
