@@ -79,6 +79,9 @@ LSTM_DETAIL_BEGIN
             , var_base{type}
         {}
         
+        ~var_alloc_policy() noexcept override
+        { var_alloc_policy::destroy_deallocate(detail::var_base::storage.load(LSTM_RELAXED)); }
+        
         template<typename... Us>
         constexpr var_storage allocate_construct(Us&&... us)
             noexcept(noexcept(alloc_traits::allocate(alloc(), 1)) &&
@@ -128,6 +131,8 @@ LSTM_DETAIL_BEGIN
         
         constexpr var_alloc_policy() noexcept : var_base{type} {}
         constexpr var_alloc_policy(const Alloc&) noexcept : var_base{type} {}
+        
+        ~var_alloc_policy() noexcept override = default;
         
         template<typename... Us>
         var_storage allocate_construct(Us&&... us)

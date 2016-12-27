@@ -39,9 +39,6 @@ LSTM_BEGIN
         { detail::var_base::storage.store(base::allocate_construct((Us&&)us...),
                                           LSTM_RELAXED); }
         
-        ~var() noexcept override final
-        { base::destroy_deallocate(detail::var_base::storage.load(LSTM_RELAXED)); }
-        
         T unsafe_read() const noexcept
         { return base::load(detail::var_base::storage.load(LSTM_RELAXED)); }
         
