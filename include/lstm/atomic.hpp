@@ -1,7 +1,6 @@
 #ifndef LSTM_ATOMIC_HPP
 #define LSTM_ATOMIC_HPP
 
-#include <lstm/detail/thread_data.hpp>
 #include <lstm/detail/tx_result_buffer.hpp>
 
 #include <lstm/transaction.hpp>

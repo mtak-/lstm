@@ -3,8 +3,8 @@
 
 #include <lstm/detail/var_detail.hpp>
 #include <lstm/detail/pod_hash_set.hpp>
-#include <lstm/detail/thread_data.hpp>
 
+#include <lstm/thread_data.hpp>
 #include <lstm/transaction_domain.hpp>
 
 #include <atomic>

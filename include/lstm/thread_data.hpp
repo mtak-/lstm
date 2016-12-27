@@ -1,5 +1,5 @@
-#ifndef LSTM_DETAIL_THREAD_DATA_HPP
-#define LSTM_DETAIL_THREAD_DATA_HPP
+#ifndef LSTM_THREAD_DATA_HPP
+#define LSTM_THREAD_DATA_HPP
 
 #include <lstm/detail/backoff.hpp>
 #include <lstm/detail/gp_callback.hpp>
@@ -177,4 +177,4 @@ LSTM_BEGIN
     }
 LSTM_END
 
-#endif /* LSTM_DETAIL_THREAD_DATA_HPP */
+#endif /* LSTM_THREAD_DATA_HPP */
