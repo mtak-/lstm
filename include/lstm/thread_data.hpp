@@ -132,9 +132,33 @@ LSTM_BEGIN
             fail_callbacks.clear();
         }
         
+        template<typename T, typename Alloc = void>
+        T* allocate_slow(Alloc* alloc = nullptr, const std::size_t count = 1) {
+            using alloc_traits = std::allocator_traits<Alloc>;
+            T* result = alloc_traits::allocate(*alloc, count);
+            fail_callbacks.emplace_back([alloc, result] {
+                alloc_traits::deallocate(*alloc, result, 1);
+            });
+            return result;
+        }
+        
+        template<typename T, typename Alloc = void>
+        T* allocate_fast(Alloc* alloc = nullptr, const std::size_t count = 1) {
+            using alloc_traits = std::allocator_traits<Alloc>;
+            return alloc_traits::allocate(*alloc, count);
+        }
+        
     public:
-        inline bool in_critical_section() const { return active.load(LSTM_RELAXED); }
         inline bool in_transaction() const { return tx != nullptr; }
+        inline bool in_critical_section() const
+        { return active.load(LSTM_RELAXED) != detail::off_state; }
+        
+        template<typename T, typename Alloc = void>
+        T* allocate(Alloc* alloc = nullptr, const std::size_t count = 1) {
+            if (LSTM_UNLIKELY(in_transaction()))
+                return allocate_slow<T>(alloc, count);
+            return allocate_fast<T>(alloc, count);
+        }
         
         inline void access_lock(const gp_t gp) noexcept {
             assert(active.load(LSTM_RELAXED) == detail::off_state);

@@ -107,18 +107,17 @@ LSTM_BEGIN
         
         template<typename... Us>
         void emplace_front(Us&&... us) {
-            std::unique_ptr<node_t> new_head{alloc_traits::allocate(alloc(), 1)};
+            node_t* new_head = tls_thread_data().allocate<node_t>(&alloc(), 1);
             new (&*new_head) node_t((Us&&)us...);
             lstm::read_write([&](auto& tx) {
                 auto _head = tx.read(head);
                 new_head->_next.unsafe_write(_head);
                 
                 if (_head)
-                    tx.write(_head->_prev, (void*)&*new_head);
+                    tx.write(_head->_prev, (void*)new_head);
                 tx.write(_size, tx.read(_size) + 1);
-                tx.write(head, &*new_head);
+                tx.write(head, new_head);
             }, lstm::default_domain(), alloc());
-            new_head.release();
         }
         
         word size() const {
