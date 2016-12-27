@@ -26,8 +26,6 @@ LSTM_DETAIL_BEGIN
             , kind{in_kind}
         {}
         
-        virtual ~var_base() noexcept = default;
-        
         virtual void destroy_deallocate(var_storage storage) noexcept = 0;
         
         template<typename, std::size_t, std::size_t, std::size_t>
@@ -79,8 +77,8 @@ LSTM_DETAIL_BEGIN
             , var_base{type}
         {}
         
-        ~var_alloc_policy() noexcept override
-        { var_alloc_policy::destroy_deallocate(detail::var_base::storage.load(LSTM_RELAXED)); }
+        ~var_alloc_policy() noexcept
+        { var_alloc_policy::destroy_deallocate(storage.load(LSTM_RELAXED)); }
         
         template<typename... Us>
         constexpr var_storage allocate_construct(Us&&... us)
@@ -132,7 +130,7 @@ LSTM_DETAIL_BEGIN
         constexpr var_alloc_policy() noexcept : var_base{type} {}
         constexpr var_alloc_policy(const Alloc&) noexcept : var_base{type} {}
         
-        ~var_alloc_policy() noexcept override = default;
+        ~var_alloc_policy() noexcept { load(storage.load(LSTM_RELAXED)).~T(); }
         
         template<typename... Us>
         var_storage allocate_construct(Us&&... us)
