@@ -2,7 +2,6 @@
 #define LSTM_DETAIL_TRANSACTION_IMPL_HPP
 
 #include <lstm/detail/read_set_value_type.hpp>
-#include <lstm/detail/write_set_deleter.hpp>
 #include <lstm/detail/write_set_value_type.hpp>
 
 #include <lstm/transaction.hpp>
@@ -95,13 +94,6 @@ LSTM_DETAIL_BEGIN
         // TODO: emplace_back can throw exceptions...
         void commit_publish(const gp_t write_version) noexcept {
             for (auto& write_set_value : write_set) {
-                // TODO: possibly could reduce overhead here by adding to the write_set_deleters
-                // in "store" calls
-                if (write_set_value.dest_var().kind != var_type::atomic) {
-                    write_set_deleter dler(&write_set_value.dest_var(),
-                                           write_set_value.dest_var().storage.load(LSTM_RELAXED));
-                    tls_td->gp_callbacks.emplace_back(std::move(dler));
-                }
                 write_set_value.dest_var().storage.store(std::move(write_set_value.pending_write()),
                                                          LSTM_RELAXED);
                 unlock(write_version, write_set_value.dest_var());
@@ -153,10 +145,10 @@ LSTM_DETAIL_BEGIN
         // therefore, access_lock() must be active
         void cleanup() noexcept {
             // TODO: destroy only???
-            for (auto& write_set_value : write_set)
-                write_set_value.dest_var().destroy_deallocate(write_set_value.pending_write());
             write_set.clear();
             read_set.clear();
+            
+            tls_td->do_fail_callbacks();
             
             // TODO: batching
             tls_td->gp_callbacks.clear();
@@ -165,6 +157,7 @@ LSTM_DETAIL_BEGIN
         void reset_heap() noexcept {
             write_set.reset();
             read_set.reset();
+            tls_td->fail_callbacks.clear();
         }
         
         void add_read_set(const var_base& src_var) override final
@@ -229,7 +222,40 @@ LSTM_DETAIL_BEGIN
         }
         
         template<typename T, typename Alloc0, typename U,
-            LSTM_REQUIRES_(std::is_assignable<T&, U&&>() &&
+            LSTM_REQUIRES_(!var<T, Alloc0>::atomic &&
+                           std::is_assignable<T&, U&&>() &&
+                           std::is_constructible<T, U&&>())>
+        void write(var<T, Alloc0>& dest_var, U&& u) {
+            detail::write_set_lookup lookup = find_write_set(dest_var);
+            if (LSTM_LIKELY(!lookup.success())) {
+                const gp_t dest_version = dest_var.version_lock.load(LSTM_ACQUIRE);
+                const detail::var_storage cur_storage = dest_var.storage.load(LSTM_ACQUIRE);
+                if (rw_valid(dest_version)
+                        && dest_var.version_lock.load(LSTM_RELAXED) == dest_version) {
+                    const detail::var_storage new_storage = dest_var.allocate_construct((U&&)u);
+                    add_write_set(dest_var, new_storage, lookup.hash);
+                    tls_td->gp_callbacks.emplace_back([dest_var = &dest_var,
+                                                       cur_storage] {
+                        dest_var->destroy_deallocate(cur_storage);
+                    });
+                    tls_td->fail_callbacks.emplace_back([dest_var = &dest_var,
+                                                         new_storage] {
+                        dest_var->destroy_deallocate(new_storage);
+                    });
+                    return;
+                }
+            }
+            else if (rw_valid(dest_var)) {
+                var<T>::store(lookup.pending_write(), (U&&)u);
+                return;
+            }
+            
+            detail::internal_retry();
+        }
+        
+        template<typename T, typename Alloc0, typename U,
+            LSTM_REQUIRES_(var<T, Alloc0>::atomic &&
+                           std::is_assignable<T&, U&&>() &&
                            std::is_constructible<T, U&&>())>
         void write(var<T, Alloc0>& dest_var, U&& u) {
             detail::write_set_lookup lookup = find_write_set(dest_var);

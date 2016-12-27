@@ -178,7 +178,40 @@ LSTM_BEGIN
         }
         
         template<typename T, typename Alloc0, typename U,
-            LSTM_REQUIRES_(std::is_assignable<T&, U&&>() &&
+            LSTM_REQUIRES_(!var<T, Alloc0>::atomic &&
+                           std::is_assignable<T&, U&&>() &&
+                           std::is_constructible<T, U&&>())>
+        void write(var<T, Alloc0>& dest_var, U&& u) {
+            detail::write_set_lookup lookup = find_write_set(dest_var);
+            if (LSTM_LIKELY(!lookup.success())) {
+                const gp_t dest_version = dest_var.version_lock.load(LSTM_ACQUIRE);
+                const detail::var_storage cur_storage = dest_var.storage.load(LSTM_ACQUIRE);
+                if (rw_valid(dest_version)
+                        && dest_var.version_lock.load(LSTM_RELAXED) == dest_version) {
+                    const detail::var_storage new_storage = dest_var.allocate_construct((U&&)u);
+                    add_write_set(dest_var, new_storage, lookup.hash);
+                    tls_td->gp_callbacks.emplace_back([dest_var = &dest_var,
+                                                       cur_storage] {
+                        dest_var->destroy_deallocate(cur_storage);
+                    });
+                    tls_td->fail_callbacks.emplace_back([dest_var = &dest_var,
+                                                         new_storage] {
+                        dest_var->destroy_deallocate(new_storage);
+                    });
+                    return;
+                }
+            }
+            else if (rw_valid(dest_var)) {
+                var<T>::store(lookup.pending_write(), (U&&)u);
+                return;
+            }
+            
+            detail::internal_retry();
+        }
+        
+        template<typename T, typename Alloc0, typename U,
+            LSTM_REQUIRES_(var<T, Alloc0>::atomic &&
+                           std::is_assignable<T&, U&&>() &&
                            std::is_constructible<T, U&&>())>
         void write(var<T, Alloc0>& dest_var, U&& u) {
             detail::write_set_lookup lookup = find_write_set(dest_var);

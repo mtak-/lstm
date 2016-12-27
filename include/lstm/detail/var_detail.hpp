@@ -19,14 +19,8 @@ LSTM_DETAIL_BEGIN
     protected:
         mutable std::atomic<gp_t> version_lock;
         std::atomic<var_storage> storage;
-        const var_type kind;
         
-        inline var_base(const var_type in_kind) noexcept
-            : version_lock{0}
-            , kind{in_kind}
-        {}
-        
-        virtual void destroy_deallocate(var_storage storage) noexcept = 0;
+        inline var_base() noexcept : version_lock{0} {}
         
         template<typename, std::size_t, std::size_t, std::size_t>
         friend struct ::lstm::detail::transaction_impl;
@@ -70,13 +64,11 @@ LSTM_DETAIL_BEGIN
         constexpr var_alloc_policy()
             noexcept(std::is_nothrow_default_constructible<Alloc>{})
             : Alloc()
-            , var_base{type}
         {}
         
         constexpr var_alloc_policy(const Alloc& alloc)
             noexcept(std::is_nothrow_constructible<Alloc, const Alloc&>{})
             : Alloc(alloc)
-            , var_base{type}
         {}
         
         ~var_alloc_policy() noexcept
@@ -92,7 +84,7 @@ LSTM_DETAIL_BEGIN
             return ptr;
         }
         
-        void destroy_deallocate(var_storage s) noexcept override final {
+        void destroy_deallocate(var_storage s) noexcept {
             T* ptr = &load(s);
             alloc_traits::destroy(alloc(), ptr);
             alloc_traits::deallocate(alloc(), ptr, 1);
@@ -129,8 +121,8 @@ LSTM_DETAIL_BEGIN
         friend struct ::lstm::detail::transaction_impl;
         friend struct ::lstm::transaction;
         
-        constexpr var_alloc_policy() noexcept : var_base{type} {}
-        constexpr var_alloc_policy(const Alloc&) noexcept : var_base{type} {}
+        constexpr var_alloc_policy() noexcept = default;
+        constexpr var_alloc_policy(const Alloc&) noexcept {};
         
         ~var_alloc_policy() noexcept { load(storage.load(LSTM_RELAXED)).~T(); }
         
@@ -138,8 +130,6 @@ LSTM_DETAIL_BEGIN
         var_storage allocate_construct(Us&&... us)
             noexcept(std::is_nothrow_constructible<T, Us&&...>{})
         { return reinterpret_cast<var_storage>(T((Us&&)us...)); }
-        
-        void destroy_deallocate(var_storage s) noexcept override final { load(s).~T(); }
         
         static T load(var_storage storage) noexcept { return reinterpret_cast<T&>(storage); }
         
