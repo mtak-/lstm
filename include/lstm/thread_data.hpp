@@ -142,83 +142,23 @@ LSTM_BEGIN
             fail_callbacks.clear();
         }
         
-        template<typename Alloc, typename Pointer>
-        void queue_allocate_rollback(Alloc& alloc, Pointer ptr) {
-            using alloc_traits = std::allocator_traits<Alloc>;
-            fail_callbacks.emplace_back([alloc = &alloc, ptr = std::move(ptr)] {
-                alloc_traits::deallocate(*alloc, std::move(ptr), 1);
-            });
-        }
-        
-        template<typename Alloc, typename Pointer>
-        void queue_allocate_rollback(Alloc& alloc, Pointer ptr, const std::size_t count) {
-            using alloc_traits = std::allocator_traits<Alloc>;
-            fail_callbacks.emplace_back([alloc = &alloc, ptr = std::move(ptr), count] {
-                alloc_traits::deallocate(*alloc, std::move(ptr), count);
-            });
-        }
-        
-        template<typename Alloc, typename Pointer>
-        void queue_deallocate(Alloc& alloc, Pointer ptr) {
-            using alloc_traits = std::allocator_traits<Alloc>;
-            succ_callbacks.emplace_back([alloc = &alloc, ptr = std::move(ptr)] {
-                alloc_traits::deallocate(*alloc, std::move(ptr), 1);
-            });
-        }
-        
-        template<typename Alloc, typename Pointer>
-        void queue_deallocate(Alloc& alloc, Pointer ptr, const std::size_t count) {
-            using alloc_traits = std::allocator_traits<Alloc>;
-            succ_callbacks.emplace_back([alloc = &alloc, ptr = std::move(ptr), count] {
-                alloc_traits::deallocate(*alloc, std::move(ptr), count);
-            });
-        }
-        
     public:
         inline bool in_transaction() const { return tx != nullptr; }
         inline bool in_critical_section() const
         { return active.load(LSTM_RELAXED) != detail::off_state; }
         
-        template<typename Alloc,
-                 typename AllocTraits = std::allocator_traits<Alloc>,
-                 typename Pointer = typename AllocTraits::pointer,
-            LSTM_REQUIRES_(!std::is_const<Alloc>{})>
-        Pointer allocate(Alloc& alloc) {
-            Pointer result = AllocTraits::allocate(alloc, 1);
-            if (in_transaction())
-                queue_allocate_rollback(alloc, result);
-            return result;
+        template<typename Func,
+            LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
+        void queue_succ_callback(Func&& func) {
+            assert(active.load(LSTM_RELAXED) != detail::off_state);
+            succ_callbacks.emplace_back((Func&&)func);
         }
         
-        template<typename Alloc,
-                 typename AllocTraits = std::allocator_traits<Alloc>,
-                 typename Pointer = typename AllocTraits::pointer,
-            LSTM_REQUIRES_(!std::is_const<Alloc>{})>
-        Pointer allocate(Alloc& alloc, const std::size_t count) {
-            Pointer result = AllocTraits::allocate(alloc, count);
-            if (in_transaction())
-                queue_allocate_rollback(alloc, result, count);
-            return result;
-        }
-        
-        template<typename Alloc,
-                 typename AllocTraits = std::allocator_traits<Alloc>,
-            LSTM_REQUIRES_(!std::is_const<Alloc>{})>
-        void deallocate(Alloc& alloc, typename AllocTraits::pointer& ptr) {
-            if (in_transaction())
-                queue_deallocate(alloc, ptr);
-            else
-                AllocTraits::deallocate(alloc, ptr, 1);
-        }
-        
-        template<typename Alloc,
-                 typename AllocTraits = std::allocator_traits<Alloc>,
-            LSTM_REQUIRES_(!std::is_const<Alloc>{})>
-        void deallocate(Alloc& alloc, typename AllocTraits::pointer& ptr, const std::size_t count) {
-            if (in_transaction())
-                queue_deallocate(alloc, ptr, count);
-            else
-                AllocTraits::deallocate(alloc, ptr, count);
+        template<typename Func,
+            LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
+        void queue_fail_callback(Func&& func) {
+            assert(active.load(LSTM_RELAXED) != detail::off_state);
+            fail_callbacks.emplace_back((Func&&)func);
         }
         
         inline void access_lock(const gp_t gp) noexcept {

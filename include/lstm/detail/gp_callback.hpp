@@ -10,12 +10,12 @@ LSTM_DETAIL_BEGIN
         static constexpr auto max_payload_size = sizeof(void*) * 3;
         
         using cb_payload_t = std::aligned_storage_t<max_payload_size, alignof(std::max_align_t)>;
-        using cb_t = void (*)(cb_payload_t);
+        using cb_t = void (*)(cb_payload_t&);
         
         cb_payload_t payload;
         cb_t cb;
         
-        void operator()() const { cb(payload); }
+        void operator()() { cb(payload); }
         
         gp_callback() noexcept = default;
         
@@ -27,14 +27,14 @@ LSTM_DETAIL_BEGIN
                           "for small buffer optimizations");
             
             ::new(&payload) uncvref<F>((F&&)f);
-            cb = [](cb_payload_t payload) { (*reinterpret_cast<uncvref<F>*>(&payload))(); };
+            cb = [](cb_payload_t& payload) { (*reinterpret_cast<uncvref<F>*>(&payload))(); };
         }
         
         template<typename F,
             LSTM_REQUIRES_(sizeof(uncvref<F>) > max_payload_size)>
         gp_callback(F&& f) {
             ::new(&payload) uncvref<F>*(::new uncvref<F>((F&&)f));
-            cb = [](cb_payload_t payload) {
+            cb = [](cb_payload_t& payload) {
                 (**reinterpret_cast<uncvref<F>**>(&payload))();
                 ::delete *reinterpret_cast<uncvref<F>**>(&payload);
             };
