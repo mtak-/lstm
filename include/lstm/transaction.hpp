@@ -222,7 +222,7 @@ LSTM_BEGIN
         
         void commit_reclaim() noexcept {
             // TODO: batching
-            if (!tls_td->gp_callbacks.empty())
+            if (!tls_td->succ_callbacks.empty())
                 commit_reclaim_slow_path();
         }
         
@@ -246,7 +246,7 @@ LSTM_BEGIN
         // write_set.size() == 1 && (read_set.empty() ||
         //                           read_set.size() == 1 && read_set[0] == write_set[0])
         bool commit() noexcept {
-            if ((!tls_td->write_set.empty() || !tls_td->gp_callbacks.empty()) && !commit_slow_path()) {
+            if ((!tls_td->write_set.empty() || !tls_td->succ_callbacks.empty()) && !commit_slow_path()) {
                 LSTM_INTERNAL_FAIL_TX();
                 return false;
             }
@@ -266,7 +266,7 @@ LSTM_BEGIN
             tls_td->do_fail_callbacks();
             
             // TODO: batching
-            tls_td->gp_callbacks.clear();
+            tls_td->succ_callbacks.clear();
         }
         
         void reset_heap() noexcept {
@@ -333,8 +333,8 @@ LSTM_BEGIN
                         && dest_var.version_lock.load(LSTM_RELAXED) == dest_version) {
                     const detail::var_storage new_storage = dest_var.allocate_construct((U&&)u);
                     add_write_set(dest_var, new_storage, lookup.hash);
-                    tls_td->gp_callbacks.emplace_back([dest_var = &dest_var,
-                                                       cur_storage] {
+                    tls_td->succ_callbacks.emplace_back([dest_var = &dest_var,
+                                                         cur_storage] {
                         dest_var->destroy_deallocate(cur_storage);
                     });
                     tls_td->fail_callbacks.emplace_back([dest_var = &dest_var,
@@ -368,7 +368,7 @@ LSTM_BEGIN
         
         template<typename T, typename Alloc = void>
         void delete_(T* dest_var, Alloc* alloc = nullptr)
-        { tls_td->gp_callbacks.emplace_back(detail::deleter<T, Alloc>(dest_var, alloc)); }
+        { tls_td->succ_callbacks.emplace_back(detail::deleter<T, Alloc>(dest_var, alloc)); }
         
         // reading/writing an rvalue probably never makes sense
         template<typename T, typename Alloc0> void read(var<T, Alloc0>&& v) = delete;

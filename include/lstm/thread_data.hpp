@@ -39,10 +39,10 @@ LSTM_BEGIN
         LSTM_CACHE_ALIGNED thread_data* next;
         transaction* tx;
         
-        // TODO: this is a terrible type for gp_callbacks
+        // TODO: this is a terrible type for succ_callbacks
         // also probly should be a few different kinds of callbacks (succ/fail/always)
-        // sharing of gp_callbacks would be nice, but how could it be made fast for small tx's?
-        detail::pod_vector<detail::gp_callback> gp_callbacks;
+        // sharing of succ_callbacks would be nice, but how could it be made fast for small tx's?
+        detail::pod_vector<detail::gp_callback> succ_callbacks;
         detail::pod_vector<detail::gp_callback> fail_callbacks;
         LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
         
@@ -116,7 +116,7 @@ LSTM_BEGIN
             
             mut.unlock();
             
-            gp_callbacks.reset();
+            succ_callbacks.reset();
             fail_callbacks.reset();
             read_set.reset();
             write_set.reset();
@@ -125,19 +125,19 @@ LSTM_BEGIN
         thread_data(const thread_data&) = delete;
         thread_data& operator=(const thread_data&) = delete;
         
-        // TODO: when atomic swap on gp_callbacks is possible, this needs to do just that
+        // TODO: when atomic swap on succ_callbacks is possible, this needs to do just that
         void do_callbacks() noexcept {
             // TODO: if a callback adds a callback, this fails, again need a different type
-            for (auto& gp_callback : gp_callbacks)
-                gp_callback();
-            gp_callbacks.clear();
+            for (auto& succ_callback : succ_callbacks)
+                succ_callback();
+            succ_callbacks.clear();
         }
         
-        // TODO: when atomic swap on gp_callbacks is possible, this needs to do just that
+        // TODO: when atomic swap on succ_callbacks is possible, this needs to do just that
         void do_fail_callbacks() noexcept {
             // TODO: if a callback adds a callback, this fails, again need a different type
-            for (auto& fail_callback : fail_callbacks)
-                fail_callback();
+            for (auto riter = fail_callbacks.end(); riter != fail_callbacks.begin();)
+                (*--riter)();
             fail_callbacks.clear();
         }
         
@@ -160,7 +160,7 @@ LSTM_BEGIN
         template<typename Alloc, typename Pointer>
         void queue_deallocate(Alloc& alloc, Pointer ptr) {
             using alloc_traits = std::allocator_traits<Alloc>;
-            gp_callbacks.emplace_back([alloc = &alloc, ptr = std::move(ptr)] {
+            succ_callbacks.emplace_back([alloc = &alloc, ptr = std::move(ptr)] {
                 alloc_traits::deallocate(*alloc, std::move(ptr), 1);
             });
         }
@@ -168,7 +168,7 @@ LSTM_BEGIN
         template<typename Alloc, typename Pointer>
         void queue_deallocate(Alloc& alloc, Pointer ptr, const std::size_t count) {
             using alloc_traits = std::allocator_traits<Alloc>;
-            gp_callbacks.emplace_back([alloc = &alloc, ptr = std::move(ptr), count] {
+            succ_callbacks.emplace_back([alloc = &alloc, ptr = std::move(ptr), count] {
                 alloc_traits::deallocate(*alloc, std::move(ptr), count);
             });
         }
