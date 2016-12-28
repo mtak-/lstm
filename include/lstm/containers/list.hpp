@@ -95,20 +95,20 @@ LSTM_BEGIN
                 tx.write(head, nullptr);
                 return result;
             });
-            if (node)
-                lstm::read_write([&](auto& tx) {
-                    while (node) {
-                        auto next_ = next(*node, tx);
-                        tx.delete_(node, &alloc());
-                        node = next_;
-                    }
-                });
+            if (node) {
+                while (node) {
+                    auto next_ = unsafe_next(*node);
+                    lstm::destroy(alloc(), node);
+                    lstm::deallocate(alloc(), node);
+                    node = next_;
+                }
+            }
         }
         
         template<typename... Us>
         void emplace_front(Us&&... us) {
             node_t* new_head = lstm::allocate(alloc());
-            new (&*new_head) node_t((Us&&)us...);
+            lstm::construct(alloc(), new_head, (Us&&)us...);
             lstm::read_write([&](auto& tx) {
                 auto _head = tx.read(head);
                 new_head->_next.unsafe_write(_head);
