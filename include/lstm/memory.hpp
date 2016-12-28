@@ -90,37 +90,6 @@ LSTM_BEGIN
              typename... Args,
              typename AllocTraits = std::allocator_traits<Alloc>,
         LSTM_REQUIRES_(!std::is_const<Alloc>{} &&
-                       !std::is_same<detail::uncvref<Alloc>, thread_data>{} &&
-                       !std::is_trivially_destructible<T>{})>
-    inline void construct(Alloc& alloc,
-                          T* t,
-                          Args&&... args) {
-        AllocTraits::construct(alloc, t, (Args&&)args...);
-        thread_data& tls_td = tls_thread_data();
-        if (tls_td.in_critical_section()) {
-            tls_td.queue_fail_callback([alloc = &alloc, t] {
-                AllocTraits::destroy(*alloc, t);
-            });
-        }
-    }
-    
-    template<typename Alloc,
-             typename T,
-             typename... Args,
-             typename AllocTraits = std::allocator_traits<Alloc>,
-        LSTM_REQUIRES_(!std::is_const<Alloc>{} &&
-                       !std::is_same<detail::uncvref<Alloc>, thread_data>{} &&
-                       std::is_trivially_destructible<T>{})>
-    inline void construct(Alloc& alloc,
-                          T* t,
-                          Args&&... args)
-    { AllocTraits::construct(alloc, t, (Args&&)args...); }
-    
-    template<typename Alloc,
-             typename T,
-             typename... Args,
-             typename AllocTraits = std::allocator_traits<Alloc>,
-        LSTM_REQUIRES_(!std::is_const<Alloc>{} &&
                        !std::is_trivially_destructible<T>{})>
     inline void construct(thread_data& tls_td,
                           Alloc& alloc,
@@ -148,24 +117,27 @@ LSTM_BEGIN
     
     template<typename Alloc,
              typename T,
+             typename... Args,
              typename AllocTraits = std::allocator_traits<Alloc>,
         LSTM_REQUIRES_(!std::is_const<Alloc>{} &&
                        !std::is_same<detail::uncvref<Alloc>, thread_data>{} &&
                        !std::is_trivially_destructible<T>{})>
-    inline void destroy(Alloc& alloc, T* t) {
-        thread_data& tls_td = tls_thread_data();
-        tls_td.queue_succ_callback([alloc = &alloc, t] {
-            AllocTraits::destroy(*alloc, t);
-        });
-    }
+    inline void construct(Alloc& alloc,
+                          T* t,
+                          Args&&... args)
+    { lstm::construct(tls_thread_data(), alloc, t, (Args&&)args...); }
     
     template<typename Alloc,
              typename T,
+             typename... Args,
              typename AllocTraits = std::allocator_traits<Alloc>,
         LSTM_REQUIRES_(!std::is_const<Alloc>{} &&
                        !std::is_same<detail::uncvref<Alloc>, thread_data>{} &&
                        std::is_trivially_destructible<T>{})>
-    inline void destroy(Alloc&, T*) noexcept {}
+    inline void construct(Alloc& alloc,
+                          T* t,
+                          Args&&... args)
+    { AllocTraits::construct(alloc, t, (Args&&)args...); }
     
     template<typename Alloc,
              typename T,
@@ -184,6 +156,23 @@ LSTM_BEGIN
         LSTM_REQUIRES_(!std::is_const<Alloc>{} &&
                        std::is_trivially_destructible<T>{})>
     inline void destroy(thread_data&, Alloc&, T*) noexcept {}
+    
+    template<typename Alloc,
+             typename T,
+             typename AllocTraits = std::allocator_traits<Alloc>,
+        LSTM_REQUIRES_(!std::is_const<Alloc>{} &&
+                       !std::is_same<detail::uncvref<Alloc>, thread_data>{} &&
+                       !std::is_trivially_destructible<T>{})>
+    inline void destroy(Alloc& alloc, T* t)
+    { lstm::destroy(tls_thread_data(), alloc, t); }
+    
+    template<typename Alloc,
+             typename T,
+             typename AllocTraits = std::allocator_traits<Alloc>,
+        LSTM_REQUIRES_(!std::is_const<Alloc>{} &&
+                       !std::is_same<detail::uncvref<Alloc>, thread_data>{} &&
+                       std::is_trivially_destructible<T>{})>
+    inline void destroy(Alloc&, T*) noexcept {}
     
     // TODO: new,
     //       delete,
