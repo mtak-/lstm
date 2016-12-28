@@ -15,8 +15,7 @@ std::atomic<int> debug_live_allocations{0};
     struct debug_alloc : private std::allocator<T> {
     private:
         std::allocator<T>& alloc() noexcept { return *this; }
-        template<typename U>
-        friend struct debug_alloc;
+        template<typename U> friend struct debug_alloc;
         
     public:
         using typename std::allocator<T>::value_type;

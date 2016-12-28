@@ -94,7 +94,7 @@ LSTM_BEGIN
                 auto result = tx.read(head);
                 tx.write(head, nullptr);
                 return result;
-            }, lstm::default_domain());
+            });
             if (node)
                 lstm::read_write([&](auto& tx) {
                     while (node) {
@@ -102,7 +102,7 @@ LSTM_BEGIN
                         tx.delete_(node, &alloc());
                         node = next_;
                     }
-                }, lstm::default_domain());
+                });
         }
         
         template<typename... Us>
@@ -117,12 +117,11 @@ LSTM_BEGIN
                     tx.write(_head->_prev, (void*)new_head);
                 tx.write(_size, tx.read(_size) + 1);
                 tx.write(head, new_head);
-            }, lstm::default_domain());
+            });
         }
         
         word size() const {
-            return lstm::read_write([&](auto& tx) { return tx.read(_size); },
-                                    lstm::default_domain());
+            return lstm::read_write([&](auto& tx) { return tx.read(_size); });
         }
     };
 LSTM_END

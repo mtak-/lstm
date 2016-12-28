@@ -7,8 +7,7 @@ LSTM_BEGIN
     template<typename T, typename Alloc,
         LSTM_REQUIRES_(!std::is_same<detail::uncvref<Alloc>, thread_data>{} &&
                        !std::is_const<Alloc>{})>
-    inline T* allocate(Alloc& alloc,
-                       thread_data& tls_td = tls_thread_data())
+    inline T* allocate(Alloc& alloc, thread_data& tls_td = tls_thread_data())
     { return tls_td.allocate<T>(alloc); }
     
     template<typename T>

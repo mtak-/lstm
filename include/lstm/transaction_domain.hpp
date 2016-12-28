@@ -13,8 +13,6 @@ LSTM_BEGIN
         
         LSTM_CACHE_ALIGNED std::atomic<gp_t> clock{0};
         
-        static transaction_domain& default_domain() noexcept;
-        
     public:
         inline transaction_domain() noexcept = default;
         transaction_domain(const transaction_domain&) = delete;
