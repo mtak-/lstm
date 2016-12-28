@@ -19,10 +19,14 @@ int main() {
             lstm::list<int, debug_alloc<int>> ints;
             thread_manager manager;
     
-            manager.queue_loop_n([&] { lstm::read_write([&] { ints.emplace_front(0); }); }, iter_count);
+            manager.queue_loop_n([&] {
+                lstm::read_write([&] { ints.emplace_front(0); }); },
+                iter_count);
             manager.queue_loop_n([&] { ints.emplace_front(0); }, iter_count);
             manager.queue_loop_n([&] { ints.clear(); }, iter_count);
-            manager.queue_loop_n([&] { ints.clear(); }, iter_count);
+            manager.queue_loop_n([&] {
+                lstm::read_write([&] { ints.clear(); }); },
+                iter_count);
     
             manager.run();
                       
