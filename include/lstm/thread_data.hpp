@@ -130,41 +130,10 @@ LSTM_BEGIN
         thread_data(const thread_data&) = delete;
         thread_data& operator=(const thread_data&) = delete;
         
-        // TODO: when atomic swap on succ_callbacks is possible, this needs to do just that
-        void do_succ_callbacks() noexcept {
-            // TODO: if a callback adds a callback, this fails, again need a different type
-            for (auto& succ_callback : succ_callbacks)
-                succ_callback();
-            succ_callbacks.clear();
-        }
-        
-        // TODO: when atomic swap on succ_callbacks is possible, this needs to do just that
-        void do_fail_callbacks() noexcept {
-            // TODO: if a callback adds a callback, this fails, again need a different type
-            for (auto riter = fail_callbacks.end(); riter != fail_callbacks.begin();)
-                (*--riter)(); // fail callbacks are sooo similar to destructors, so they happen
-                              // in reverse order
-            fail_callbacks.clear();
-        }
-        
     public:
         inline bool in_transaction() const { return tx != nullptr; }
         inline bool in_critical_section() const
         { return active.load(LSTM_RELAXED) != detail::off_state; }
-        
-        template<typename Func,
-            LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
-        void queue_succ_callback(Func&& func) {
-            assert(active.load(LSTM_RELAXED) != detail::off_state);
-            succ_callbacks.emplace_back((Func&&)func);
-        }
-        
-        template<typename Func,
-            LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
-        void queue_fail_callback(Func&& func) {
-            assert(active.load(LSTM_RELAXED) != detail::off_state);
-            fail_callbacks.emplace_back((Func&&)func);
-        }
         
         inline void access_lock(const gp_t gp) noexcept {
             assert(tx == nullptr);
@@ -202,6 +171,37 @@ LSTM_BEGIN
                 wait(gp);
             
             mut.unlock();
+        }
+        
+        template<typename Func,
+            LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
+        void queue_succ_callback(Func&& func) {
+            assert(active.load(LSTM_RELAXED) != detail::off_state);
+            succ_callbacks.emplace_back((Func&&)func);
+        }
+        
+        template<typename Func,
+            LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
+        void queue_fail_callback(Func&& func) {
+            assert(active.load(LSTM_RELAXED) != detail::off_state);
+            fail_callbacks.emplace_back((Func&&)func);
+        }
+        
+        // TODO: when atomic swap on succ_callbacks is possible, this needs to do just that
+        void do_succ_callbacks() noexcept {
+            // TODO: if a callback adds a callback, this fails, again need a different type
+            for (auto& succ_callback : succ_callbacks)
+                succ_callback();
+            succ_callbacks.clear();
+        }
+        
+        // TODO: when atomic swap on succ_callbacks is possible, this needs to do just that
+        void do_fail_callbacks() noexcept {
+            // TODO: if a callback adds a callback, this fails, again need a different type
+            for (auto riter = fail_callbacks.end(); riter != fail_callbacks.begin();)
+                (*--riter)(); // fail callbacks are sooo similar to destructors, so they happen
+                              // in reverse order
+            fail_callbacks.clear();
         }
     };
     
