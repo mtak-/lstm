@@ -65,8 +65,8 @@ LSTM_DETAIL_BEGIN
             
             while(true) {
                 try {
-                    assert(tx.read_set.size() == 0);
-                    assert(tx.write_set.size() == 0);
+                    assert(tls_td.read_set.size() == 0);
+                    assert(tls_td.write_set.size() == 0);
                     
                     read_write_fn::try_transact(func, tx, buf);
                     
