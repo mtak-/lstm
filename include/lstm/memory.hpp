@@ -8,7 +8,7 @@ LSTM_BEGIN
              typename AllocTraits = std::allocator_traits<Alloc>,
              typename Pointer = typename AllocTraits::pointer,
         LSTM_REQUIRES_(!std::is_const<Alloc>{})>
-    inline Pointer allocate(Alloc& alloc, thread_data& tls_td = tls_thread_data()) {
+    inline Pointer allocate(thread_data& tls_td, Alloc& alloc) {
         Pointer result = AllocTraits::allocate(alloc, 1);
         if (tls_td.in_critical_section()) {
             tls_td.queue_fail_callback([alloc = &alloc, result] {
@@ -22,9 +22,9 @@ LSTM_BEGIN
              typename AllocTraits = std::allocator_traits<Alloc>,
              typename Pointer = typename AllocTraits::pointer,
         LSTM_REQUIRES_(!std::is_const<Alloc>{})>
-    inline Pointer allocate(Alloc& alloc,
-                            const std::size_t count,
-                            thread_data& tls_td = tls_thread_data()) {
+    inline Pointer allocate(thread_data& tls_td,
+                            Alloc& alloc,
+                            const std::size_t count) {
         Pointer result = AllocTraits::allocate(alloc, count);
         if (tls_td.in_critical_section()) {
             tls_td.queue_fail_callback([alloc = &alloc, result, count] {
@@ -36,10 +36,24 @@ LSTM_BEGIN
     
     template<typename Alloc,
              typename AllocTraits = std::allocator_traits<Alloc>,
+             typename Pointer = typename AllocTraits::pointer,
         LSTM_REQUIRES_(!std::is_const<Alloc>{})>
-    inline void deallocate(Alloc& alloc,
-                           typename AllocTraits::pointer ptr,
-                           thread_data& tls_td = tls_thread_data()) {
+    inline Pointer allocate(Alloc& alloc)
+    { return lstm::allocate(tls_thread_data(), alloc); }
+    
+    template<typename Alloc,
+             typename AllocTraits = std::allocator_traits<Alloc>,
+             typename Pointer = typename AllocTraits::pointer,
+        LSTM_REQUIRES_(!std::is_const<Alloc>{})>
+    inline Pointer allocate(Alloc& alloc, const std::size_t count)
+    { return lstm::allocate(tls_thread_data(), alloc, count); }
+    
+    template<typename Alloc,
+             typename AllocTraits = std::allocator_traits<Alloc>,
+        LSTM_REQUIRES_(!std::is_const<Alloc>{})>
+    inline void deallocate(thread_data& tls_td,
+                           Alloc& alloc,
+                           typename AllocTraits::pointer ptr) {
         tls_td.queue_succ_callback([alloc = &alloc, ptr = std::move(ptr)]() mutable {
             AllocTraits::deallocate(*alloc, std::move(ptr), 1);
         });
@@ -48,14 +62,28 @@ LSTM_BEGIN
     template<typename Alloc,
              typename AllocTraits = std::allocator_traits<Alloc>,
         LSTM_REQUIRES_(!std::is_const<Alloc>{})>
-    inline void deallocate(Alloc& alloc,
+    inline void deallocate(thread_data& tls_td,
+                           Alloc& alloc,
                            typename AllocTraits::pointer ptr,
-                           const std::size_t count,
-                           thread_data& tls_td = tls_thread_data()) {
+                           const std::size_t count) {
         tls_td.queue_succ_callback([alloc = &alloc, ptr = std::move(ptr), count]() mutable {
             AllocTraits::deallocate(*alloc, std::move(ptr), count);
         });
     }
+    
+    template<typename Alloc,
+             typename AllocTraits = std::allocator_traits<Alloc>,
+        LSTM_REQUIRES_(!std::is_const<Alloc>{})>
+    inline void deallocate(Alloc& alloc, typename AllocTraits::pointer ptr)
+    { return lstm::deallocate(tls_thread_data(), alloc, ptr); }
+    
+    template<typename Alloc,
+             typename AllocTraits = std::allocator_traits<Alloc>,
+        LSTM_REQUIRES_(!std::is_const<Alloc>{})>
+    inline void deallocate(Alloc& alloc,
+                           typename AllocTraits::pointer ptr,
+                           const std::size_t count)
+    { return lstm::deallocate(tls_thread_data(), alloc, ptr, count); }
     
     template<typename Alloc,
              typename T,
