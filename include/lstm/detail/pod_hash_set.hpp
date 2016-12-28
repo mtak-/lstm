@@ -1,7 +1,7 @@
 #ifndef LSTM_DETAIL_POD_HASH_SET_HPP
 #define LSTM_DETAIL_POD_HASH_SET_HPP
 
-#include <lstm/detail/small_pod_vector.hpp>
+#include <lstm/detail/lstm_fwd.hpp>
 
 #include <algorithm>
 #include <cmath>
