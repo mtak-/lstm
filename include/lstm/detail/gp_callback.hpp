@@ -7,7 +7,7 @@
 
 LSTM_DETAIL_BEGIN
     struct gp_callback {
-        static constexpr auto max_payload_size = sizeof(void*) * 2;
+        static constexpr auto max_payload_size = sizeof(void*) * 3;
         
         using cb_payload_t = std::aligned_storage_t<max_payload_size, alignof(std::max_align_t)>;
         using cb_t = void (*)(cb_payload_t);
