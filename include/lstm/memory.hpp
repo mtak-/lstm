@@ -40,13 +40,9 @@ LSTM_BEGIN
     inline void deallocate(Alloc& alloc,
                            typename AllocTraits::pointer ptr,
                            thread_data& tls_td = tls_thread_data()) {
-        if (tls_td.in_critical_section()) {
-            tls_td.queue_succ_callback([alloc = &alloc, ptr = std::move(ptr)]() mutable {
-                AllocTraits::deallocate(*alloc, std::move(ptr), 1);
-            });
-        } else {
-            AllocTraits::deallocate(alloc, std::move(ptr), 1);
-        }
+        tls_td.queue_succ_callback([alloc = &alloc, ptr = std::move(ptr)]() mutable {
+            AllocTraits::deallocate(*alloc, std::move(ptr), 1);
+        });
     }
     
     template<typename Alloc,
@@ -56,13 +52,9 @@ LSTM_BEGIN
                            typename AllocTraits::pointer ptr,
                            const std::size_t count,
                            thread_data& tls_td = tls_thread_data()) {
-        if (tls_td.in_critical_section()) {
-            tls_td.queue_succ_callback([alloc = &alloc, ptr = std::move(ptr), count]() mutable {
-                AllocTraits::deallocate(*alloc, std::move(ptr), count);
-            });
-        } else {
-            AllocTraits::deallocate(alloc, std::move(ptr), count);
-        }
+        tls_td.queue_succ_callback([alloc = &alloc, ptr = std::move(ptr), count]() mutable {
+            AllocTraits::deallocate(*alloc, std::move(ptr), count);
+        });
     }
     
     template<typename Alloc,
@@ -134,13 +126,9 @@ LSTM_BEGIN
                        !std::is_trivially_destructible<T>{})>
     inline void destroy(Alloc& alloc, T* t) {
         thread_data& tls_td = tls_thread_data();
-        if (tls_td.in_critical_section()) {
-            tls_td.queue_succ_callback([alloc = &alloc, t] {
-                AllocTraits::destroy(*alloc, t);
-            });
-        } else {
-            AllocTraits::destroy(alloc, t);
-        }
+        tls_td.queue_succ_callback([alloc = &alloc, t] {
+            AllocTraits::destroy(*alloc, t);
+        });
     }
     
     template<typename Alloc,
@@ -157,13 +145,9 @@ LSTM_BEGIN
         LSTM_REQUIRES_(!std::is_const<Alloc>{} &&
                        !std::is_trivially_destructible<T>{})>
     inline void destroy(thread_data& tls_td, Alloc& alloc, T* t) {
-        if (tls_td.in_critical_section()) {
-            tls_td.queue_succ_callback([alloc = &alloc, t] {
-                AllocTraits::destroy(*alloc, t);
-            });
-        } else {
-            AllocTraits::destroy(alloc, t);
-        }
+        tls_td.queue_succ_callback([alloc = &alloc, t] {
+            AllocTraits::destroy(*alloc, t);
+        });
     }
     
     template<typename Alloc,
