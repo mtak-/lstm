@@ -333,12 +333,12 @@ LSTM_BEGIN
                         && dest_var.version_lock.load(LSTM_RELAXED) == dest_version) {
                     const detail::var_storage new_storage = dest_var.allocate_construct((U&&)u);
                     add_write_set(dest_var, new_storage, lookup.hash);
-                    tls_td->succ_callbacks.emplace_back([dest_var = &dest_var,
-                                                         cur_storage] {
+                    tls_td->queue_succ_callback([dest_var = &dest_var,
+                                                 cur_storage] {
                         dest_var->destroy_deallocate(cur_storage);
                     });
-                    tls_td->fail_callbacks.emplace_back([dest_var = &dest_var,
-                                                         new_storage] {
+                    tls_td->queue_fail_callback([dest_var = &dest_var,
+                                                 new_storage] {
                         dest_var->destroy_deallocate(new_storage);
                     });
                     return;
@@ -365,10 +365,6 @@ LSTM_BEGIN
             
             if (!rw_valid(dest_var)) detail::internal_retry();
         }
-        
-        template<typename T, typename Alloc = void>
-        void delete_(T* dest_var, Alloc* alloc = nullptr)
-        { tls_td->succ_callbacks.emplace_back(detail::deleter<T, Alloc>(dest_var, alloc)); }
         
         // reading/writing an rvalue probably never makes sense
         template<typename T, typename Alloc0> void read(var<T, Alloc0>&& v) = delete;

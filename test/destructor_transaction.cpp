@@ -54,10 +54,11 @@ int main() {
         });
         
         tm.queue_thread([&] {
+            static std::allocator<destruct> alloc{};
             for (int j = 0; j < loop_count; ++j) {
-                auto b = new destruct();
+                auto b = lstm::allocate_construct(alloc);
                 read_write([&](auto& tx) {
-                    tx.delete_(b);
+                    lstm::destroy_deallocate(alloc, b);
                     auto foo = tx.read(x);
                     ++foo.z;
                     tx.write(x, foo);

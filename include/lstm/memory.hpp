@@ -209,7 +209,7 @@ LSTM_BEGIN
         AllocTraits::construct(alloc, detail::to_raw_pointer(result), (Args&&)args...);
         if (tls_td.in_critical_section()) {
             tls_td.queue_fail_callback([alloc = &alloc, result]() mutable {
-                AllocTraits::destroy(*alloc, to_raw_pointer(result));
+                AllocTraits::destroy(*alloc, detail::to_raw_pointer(result));
                 AllocTraits::deallocate(*alloc, std::move(result), 1);
             });
         }
