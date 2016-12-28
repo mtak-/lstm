@@ -126,7 +126,7 @@ LSTM_BEGIN
         thread_data& operator=(const thread_data&) = delete;
         
         // TODO: when atomic swap on succ_callbacks is possible, this needs to do just that
-        void do_callbacks() noexcept {
+        void do_succ_callbacks() noexcept {
             // TODO: if a callback adds a callback, this fails, again need a different type
             for (auto& succ_callback : succ_callbacks)
                 succ_callback();
