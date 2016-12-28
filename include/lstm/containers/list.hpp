@@ -89,26 +89,31 @@ LSTM_BEGIN
         }
         
         void clear() {
+            thread_data& tls_td = tls_thread_data();
             auto* node = lstm::read_write([&](auto& tx) {
                 tx.write(_size, 0);
                 auto result = tx.read(head);
                 tx.write(head, nullptr);
                 return result;
-            });
+            }, default_domain(), tls_td);
             if (node) {
+                const gp_t clock = default_domain().get_clock();
                 while (node) {
                     auto next_ = unsafe_next(*node);
-                    lstm::destroy(alloc(), node);
-                    lstm::deallocate(alloc(), node);
+                    lstm::destroy_deallocate(tls_td, alloc(), node);
                     node = next_;
+                }
+                if (!tls_td.in_critical_section()) {
+                    tls_td.synchronize(clock);
+                    tls_td.do_succ_callbacks();
                 }
             }
         }
         
         template<typename... Us>
         void emplace_front(Us&&... us) {
-            node_t* new_head = lstm::allocate(alloc());
-            lstm::construct(alloc(), new_head, (Us&&)us...);
+            thread_data& tls_td = tls_thread_data();
+            node_t* new_head = lstm::allocate_construct(tls_td, alloc(), (Us&&)us...);
             lstm::read_write([&](auto& tx) {
                 auto _head = tx.read(head);
                 new_head->_next.unsafe_write(_head);
@@ -117,7 +122,7 @@ LSTM_BEGIN
                     tx.write(_head->_prev, (void*)new_head);
                 tx.write(_size, tx.read(_size) + 1);
                 tx.write(head, new_head);
-            });
+            }, default_domain(), tls_td);
         }
         
         word size() const {

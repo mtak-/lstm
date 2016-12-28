@@ -192,9 +192,9 @@ LSTM_BEGIN
         Pointer result = AllocTraits::allocate(alloc, 1);
         AllocTraits::construct(alloc, detail::to_raw_pointer(result), (Args&&)args...);
         if (tls_td.in_critical_section()) {
-            tls_td.queue_fail_callback([alloc = &alloc, result] {
-                AllocTraits::destroy(*alloc, result);
-                AllocTraits::deallocate(*alloc, result, 1);
+            tls_td.queue_fail_callback([alloc = &alloc, result]() mutable {
+                AllocTraits::destroy(*alloc, to_raw_pointer(result));
+                AllocTraits::deallocate(*alloc, std::move(result), 1);
             });
         }
         return result;
@@ -214,7 +214,7 @@ LSTM_BEGIN
         AllocTraits::construct(alloc, detail::to_raw_pointer(result), (Args&&)args...);
         if (tls_td.in_critical_section()) {
             tls_td.queue_fail_callback([alloc = &alloc, result] {
-                AllocTraits::deallocate(*alloc, result, 1);
+                AllocTraits::deallocate(*alloc, std::move(result), 1);
             });
         }
         return result;
@@ -227,6 +227,37 @@ LSTM_BEGIN
     inline auto allocate_construct(Alloc& alloc, Args&&... args)
         -> decltype(lstm::allocate_construct(tls_thread_data(), alloc, (Args&&)args...))
     { return lstm::allocate_construct(tls_thread_data(), alloc, (Args&&)args...); }
+    
+    template<typename Alloc,
+             typename AllocTraits = std::allocator_traits<Alloc>,
+        LSTM_REQUIRES_(!std::is_const<Alloc>{} &&
+                       !std::is_trivially_destructible<typename AllocTraits::value_type>{})>
+    inline void destroy_deallocate(thread_data& tls_td,
+                                   Alloc& alloc,
+                                   typename AllocTraits::pointer ptr) {
+        tls_td.queue_succ_callback([alloc = &alloc, ptr = std::move(ptr)] {
+            AllocTraits::destroy(*alloc, detail::to_raw_pointer(ptr));
+            AllocTraits::deallocate(*alloc, std::move(ptr), 1);
+        });
+    }
+    
+    template<typename Alloc,
+             typename AllocTraits = std::allocator_traits<Alloc>,
+        LSTM_REQUIRES_(!std::is_const<Alloc>{} &&
+                       std::is_trivially_destructible<typename AllocTraits::value_type>{})>
+    inline void destroy_deallocate(thread_data& tls_td,
+                                   Alloc& alloc,
+                                   typename AllocTraits::pointer ptr) {
+        tls_td.queue_succ_callback([alloc = &alloc, ptr = std::move(ptr)] {
+            AllocTraits::deallocate(*alloc, std::move(ptr), 1);
+        });
+    }
+    
+    template<typename Alloc,
+             typename AllocTraits = std::allocator_traits<Alloc>,
+        LSTM_REQUIRES_(!std::is_const<Alloc>{})>
+    inline void destroy_deallocate(Alloc& alloc, typename AllocTraits::pointer ptr)
+    { lstm::destroy_deallocate(tls_thread_data(), alloc, std::move(ptr)); }
     
     // TODO: some kinda tx_safe_allocator
 LSTM_END

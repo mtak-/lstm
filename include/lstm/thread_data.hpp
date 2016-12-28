@@ -175,17 +175,13 @@ LSTM_BEGIN
         
         template<typename Func,
             LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
-        void queue_succ_callback(Func&& func) {
-            assert(active.load(LSTM_RELAXED) != detail::off_state);
-            succ_callbacks.emplace_back((Func&&)func);
-        }
+        void queue_succ_callback(Func&& func)
+        { succ_callbacks.emplace_back((Func&&)func); }
         
         template<typename Func,
             LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
-        void queue_fail_callback(Func&& func) {
-            assert(active.load(LSTM_RELAXED) != detail::off_state);
-            fail_callbacks.emplace_back((Func&&)func);
-        }
+        void queue_fail_callback(Func&& func)
+        { fail_callbacks.emplace_back((Func&&)func); }
         
         // TODO: when atomic swap on succ_callbacks is possible, this needs to do just that
         void do_succ_callbacks() noexcept {
