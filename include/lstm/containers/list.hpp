@@ -107,7 +107,7 @@ LSTM_BEGIN
         
         template<typename... Us>
         void emplace_front(Us&&... us) {
-            node_t* new_head = lstm::allocate<node_t>(alloc());
+            node_t* new_head = lstm::allocate(alloc());
             new (&*new_head) node_t((Us&&)us...);
             lstm::read_write([&](auto& tx) {
                 auto _head = tx.read(head);

@@ -141,11 +141,35 @@ LSTM_BEGIN
             fail_callbacks.clear();
         }
         
-        template<typename T, typename Alloc>
-        void add_allocate_rollback(T* ptr, Alloc& alloc) {
+        template<typename Alloc, typename Pointer>
+        void queue_allocate_rollback(Alloc& alloc, Pointer ptr) {
             using alloc_traits = std::allocator_traits<Alloc>;
-            fail_callbacks.emplace_back([alloc = &alloc, ptr] {
-                alloc_traits::deallocate(*alloc, ptr, 1);
+            fail_callbacks.emplace_back([alloc = &alloc, ptr = std::move(ptr)] {
+                alloc_traits::deallocate(*alloc, std::move(ptr), 1);
+            });
+        }
+        
+        template<typename Alloc, typename Pointer>
+        void queue_allocate_rollback(Alloc& alloc, Pointer ptr, const std::size_t count) {
+            using alloc_traits = std::allocator_traits<Alloc>;
+            fail_callbacks.emplace_back([alloc = &alloc, ptr = std::move(ptr), count] {
+                alloc_traits::deallocate(*alloc, std::move(ptr), count);
+            });
+        }
+        
+        template<typename Alloc, typename Pointer>
+        void queue_deallocate(Alloc& alloc, Pointer ptr) {
+            using alloc_traits = std::allocator_traits<Alloc>;
+            gp_callbacks.emplace_back([alloc = &alloc, ptr = std::move(ptr)] {
+                alloc_traits::deallocate(*alloc, std::move(ptr), 1);
+            });
+        }
+        
+        template<typename Alloc, typename Pointer>
+        void queue_deallocate(Alloc& alloc, Pointer ptr, const std::size_t count) {
+            using alloc_traits = std::allocator_traits<Alloc>;
+            gp_callbacks.emplace_back([alloc = &alloc, ptr = std::move(ptr), count] {
+                alloc_traits::deallocate(*alloc, std::move(ptr), count);
             });
         }
         
@@ -154,14 +178,46 @@ LSTM_BEGIN
         inline bool in_critical_section() const
         { return active.load(LSTM_RELAXED) != detail::off_state; }
         
-        template<typename T, typename Alloc,
+        template<typename Alloc,
+                 typename AllocTraits = std::allocator_traits<Alloc>,
+                 typename Pointer = typename AllocTraits::pointer,
             LSTM_REQUIRES_(!std::is_const<Alloc>{})>
-        T* allocate(Alloc& alloc) {
-            using alloc_traits = std::allocator_traits<Alloc>;
-            T* result = alloc_traits::allocate(alloc, 1);
+        Pointer allocate(Alloc& alloc) {
+            Pointer result = AllocTraits::allocate(alloc, 1);
             if (in_transaction())
-                add_allocate_rollback(result, alloc);
+                queue_allocate_rollback(alloc, result);
             return result;
+        }
+        
+        template<typename Alloc,
+                 typename AllocTraits = std::allocator_traits<Alloc>,
+                 typename Pointer = typename AllocTraits::pointer,
+            LSTM_REQUIRES_(!std::is_const<Alloc>{})>
+        Pointer allocate(Alloc& alloc, const std::size_t count) {
+            Pointer result = AllocTraits::allocate(alloc, count);
+            if (in_transaction())
+                queue_allocate_rollback(alloc, result, count);
+            return result;
+        }
+        
+        template<typename Alloc,
+                 typename AllocTraits = std::allocator_traits<Alloc>,
+            LSTM_REQUIRES_(!std::is_const<Alloc>{})>
+        void deallocate(Alloc& alloc, typename AllocTraits::pointer& ptr) {
+            if (in_transaction())
+                queue_deallocate(alloc, ptr);
+            else
+                AllocTraits::deallocate(alloc, ptr, 1);
+        }
+        
+        template<typename Alloc,
+                 typename AllocTraits = std::allocator_traits<Alloc>,
+            LSTM_REQUIRES_(!std::is_const<Alloc>{})>
+        void deallocate(Alloc& alloc, typename AllocTraits::pointer& ptr, const std::size_t count) {
+            if (in_transaction())
+                queue_deallocate(alloc, ptr, count);
+            else
+                AllocTraits::deallocate(alloc, ptr, count);
         }
         
         inline void access_lock(const gp_t gp) noexcept {
