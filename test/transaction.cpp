@@ -1,5 +1,4 @@
 #include <lstm/transaction.hpp>
-#include <lstm/detail/transaction_impl.hpp>
 
 #include <lstm/var.hpp>
 

@@ -13,16 +13,7 @@ LSTM_BEGIN
         
         LSTM_CACHE_ALIGNED std::atomic<gp_t> clock{0};
         
-        inline gp_t bump_clock() noexcept {
-            gp_t result = clock.fetch_add(1, LSTM_RELAXED);
-            assert(result < max_version - 1);
-            return result;
-        }
-        
         static transaction_domain& default_domain() noexcept;
-        
-        template<typename, std::size_t, std::size_t, std::size_t>
-        friend struct lstm::detail::transaction_impl;
         
     public:
         inline transaction_domain() noexcept = default;
@@ -30,6 +21,13 @@ LSTM_BEGIN
         transaction_domain& operator=(const transaction_domain&) = delete;
         
         inline gp_t get_clock() noexcept { return clock.load(LSTM_RELAXED); }
+        
+        // returns the previous version
+        inline gp_t bump_clock() noexcept {
+            gp_t result = clock.fetch_add(1, LSTM_RELAXED);
+            assert(result < max_version - 1);
+            return result;
+        }
     };
     
     namespace detail { LSTM_INLINE_VAR transaction_domain _default_domain{}; }

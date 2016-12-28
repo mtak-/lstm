@@ -1,16 +1,8 @@
 #ifndef LSTM_READ_WRITE_HPP
 #define LSTM_READ_WRITE_HPP
 
-#include <lstm/detail/transaction_impl.hpp>
 #include <lstm/detail/tx_result_buffer.hpp>
-
-LSTM_BEGIN
-    // optional knobs
-    template<std::size_t MaxStackReadBuffSize = 4,
-             std::size_t MaxStackWriteBuffSize = 4,
-             std::size_t MaxStackDeleterBuffSize = 4>
-    struct knobs {};
-LSTM_END
+#include <lstm/transaction.hpp>
 
 LSTM_DETAIL_BEGIN
     struct read_write_fn {
@@ -62,15 +54,12 @@ LSTM_DETAIL_BEGIN
             tx.reset_heap();
         }
         
-        template<typename Func, typename Alloc, std::size_t ReadSize, std::size_t WriteSize,
-            std::size_t DeleteSize>
+        template<typename Func>
         static transact_result<Func> slow_path(Func& func,
                                                transaction_domain& domain,
-                                               const Alloc& alloc,
-                                               knobs<ReadSize, WriteSize, DeleteSize>,
                                                thread_data& tls_td) {
             tx_result_buffer<transact_result<Func>> buf;
-            transaction_impl<Alloc, ReadSize, WriteSize, DeleteSize> tx{domain, tls_td, alloc};
+            transaction tx{domain, tls_td};
             
             tls_td.tx = &tx;
             
@@ -97,22 +86,15 @@ LSTM_DETAIL_BEGIN
         }
         
     public:
-        template<typename Func, typename Alloc = std::allocator<detail::var_base*>,
-            std::size_t MaxStackReadBuffSize = 4,
-            std::size_t MaxStackWriteBuffSize = 4,
-            std::size_t MaxStackDeleterBuffSize = 4,
+        template<typename Func,
             LSTM_REQUIRES_(detail::is_transact_function<Func>())>
         transact_result<Func> operator()(Func&& func,
                                          transaction_domain& domain = default_domain(),
-                                         const Alloc& alloc = {},
-                                         knobs<MaxStackWriteBuffSize,
-                                               MaxStackReadBuffSize,
-                                               MaxStackDeleterBuffSize> knobs = {},
                                          thread_data& tls_td = tls_thread_data()) const {
             if (tls_td.tx)
                 return call(func, *tls_td.tx);
             
-            return read_write_fn::slow_path(func, domain, alloc, knobs, tls_td);
+            return read_write_fn::slow_path(func, domain, tls_td);
         }
         
 #ifndef LSTM_MAKE_SFINAE_FRIENDLY

@@ -14,10 +14,7 @@ LSTM_BEGIN
             "invalid allocator for type T");
         static_assert(!std::is_array<T>{},
             "raw c arrays are not allowed. try using a std::array");
-            
-        template<typename, std::size_t, std::size_t, std::size_t>
-        friend struct ::lstm::detail::transaction_impl;
-        friend struct ::lstm::detail::write_set_deleter;
+        
         friend struct ::lstm::transaction;
         friend test::transaction_tester;
         

@@ -3,7 +3,11 @@
 
 #include <lstm/detail/backoff.hpp>
 #include <lstm/detail/gp_callback.hpp>
+#include <lstm/detail/var_detail.hpp>
+#include <lstm/detail/pod_hash_set.hpp>
 #include <lstm/detail/pod_vector.hpp>
+#include <lstm/detail/read_set_value_type.hpp>
+#include <lstm/detail/write_set_value_type.hpp>
 
 LSTM_DETAIL_BEGIN
     namespace { static constexpr gp_t off_state = ~gp_t(0); }
@@ -27,12 +31,9 @@ LSTM_BEGIN
     // in concurrent writes
     struct LSTM_CACHE_ALIGNED thread_data {
     private:
-        friend LSTM_NOINLINE inline thread_data& detail::tls_data_init() noexcept;
-        
-        template<typename, std::size_t, std::size_t, std::size_t>
-        friend struct detail::transaction_impl;
         friend struct detail::read_write_fn;
         friend transaction;
+        friend LSTM_NOINLINE inline thread_data& detail::tls_data_init() noexcept;
         
         LSTM_CACHE_ALIGNED mutex_type mut;
         LSTM_CACHE_ALIGNED thread_data* next;
@@ -44,6 +45,12 @@ LSTM_BEGIN
         detail::pod_vector<detail::gp_callback> gp_callbacks;
         detail::pod_vector<detail::gp_callback> fail_callbacks;
         LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
+        
+        using read_set_t = detail::pod_vector<detail::read_set_value_type>;
+        using write_set_t = detail::pod_hash_set<detail::pod_vector<detail::write_set_value_type>>;
+        
+        read_set_t read_set;
+        write_set_t write_set;
         
         static void lock_all() noexcept {
             LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_mut.lock();
@@ -111,6 +118,8 @@ LSTM_BEGIN
             
             gp_callbacks.reset();
             fail_callbacks.reset();
+            read_set.reset();
+            write_set.reset();
         }
         
         thread_data(const thread_data&) = delete;

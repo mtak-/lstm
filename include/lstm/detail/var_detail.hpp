@@ -22,9 +22,6 @@ LSTM_DETAIL_BEGIN
         
         inline var_base() noexcept : version_lock{0} {}
         
-        template<typename, std::size_t, std::size_t, std::size_t>
-        friend struct ::lstm::detail::transaction_impl;
-        friend struct ::lstm::detail::write_set_deleter;
         friend struct ::lstm::transaction;
         friend test::transaction_tester;
     };
@@ -52,8 +49,6 @@ LSTM_DETAIL_BEGIN
         static constexpr bool atomic = false;
         static constexpr var_type type = Var_type;
     protected:
-        template<typename, std::size_t, std::size_t, std::size_t>
-        friend struct ::lstm::detail::transaction_impl;
         friend struct ::lstm::transaction;
         using alloc_traits = std::allocator_traits<Alloc>;
         static_assert(std::is_pointer<typename alloc_traits::pointer>{},
@@ -117,8 +112,6 @@ LSTM_DETAIL_BEGIN
         static constexpr bool atomic = true;
         static constexpr var_type type = var_type::atomic;
     protected:
-        template<typename, std::size_t, std::size_t, std::size_t>
-        friend struct ::lstm::detail::transaction_impl;
         friend struct ::lstm::transaction;
         
         constexpr var_alloc_policy() noexcept = default;

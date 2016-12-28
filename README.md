@@ -7,7 +7,6 @@ _WIP: This library is definitely not ready for... much of anything_
 Techniques used include:
 - The Transactional Locking II Per Object model is at the core of the commit algorithm used.
 - a heavily URCU inspired algorithm is used for resource reclamation
-- Up to `sizeof(std::uintptr_t) * 8 - 1` threads can reclaim shared memory concurrently (31 or 63 typically)
 - `thread_local` is used to automatically track threads (no need to register them)
 - nested transactions are fully supported by merging them into the root most transaction
 - custom allocators are also supported
@@ -52,4 +51,4 @@ bool transfer_funds(int amount, lstm::easy_var<int>& fromAccount, lstm::easy_var
 
 ## Performance
 `TODO:`
-A single threaded noop transaction which neither reads nor writes share data, has an overhead of around 15ns on a `2.4 GHz Intel Core i5`.
+A single threaded noop transaction which neither reads nor writes share data, has an overhead of around 6.2ns on a `2.4 GHz Intel Core i5`.

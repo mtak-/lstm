@@ -108,9 +108,6 @@ LSTM_DETAIL_BEGIN
     struct read_write_fn;
     struct var_base;
     
-    template<typename Alloc, std::size_t ReadSize, std::size_t WriteSize, std::size_t DeleteSize>
-    struct transaction_impl;
-    
     struct _tx_retry {};
     [[noreturn]] LSTM_ALWAYS_INLINE void internal_retry() {
         LSTM_INTERNAL_FAIL_TX();
@@ -146,8 +143,6 @@ LSTM_BEGIN
 LSTM_END
 
 LSTM_DETAIL_BEGIN
-    struct write_set_deleter;
-    
     template<typename...>
     using void_ = void;
     

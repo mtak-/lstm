@@ -22,7 +22,7 @@ int main() {
                 if (j % 100 >= i*25 && j % 100 < i*25 + 5) {
                     lstm::read_write([&](auto& tx) {
                         tx.write(x, tx.read(x) + 1);
-                    }, lstm::default_domain(), {}, {}, tls_td);
+                    }, lstm::default_domain(), tls_td);
                 } else {
                     tls_td.access_lock(lstm::default_domain().get_clock());
                     tls_td.access_unlock();
