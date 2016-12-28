@@ -84,16 +84,10 @@ LSTM_DETAIL_BEGIN
         uword capacity() const noexcept { return capacity_; }
         
         template<typename... Us>
-        void emplace_back(const Us... us) noexcept(noexcept(reserve_more())) {
-            static_assert(and_<std::integral_constant<bool, !std::is_polymorphic<Us>{}>...>{}, "");
-            static_assert(and_<std::is_standard_layout<Us>...>{}, "");
-            static_assert(and_<std::is_trivially_copy_constructible<Us>...>{}, "");
-            static_assert(and_<std::is_trivially_move_constructible<Us>...>{}, "");
-            static_assert(and_<std::is_trivially_destructible<Us>...>{}, "");
-            
+        void emplace_back(Us&&... us) noexcept(noexcept(reserve_more())) {
             if (LSTM_UNLIKELY(size() == capacity_))
                 reserve_more();
-            ::new (end_++) value_type(us...);
+            ::new (end_++) value_type((Us&&)us...);
         }
         
         void unordered_erase(const pointer ptr) noexcept {
