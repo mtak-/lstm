@@ -222,6 +222,7 @@ LSTM_BEGIN
         }
         
         inline void access_lock(const gp_t gp) noexcept {
+            assert(tx == nullptr);
             assert(active.load(LSTM_RELAXED) == detail::off_state);
             assert(gp != detail::off_state);
             active.store(gp, LSTM_RELEASE);
