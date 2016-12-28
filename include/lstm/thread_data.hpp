@@ -137,7 +137,8 @@ LSTM_BEGIN
         void do_fail_callbacks() noexcept {
             // TODO: if a callback adds a callback, this fails, again need a different type
             for (auto riter = fail_callbacks.end(); riter != fail_callbacks.begin();)
-                (*--riter)();
+                (*--riter)(); // fail callbacks are sooo similar to destructors, so they happen
+                              // in reverse order
             fail_callbacks.clear();
         }
         
