@@ -178,7 +178,7 @@ LSTM_BEGIN
         
         bool commit_lock_writes() noexcept {
             // TODO: substantial performance hit from these two calls :(
-            commit_sort_writes(); // not needed in practice... but does guarantee progress
+            // commit_sort_writes(); // not needed in practice... but does guarantee progress
             commit_remove_writes_from_reads();
             
             write_set_iter write_begin = std::begin(tls_td->write_set);
