@@ -335,10 +335,14 @@ LSTM_BEGIN
                     add_write_set(dest_var, new_storage, lookup.hash);
                     tls_td->queue_succ_callback([dest_var = &dest_var,
                                                  cur_storage] {
+                        // TODO: NO guarantees that dest_var is around to destroy it's old
+                        // storage at this point (i.e. not in a critical section)
                         dest_var->destroy_deallocate(cur_storage);
                     });
                     tls_td->queue_fail_callback([dest_var = &dest_var,
                                                  new_storage] {
+                        // TODO: NO guarantees that dest_var is around to destroy it's old
+                        // storage at this point (i.e. not in a critical section)
                         dest_var->destroy_deallocate(new_storage);
                     });
                     return;
