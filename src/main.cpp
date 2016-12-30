@@ -19,7 +19,7 @@ int main() {
             int j = 0;
             auto& tls_td = lstm::tls_thread_data();
             while (j++ < loop_count) {
-                if (j % 100 >= i*25 && j % 100 < i*25 + 5) {
+                if (j % 100 >= (i % 4) * 25 && j % 100 < (i % 4) * 25 + 5) {
                     lstm::read_write([&](auto& tx) {
                         tx.write(x, tx.read(x) + 1);
                     }, lstm::default_domain(), tls_td);
