@@ -8,12 +8,17 @@ LSTM_BEGIN
     struct var : private detail::var_alloc_policy<T, Alloc> {
     private:
         using base = detail::var_alloc_policy<T, Alloc>;
+        static_assert(std::is_same<Alloc, detail::uncvref<Alloc>>{},
+            "lstm::var<> allocators cannot be cv/ref qualified!");
         static_assert(!std::is_reference<T>{},
-            "a var cannot contain a reference");
-        static_assert(std::is_same<T, typename Alloc::value_type>{},
-            "invalid allocator for type T");
+            "lstm::var<>'s cannot contain a reference");
+        static_assert(std::is_same<detail::uncvref<T>, typename Alloc::value_type>{},
+            "lstm::var<> given invalid allocator for type T");
+        static_assert(!std::is_const<typename Alloc::value_type>{} &&
+                      !std::is_volatile<typename Alloc::value_type>{},
+            "lstm::var<> does not currently support cv qualifications on T");
         static_assert(!std::is_array<T>{},
-            "raw c arrays are not allowed. try using a std::array");
+            "lstm::var<> does not support raw c arrays. try using a std::array");
         
         friend struct ::lstm::transaction;
         friend test::transaction_tester;

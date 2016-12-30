@@ -15,23 +15,27 @@ LSTM_DETAIL_BEGIN
         cb_payload_t payload;
         cb_t cb;
         
+        template<typename F>
+        using sbo_concept = std::integral_constant<bool,
+            sizeof(uncvref<F>) <= max_payload_size &&
+            alignof(uncvref<F>) <= alignof(cb_payload_t) &&
+            std::is_trivially_destructible<uncvref<F>>{} &&
+            (std::is_trivially_move_constructible<uncvref<F>>{} ||
+             std::is_trivially_copy_constructible<uncvref<F>>{})>;
+        
         void operator()() { cb(payload); }
         
         gp_callback() noexcept = default;
         
         template<typename F,
-            LSTM_REQUIRES_(sizeof(uncvref<F>) <= max_payload_size)>
-        gp_callback(F&& f) noexcept(std::is_nothrow_copy_constructible<uncvref<F>>{}) {
-            static_assert(alignof(uncvref<F>) <= alignof(cb_payload_t),
-                          "gp_callback currently only supports alignof(std::max_align_t) or less "
-                          "for small buffer optimizations");
-            
+            LSTM_REQUIRES_(sbo_concept<F>{})>
+        gp_callback(F&& f) noexcept(std::is_nothrow_copy_constructible<uncvref<F>>{}) {            
             ::new(&payload) uncvref<F>((F&&)f);
             cb = [](cb_payload_t& payload) { (*reinterpret_cast<uncvref<F>*>(&payload))(); };
         }
         
         template<typename F,
-            LSTM_REQUIRES_(sizeof(uncvref<F>) > max_payload_size)>
+            LSTM_REQUIRES_(!sbo_concept<F>{})>
         gp_callback(F&& f) {
             ::new(&payload) uncvref<F>*(::new uncvref<F>((F&&)f));
             cb = [](cb_payload_t& payload) {

@@ -34,15 +34,15 @@ int main() {
         // static_assert(Same<const int&&, decltype(std::move(x).unsafe())>, "");
     }
     {
-        var<const int> x{42};
-        NOEXCEPT_CHECK(x.unsafe_read() == 42);
+        // var<const int> x{42};
+        // NOEXCEPT_CHECK(x.unsafe_read() == 42);
 
         // static_assert(Same<const int&, decltype(x.unsafe())>, "");
         // static_assert(Same<const int&&, decltype(std::move(x).unsafe())>, "");
     }
     {
-        const var<const int> x{42};
-        NOEXCEPT_CHECK(x.unsafe_read() == 42);
+        // const var<const int> x{42};
+        // NOEXCEPT_CHECK(x.unsafe_read() == 42);
 
         // static_assert(Same<const int&, decltype(x.unsafe())>, "");
         // static_assert(Same<const int&&, decltype(std::move(x).unsafe())>, "");
@@ -162,17 +162,17 @@ int main() {
     // static_assert(!std::is_default_constructible<lstm::var<const int>>{}, "");
     // static_assert(!std::is_constructible<lstm::var<const int>>{}, "");
     // static_assert(!std::is_nothrow_constructible<lstm::var<const int>>{}, "");
-    static_assert(std::is_constructible<lstm::var<const int>, int&>{}, "");
-    static_assert(std::is_constructible<lstm::var<const int>, int&&>{}, "");
-    static_assert(std::is_constructible<lstm::var<const int>, const int&>{}, "");
-    static_assert(std::is_constructible<lstm::var<const int>, const int&&>{}, "");
-    static_assert(std::is_nothrow_constructible<lstm::var<const int>, int&>{}, "");
-    static_assert(std::is_nothrow_constructible<lstm::var<const int>, int&&>{}, "");
-    static_assert(std::is_nothrow_constructible<lstm::var<const int>, const int&>{}, "");
-    static_assert(std::is_nothrow_constructible<lstm::var<const int>, const int&&>{}, "");
-    static_assert(!std::is_copy_constructible<lstm::var<const int>>{}, "");
-    static_assert(!std::is_move_constructible<lstm::var<const int>>{}, "");
-    static_assert(std::is_destructible<lstm::var<const int>>{}, "");
+    // static_assert(std::is_constructible<lstm::var<const int>, int&>{}, "");
+    // static_assert(std::is_constructible<lstm::var<const int>, int&&>{}, "");
+    // static_assert(std::is_constructible<lstm::var<const int>, const int&>{}, "");
+    // static_assert(std::is_constructible<lstm::var<const int>, const int&&>{}, "");
+    // static_assert(std::is_nothrow_constructible<lstm::var<const int>, int&>{}, "");
+    // static_assert(std::is_nothrow_constructible<lstm::var<const int>, int&&>{}, "");
+    // static_assert(std::is_nothrow_constructible<lstm::var<const int>, const int&>{}, "");
+    // static_assert(std::is_nothrow_constructible<lstm::var<const int>, const int&&>{}, "");
+    // static_assert(!std::is_copy_constructible<lstm::var<const int>>{}, "");
+    // static_assert(!std::is_move_constructible<lstm::var<const int>>{}, "");
+    // static_assert(std::is_destructible<lstm::var<const int>>{}, "");
 
     // ref
     // static_assert(std::is_constructible<lstm::var<int&>, int&>{}, "");

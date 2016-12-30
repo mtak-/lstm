@@ -30,6 +30,8 @@ LSTM_DETAIL_BEGIN
         if (sizeof(T) <= sizeof(word) && alignof(T) <= alignof(word) &&
                 std::is_trivially_copy_constructible<T>{}() &&
                 std::is_trivially_move_constructible<T>{}() &&
+                std::is_trivially_copy_assignable<T>{}() &&
+                std::is_trivially_move_assignable<T>{}() &&
                 std::is_trivially_destructible<T>{}())
             return var_type::atomic;
         return var_type::heap;
