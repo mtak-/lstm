@@ -19,7 +19,7 @@ LSTM_BEGIN
         friend test::transaction_tester;
         
     public:
-        using base::trivial;
+        using base::heap;
         using base::atomic;
         using base::type;
         

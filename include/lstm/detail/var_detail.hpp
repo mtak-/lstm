@@ -8,8 +8,7 @@
 LSTM_BEGIN
     // TODO: this naming is wrong now. nothing is locking except in the commit phase
     enum class var_type {
-        locking,
-        trivial,
+        heap,
         atomic,
     };
 LSTM_END
@@ -33,11 +32,7 @@ LSTM_DETAIL_BEGIN
                 std::is_trivially_move_constructible<T>{}() &&
                 std::is_trivially_destructible<T>{}())
             return var_type::atomic;
-        else if (std::is_trivially_copy_constructible<T>{}() &&
-                 std::is_trivially_move_constructible<T>{}() &&
-                 std::is_trivially_destructible<T>{}())
-            return var_type::trivial;
-        return var_type::locking;
+        return var_type::heap;
     }
     
     template<typename T, typename Alloc, var_type Var_type = var_type_switch<T>()>
@@ -45,14 +40,14 @@ LSTM_DETAIL_BEGIN
         : private Alloc
         , var_base
     {
-        static constexpr bool trivial = var_type_switch<T>() == var_type::trivial;
+        static constexpr bool heap = true;
         static constexpr bool atomic = false;
         static constexpr var_type type = Var_type;
     protected:
         friend struct ::lstm::transaction;
         using alloc_traits = std::allocator_traits<Alloc>;
         static_assert(std::is_pointer<typename alloc_traits::pointer>{},
-            "sorry, lstm only supports allocators that return raw pointers");
+            "sorry, lstm::var only supports allocators that return raw pointers");
         
         constexpr Alloc& alloc() noexcept { return static_cast<Alloc&>(*this); }
         
@@ -108,7 +103,7 @@ LSTM_DETAIL_BEGIN
     struct var_alloc_policy<T, Alloc, var_type::atomic>
         : var_base
     {
-        static constexpr bool trivial = true;
+        static constexpr bool heap = false;
         static constexpr bool atomic = true;
         static constexpr var_type type = var_type::atomic;
     protected:
