@@ -45,7 +45,7 @@ LSTM_DETAIL_BEGIN
         : private Alloc
         , var_base
     {
-        static constexpr bool trivial = std::is_trivially_copy_constructible<T>{}();
+        static constexpr bool trivial = var_type_switch<T>() == var_type::trivial;
         static constexpr bool atomic = false;
         static constexpr var_type type = Var_type;
     protected:
