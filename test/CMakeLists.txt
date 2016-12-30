@@ -24,3 +24,6 @@ add_test(test.exception exception)
 
 add_executable(destructor_transaction destructor_transaction.cpp)
 add_test(test.destructor_transaction destructor_transaction)
+
+add_executable(delete_var_and_modify delete_var_and_modify.cpp)
+add_test(test.delete_var_and_modify delete_var_and_modify)
