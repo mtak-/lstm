@@ -10,6 +10,8 @@
 #include "simple_test.hpp"
 #include "thread_manager.hpp"
 
+static constexpr auto loop_count = 1000000;
+
 using lstm::read_write;
 using lstm::var;
 
@@ -32,7 +34,7 @@ int main() {
                     tx.write(x_ptr, allocate_construct(alloc));
                 }
             });
-        }, 1000001);
+        }, loop_count | 1);
         tm.queue_loop_n([&] {
             read_write([&](auto& tx) {
                 auto ptr = tx.read(x_ptr);
@@ -41,7 +43,7 @@ int main() {
                 } else
                     lstm::retry();
             });
-        }, 1000000);
+        }, loop_count);
         tm.run();
     }
 }
