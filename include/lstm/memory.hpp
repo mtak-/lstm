@@ -3,6 +3,10 @@
 
 #include <lstm/thread_data.hpp>
 
+// TODO: hacked some garbage traits stuff in here to make progress on some outstanding
+// problems in the library. the correct solutions are still TBD
+// it's not optimized nor pretty
+
 LSTM_BEGIN
     namespace detail {
         template<typename Alloc, typename = void>
@@ -281,6 +285,10 @@ LSTM_BEGIN
     // this class will wrap an allocator, and reclaim memory on tx fails
     // it also queues up deallocation/destruction
     // plugging this into a std container does NOT make it tx safe
+    //
+    // TODO: this class is terribly incomplete and a WIP which is not used anywhere yet
+    // it's usefulness is unknown at the moment. containers all need recoding to be tx safe
+    // anyhow, so it's not like dropping one of these suckers in will fix anything
     template<typename Alloc>
     struct tx_safe_alloc_wrapper;
     
@@ -294,6 +302,7 @@ LSTM_BEGIN
         using alloc_traits = std::allocator_traits<Alloc>;
         
     public:
+        // TODO: more typedefs...
         using typename Alloc::value_type;
         
         constexpr tx_safe_alloc_wrapper() noexcept = default;
@@ -318,6 +327,9 @@ LSTM_BEGIN
         void destroy(value_type* ptr)
         { lstm::destroy(alloc(), ptr); }
         
+        // TODO: moar members
+        
+        // TODO: non-member templatized etc
         bool operator==(const tx_safe_alloc_wrapper& rhs) const noexcept { return rhs == alloc(); }
         bool operator!=(const tx_safe_alloc_wrapper& rhs) const noexcept { return rhs != alloc(); }
     };
