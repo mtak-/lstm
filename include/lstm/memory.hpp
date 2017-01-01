@@ -282,56 +282,136 @@ LSTM_BEGIN
     inline void destroy_deallocate(Alloc& alloc, typename AllocTraits::pointer ptr)
     { lstm::destroy_deallocate(tls_thread_data(), alloc, std::move(ptr)); }
     
+    namespace detail {
+        template<typename Alloc, bool = std::is_empty<Alloc>{} &&
+                                        !std::is_final<Alloc>{} &&
+                                        std::is_trivially_destructible<Alloc>{}>
+        struct tx_alloc_adaptor_base {
+        private:
+            Alloc _alloc;
+            
+        protected:
+            constexpr tx_alloc_adaptor_base() = default;
+            constexpr tx_alloc_adaptor_base(const Alloc& in_alloc)
+                : _alloc(in_alloc)
+            {}
+            constexpr tx_alloc_adaptor_base(Alloc&& in_alloc)
+                : _alloc(std::move(in_alloc))
+            {}
+            
+            Alloc& alloc() { return _alloc; }
+            const Alloc& alloc() const { return _alloc; }
+        };
+        
+        template<typename Alloc>
+        struct tx_alloc_adaptor_base<Alloc, true> : private Alloc {
+        protected:
+            constexpr tx_alloc_adaptor_base() = default;
+            constexpr tx_alloc_adaptor_base(const Alloc& in_alloc)
+                noexcept(std::is_nothrow_constructible<Alloc, const Alloc&>{})
+                : Alloc(in_alloc)
+            {}
+            constexpr tx_alloc_adaptor_base(Alloc&& in_alloc)
+                noexcept(std::is_nothrow_constructible<Alloc, Alloc&&>{})
+                : Alloc(std::move(in_alloc))
+            {}
+            Alloc& alloc() { return *this; }
+            const Alloc& alloc() const { return *this; }
+        };
+    }
+    
     // this class will wrap an allocator, and reclaim memory on tx fails
     // it also queues up deallocation/destruction
     // plugging this into a std container does NOT make it tx safe
     //
-    // TODO: this class is terribly incomplete and a WIP which is not used anywhere yet
+    // TODO: this class is a WIP which is not used anywhere yet
     // it's usefulness is unknown at the moment. containers all need recoding to be tx safe
     // anyhow, so it's not like dropping one of these suckers in will fix anything
     template<typename Alloc>
-    struct tx_safe_alloc_wrapper;
+    struct tx_alloc_adaptor;
     
     template<typename Alloc>
-    struct tx_safe_alloc_wrapper : private Alloc {
+    struct tx_alloc_adaptor : private detail::tx_alloc_adaptor_base<Alloc> {
     private:
-        inline Alloc& alloc() { return *this; }
-        inline const Alloc& alloc() const { return *this; }
+        using base = detail::tx_alloc_adaptor_base<Alloc>;
+        using base::alloc;
         
-        template<typename U> friend struct tx_safe_alloc_wrapper;
+        template<typename U> friend struct tx_alloc_adaptor;
         using alloc_traits = std::allocator_traits<Alloc>;
         
     public:
-        // TODO: more typedefs...
-        using typename Alloc::value_type;
+        using value_type = typename Alloc::value_type;
+        using pointer = typename alloc_traits::pointer;
+        using const_pointer = typename alloc_traits::const_pointer;
+        using void_pointer = typename alloc_traits::void_pointer;
+        using const_void_pointer = typename alloc_traits::const_void_pointer;
+        using difference_type = typename alloc_traits::difference_type;
+        using size_type = typename alloc_traits::size_type;
+        using propagate_on_container_copy_assignment =
+            typename alloc_traits::propagate_on_container_copy_assignment;
+        using propagate_on_container_move_assignment =
+            typename alloc_traits::propagate_on_container_move_assignment;
+        using propagate_on_container_swap = typename alloc_traits::propagate_on_container_swap;
+        using is_always_equal = typename alloc_traits::is_always_equal;
+        template<typename U>
+        using rebind = tx_alloc_adaptor<typename alloc_traits::template rebind_alloc<U>>;
+        using tx_safe = std::true_type;
         
-        constexpr tx_safe_alloc_wrapper() noexcept = default;
+        constexpr tx_alloc_adaptor() = default;
+        
+        template<typename U,
+            LSTM_REQUIRES_(std::is_constructible<Alloc, U&&>{})>
+        constexpr tx_alloc_adaptor(U&& u) noexcept(std::is_nothrow_constructible<Alloc, U&&>{})
+            : base((U&&)u)
+        {}
         
         template<typename U,
             LSTM_REQUIRES_(std::is_constructible<Alloc, const U&>{})>
-        constexpr tx_safe_alloc_wrapper(const tx_safe_alloc_wrapper<U>& rhs)
+        constexpr tx_alloc_adaptor(const tx_alloc_adaptor<U>& rhs)
             noexcept(std::is_nothrow_constructible<Alloc, const U&>{})
-            : Alloc(rhs.alloc())
+            : base(rhs.alloc())
         {}
         
-        typename alloc_traits::pointer allocate(std::size_t n)
+        template<typename U,
+            LSTM_REQUIRES_(std::is_constructible<Alloc, U&&>{})>
+        constexpr tx_alloc_adaptor(tx_alloc_adaptor<U>&& rhs)
+            noexcept(std::is_nothrow_constructible<Alloc, U&&>{})
+            : base(std::move(rhs.alloc()))
+        {}
+        
+        pointer allocate(size_type n)
         { return lstm::allocate(alloc(), n); }
         
-        void deallocate(typename alloc_traits::pointer ptr, std::size_t n)
-        { lstm::deallocate(alloc(), ptr, n); }
+        pointer allocate(size_type n, const_void_pointer cvptr)
+        { return lstm::allocate(alloc(), n, cvptr); }
         
-        template<typename... Args>
-        void construct(value_type* ptr, Args&&... args)
+        void deallocate(pointer ptr, size_type n)
+        { lstm::deallocate(alloc(), std::move(ptr), n); }
+        
+        template<typename T, typename... Args,
+            LSTM_REQUIRES_(std::is_same<T, detail::uncvref<T>>{})>
+        void construct(T* ptr, Args&&... args)
         { lstm::construct(alloc(), ptr, (Args&&)args...); }
         
-        void destroy(value_type* ptr)
+        template<typename T>
+        void destroy(T* ptr)
         { lstm::destroy(alloc(), ptr); }
         
-        // TODO: moar members
+        size_type max_size() const noexcept { return alloc_traits::max_size(alloc()); }
         
-        // TODO: non-member templatized etc
-        bool operator==(const tx_safe_alloc_wrapper& rhs) const noexcept { return rhs == alloc(); }
-        bool operator!=(const tx_safe_alloc_wrapper& rhs) const noexcept { return rhs != alloc(); }
+        tx_alloc_adaptor select_on_container_copy_construction()
+            noexcept(noexcept(alloc_traits::select_on_container_copy_construction(alloc())))
+        { return alloc_traits::select_on_container_copy_construction(alloc()); }
+        
+        template<typename U>
+        bool operator==(const tx_alloc_adaptor<U>& rhs) const
+            noexcept(noexcept(alloc() == rhs.alloc()))
+        { return alloc() == rhs.alloc(); }
+        
+        template<typename U>
+        bool operator!=(const tx_alloc_adaptor<U>& rhs) const
+            noexcept(noexcept(alloc() != rhs.alloc()))
+        { return alloc() != rhs.alloc(); }
     };
 LSTM_END
 
