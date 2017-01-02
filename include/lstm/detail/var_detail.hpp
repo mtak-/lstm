@@ -26,7 +26,8 @@ LSTM_DETAIL_BEGIN
     
     template<typename T>
     constexpr var_type var_type_switch() noexcept {
-        if (sizeof(T) <= sizeof(word) && alignof(T) <= alignof(word) &&
+        if (sizeof(T) <= sizeof(word) &&
+                alignof(T) <= alignof(word) &&
                 std::is_trivially_copy_constructible<T>{}() &&
                 std::is_trivially_move_constructible<T>{}() &&
                 std::is_trivially_copy_assignable<T>{}() &&
@@ -56,7 +57,7 @@ LSTM_DETAIL_BEGIN
         { var_alloc_policy::destroy_deallocate(alloc(), storage.load(LSTM_RELAXED)); }
         
         template<typename... Us>
-        T* allocate_construct(Us&&... us)
+        var_storage allocate_construct(Us&&... us)
             noexcept(noexcept(alloc_traits::allocate(alloc(), 1)) &&
                      noexcept(alloc_traits::construct(alloc(), (T*)nullptr, (Us&&)us...)))
         {
@@ -103,7 +104,7 @@ LSTM_DETAIL_BEGIN
         constexpr var_alloc_policy() noexcept = default;
         constexpr var_alloc_policy(const Alloc&) noexcept {}
         
-        ~var_alloc_policy() noexcept { load(storage.load(LSTM_RELAXED)).~T(); }
+        ~var_alloc_policy() noexcept = default;
         
         template<typename... Us>
         var_storage allocate_construct(Us&&... us)
