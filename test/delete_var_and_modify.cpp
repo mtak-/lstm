@@ -10,13 +10,13 @@
 #include "simple_test.hpp"
 #include "thread_manager.hpp"
 
-static constexpr auto loop_count = 1000000;
+static constexpr auto loop_count = 50000;
 
 using lstm::read_write;
 using lstm::var;
 
 struct big {
-    char data[32];
+    char data[65];
 };
 
 int main() {

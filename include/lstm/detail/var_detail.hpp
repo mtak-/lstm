@@ -10,11 +10,6 @@ LSTM_BEGIN
         heap,
         atomic,
     };
-    
-    enum class alloc_type {
-        ebo,
-        pointer,
-    };
 LSTM_END
 
 LSTM_DETAIL_BEGIN
@@ -40,43 +35,6 @@ LSTM_DETAIL_BEGIN
             return var_type::atomic;
         return var_type::heap;
     }
-    
-    template<typename Alloc>
-    constexpr alloc_type alloc_type_switch() noexcept {
-        if (std::is_empty<Alloc>{}() &&
-                std::is_trivially_copy_constructible<Alloc>{}() &&
-                std::is_trivially_destructible<Alloc>{}() &&
-                !std::is_final<Alloc>{}())
-            return alloc_type::ebo;
-        return alloc_type::pointer;
-    }
-    
-    template<typename Alloc, alloc_type Alloc_type = alloc_type_switch<Alloc>()>
-    struct alloc_ptr {
-    private:
-        Alloc* _alloc;
-    
-    public:
-        alloc_ptr(std::nullptr_t = nullptr) = delete;
-        constexpr alloc_ptr(Alloc* in_alloc) noexcept
-            : _alloc(in_alloc)
-        { assert(_alloc); }
-        
-        constexpr Alloc& alloc() const noexcept { return *_alloc; }
-    };
-    
-    template<typename Alloc>
-    struct alloc_ptr<Alloc, alloc_type::ebo> : private Alloc {
-        LSTM_REQUIRES(std::is_trivially_default_constructible<Alloc>{})
-        constexpr alloc_ptr() noexcept {}
-        
-        LSTM_REQUIRES(std::is_trivially_default_constructible<Alloc>{})
-        constexpr alloc_ptr(std::nullptr_t) noexcept {}
-        constexpr alloc_ptr(const Alloc* in_alloc) noexcept : Alloc(*in_alloc) {}
-        
-        constexpr Alloc& alloc() noexcept { return *this; }
-        constexpr const Alloc& alloc() const noexcept { return *this; }
-    };
     
     template<typename T, typename Alloc, var_type Var_type = var_type_switch<T>()>
     struct var_alloc_policy
@@ -105,7 +63,7 @@ LSTM_DETAIL_BEGIN
         {}
         
         ~var_alloc_policy() noexcept
-        { var_alloc_policy::destroy_deallocate(storage.load(LSTM_RELAXED)); }
+        { var_alloc_policy::destroy_deallocate(alloc(), storage.load(LSTM_RELAXED)); }
         
         template<typename... Us>
         constexpr var_storage allocate_construct(Us&&... us)
@@ -117,10 +75,10 @@ LSTM_DETAIL_BEGIN
             return ptr;
         }
         
-        void destroy_deallocate(var_storage s) noexcept {
+        static void destroy_deallocate(Alloc& alloc, var_storage s) noexcept {
             T* ptr = &load(s);
-            alloc_traits::destroy(alloc(), ptr);
-            alloc_traits::deallocate(alloc(), ptr, 1);
+            alloc_traits::destroy(alloc, ptr);
+            alloc_traits::deallocate(alloc, ptr, 1);
         }
         
         static T& load(var_storage storage) noexcept { return *static_cast<T*>(storage); }

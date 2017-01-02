@@ -333,17 +333,11 @@ LSTM_BEGIN
                         && dest_var.version_lock.load(LSTM_RELAXED) == dest_version) {
                     const detail::var_storage new_storage = dest_var.allocate_construct((U&&)u);
                     add_write_set(dest_var, new_storage, lookup.hash);
-                    tls_td->queue_succ_callback([dest_var = &dest_var,
-                                                 cur_storage] {
-                        // TODO: NO guarantees that dest_var is around to destroy it's old
-                        // storage at this point (i.e. not in a critical section)
-                        dest_var->destroy_deallocate(cur_storage);
+                    tls_td->queue_succ_callback([alloc = dest_var.alloc(), cur_storage]() mutable {
+                        var<T, Alloc0>::destroy_deallocate(alloc, cur_storage);
                     });
-                    tls_td->queue_fail_callback([dest_var = &dest_var,
-                                                 new_storage] {
-                        // TODO: NO guarantees that dest_var is around to destroy it's old
-                        // storage at this point (i.e. not in a critical section)
-                        dest_var->destroy_deallocate(new_storage);
+                    tls_td->queue_fail_callback([alloc = dest_var.alloc(), new_storage]() mutable {
+                        var<T, Alloc0>::destroy_deallocate(alloc, new_storage);
                     });
                     return;
                 }

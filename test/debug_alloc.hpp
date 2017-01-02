@@ -17,7 +17,6 @@ std::atomic<int> debug_live_allocations{0};
         std::allocator<T>& alloc() noexcept { return *this; }
         template<typename U> friend struct debug_alloc;
         volatile int x;
-        volatile int* x_ptr{&x};
         
     public:
         using typename std::allocator<T>::value_type;
@@ -26,16 +25,14 @@ std::atomic<int> debug_live_allocations{0};
         template<typename U>
         constexpr debug_alloc(const debug_alloc<U>& rhs) noexcept : std::allocator<T>{rhs} {}
         
-        ~debug_alloc() { x_ptr = nullptr; }
-        
         T* allocate(std::size_t n) {
-            ++(*x_ptr);
+            ++x;
             debug_live_allocations<>.fetch_add(1, LSTM_RELAXED);
             return alloc().allocate(n);
         }
         
         void deallocate(T* t, std::size_t n) {
-            --(*x_ptr);
+            --x;
             debug_live_allocations<>.fetch_sub(1, LSTM_RELAXED);
             alloc().deallocate(t, n);
         }
