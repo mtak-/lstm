@@ -1,5 +1,7 @@
 #include <lstm/lstm.hpp>
 
+#define STATEFUL_DEBUG_ALLOC
+
 #ifdef NDEBUG
 #undef NDEBUG
 #include "debug_alloc.hpp"
@@ -46,4 +48,5 @@ int main() {
         }, loop_count);
         tm.run();
     }
+    CHECK(debug_live_allocations<> == 0);
 }
