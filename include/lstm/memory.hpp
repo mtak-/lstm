@@ -355,7 +355,6 @@ LSTM_BEGIN
         using is_always_equal = typename alloc_traits::is_always_equal;
         template<typename U>
         using rebind = tx_alloc_adaptor<typename alloc_traits::template rebind_alloc<U>>;
-        using tx_safe = std::true_type;
         
         constexpr tx_alloc_adaptor() = default;
         
