@@ -20,6 +20,8 @@ std::atomic<int> debug_live_allocations{0};
         
     public:
         using typename std::allocator<T>::value_type;
+        template<typename U>
+        struct rebind { using other = debug_alloc<U>; };
         
         constexpr debug_alloc() noexcept = default;
         template<typename U>

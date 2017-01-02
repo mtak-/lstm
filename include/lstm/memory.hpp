@@ -353,8 +353,9 @@ LSTM_BEGIN
             typename alloc_traits::propagate_on_container_move_assignment;
         using propagate_on_container_swap = typename alloc_traits::propagate_on_container_swap;
         using is_always_equal = typename alloc_traits::is_always_equal;
-        template<typename U>
-        using rebind = tx_alloc_adaptor<typename alloc_traits::template rebind_alloc<U>>;
+        
+        template<typename U> struct rebind
+        { using other = tx_alloc_adaptor<typename alloc_traits::template rebind_alloc<U>>; };
         
         constexpr tx_alloc_adaptor() = default;
         
