@@ -118,7 +118,7 @@ LSTM_DETAIL_BEGIN
             return result;
         }
         
-        static T load(var_storage storage) noexcept { return reinterpret_cast<T&>(storage); }
+        static T load(var_storage storage) noexcept { return *reinterpret_cast<T*>(&storage); }
         
         template<typename U>
         static void store(var_storage& storage, U&& u) noexcept
