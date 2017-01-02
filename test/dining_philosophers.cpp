@@ -15,7 +15,7 @@ struct LSTM_CACHE_ALIGNED philosopher {
 };
 
 struct fork {
-    var<bool, debug_alloc<bool>> in_use{false};
+    LSTM_CACHE_ALIGNED var<bool, debug_alloc<bool>> in_use{false};
 };
 
 auto get_loop(philosopher& p, fork& f0, fork& f1) {

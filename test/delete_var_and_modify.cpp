@@ -10,7 +10,7 @@
 #include "simple_test.hpp"
 #include "thread_manager.hpp"
 
-static constexpr auto loop_count = 50000;
+static constexpr auto loop_count = 25000;
 
 using lstm::read_write;
 using lstm::var;

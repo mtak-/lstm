@@ -13,7 +13,7 @@ LSTM_BEGIN
 LSTM_END
 
 LSTM_DETAIL_BEGIN
-    struct LSTM_CACHE_ALIGNED var_base {
+    struct var_base {
     protected:
         mutable std::atomic<gp_t> version_lock;
         std::atomic<var_storage> storage;
