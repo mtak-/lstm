@@ -11,43 +11,6 @@
 #include <cassert>
 
 LSTM_DETAIL_BEGIN
-    template<typename T, typename Alloc>
-    struct deleter {
-    private:
-        T* ptr;
-        Alloc* alloc;
-        
-        using alloc_traits = std::allocator_traits<Alloc>;
-        
-    public:
-        deleter() noexcept = default;
-        
-        deleter(T* in_ptr, Alloc* in_alloc) noexcept
-            : ptr(in_ptr)
-            , alloc(in_alloc)
-        { assert(ptr && alloc); }
-        
-        void operator()() const noexcept {
-            alloc_traits::destroy(*alloc, ptr);
-            alloc_traits::deallocate(*alloc, ptr, 1);
-        }
-    };
-    
-    template<typename T>
-    struct deleter<T, void> {
-    private:
-        T* ptr;
-        
-    public:
-        deleter() noexcept = default;
-        
-        deleter(T* in_ptr, void*) noexcept
-            : ptr(in_ptr)
-        { assert(ptr); }
-        
-        void operator()() const noexcept { delete ptr; }
-    };
-    
     struct write_set_lookup {
         var_storage* pending_write_;
         hash_t hash;

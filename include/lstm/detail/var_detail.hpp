@@ -47,31 +47,21 @@ LSTM_DETAIL_BEGIN
     protected:
         friend struct ::lstm::transaction;
         using alloc_traits = std::allocator_traits<Alloc>;
-        static_assert(std::is_pointer<typename alloc_traits::pointer>{},
-            "sorry, lstm::var only supports allocators that return raw pointers");
         
         constexpr Alloc& alloc() noexcept { return static_cast<Alloc&>(*this); }
         
-        constexpr var_alloc_policy()
-            noexcept(std::is_nothrow_default_constructible<Alloc>{})
-            : Alloc()
-        {}
-        
-        constexpr var_alloc_policy(const Alloc& alloc)
-            noexcept(std::is_nothrow_constructible<Alloc, const Alloc&>{})
-            : Alloc(alloc)
-        {}
+        using Alloc::Alloc;
         
         ~var_alloc_policy() noexcept
         { var_alloc_policy::destroy_deallocate(alloc(), storage.load(LSTM_RELAXED)); }
         
         template<typename... Us>
-        constexpr var_storage allocate_construct(Us&&... us)
+        T* allocate_construct(Us&&... us)
             noexcept(noexcept(alloc_traits::allocate(alloc(), 1)) &&
                      noexcept(alloc_traits::construct(alloc(), (T*)nullptr, (Us&&)us...)))
         {
-            auto ptr = alloc_traits::allocate(alloc(), 1);
-            alloc_traits::construct(alloc(), to_raw_pointer(ptr), (Us&&)us...);
+            T* ptr = alloc_traits::allocate(alloc(), 1);
+            alloc_traits::construct(alloc(), ptr, (Us&&)us...);
             return ptr;
         }
         
@@ -111,7 +101,7 @@ LSTM_DETAIL_BEGIN
         friend struct ::lstm::transaction;
         
         constexpr var_alloc_policy() noexcept = default;
-        constexpr var_alloc_policy(const Alloc&) noexcept {};
+        constexpr var_alloc_policy(const Alloc&) noexcept {}
         
         ~var_alloc_policy() noexcept { load(storage.load(LSTM_RELAXED)).~T(); }
         

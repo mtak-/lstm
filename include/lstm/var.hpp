@@ -19,6 +19,8 @@ LSTM_BEGIN
             "lstm::var<> does not currently support cv qualifications on T");
         static_assert(!std::is_array<T>{},
             "lstm::var<> does not support raw c arrays. try using a std::array");
+        static_assert(std::is_pointer<typename std::allocator_traits<Alloc>::pointer>{},
+            "sorry, lstm::var only supports allocators that return raw pointers");
         
         friend struct ::lstm::transaction;
         friend test::transaction_tester;
