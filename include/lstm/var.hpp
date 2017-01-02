@@ -6,6 +6,8 @@
 LSTM_BEGIN
     template<typename T, typename Alloc>
     struct var : private detail::var_alloc_policy<T, Alloc> {
+        using value_type = T;
+        using allocator_type = Alloc;
     private:
         using base = detail::var_alloc_policy<T, Alloc>;
         static_assert(std::is_same<Alloc, detail::uncvref<Alloc>>{},

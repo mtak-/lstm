@@ -37,6 +37,8 @@ LSTM_DETAIL_BEGIN
         return var_type::heap;
     }
     
+    // TODO: uses allocator constructors?
+    
     template<typename T, typename Alloc, var_type Var_type = var_type_switch<T>()>
     struct var_alloc_policy
         : private Alloc
@@ -93,23 +95,28 @@ LSTM_DETAIL_BEGIN
     // TODO: extremely likely there's strict aliasing issues...
     template<typename T, typename Alloc>
     struct var_alloc_policy<T, Alloc, var_type::atomic>
-        : var_base
+        : private Alloc
+        , var_base
     {
         static constexpr bool heap = false;
         static constexpr bool atomic = true;
         static constexpr var_type type = var_type::atomic;
     protected:
         friend struct ::lstm::transaction;
+        using alloc_traits = std::allocator_traits<Alloc>;
         
-        constexpr var_alloc_policy() noexcept = default;
-        constexpr var_alloc_policy(const Alloc&) noexcept {}
+        constexpr Alloc& alloc() noexcept { return static_cast<Alloc&>(*this); }
         
-        ~var_alloc_policy() noexcept = default;
+        using Alloc::Alloc;
         
         template<typename... Us>
         var_storage allocate_construct(Us&&... us)
             noexcept(std::is_nothrow_constructible<T, Us&&...>{})
-        { return reinterpret_cast<var_storage>(T((Us&&)us...)); }
+        {
+            var_storage result;
+            alloc_traits::construct(alloc(), reinterpret_cast<T*>(&result), (Us&&)us...);
+            return result;
+        }
         
         static T load(var_storage storage) noexcept { return reinterpret_cast<T&>(storage); }
         
