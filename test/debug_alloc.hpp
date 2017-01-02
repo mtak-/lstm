@@ -16,7 +16,7 @@ std::atomic<int> debug_live_allocations{0};
     private:
         std::allocator<T>& alloc() noexcept { return *this; }
         template<typename U> friend struct debug_alloc;
-        volatile int x;
+        volatile int x{0};
         
     public:
         using typename std::allocator<T>::value_type;
