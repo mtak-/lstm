@@ -396,19 +396,19 @@ LSTM_BEGIN
         void destroy(T* ptr)
         { lstm::destroy(alloc(), ptr); }
         
-        size_type max_size() const noexcept { return alloc_traits::max_size(alloc()); }
+        constexpr size_type max_size() const noexcept { return alloc_traits::max_size(alloc()); }
         
-        tx_alloc_adaptor select_on_container_copy_construction()
+        constexpr tx_alloc_adaptor select_on_container_copy_construction()
             noexcept(noexcept(alloc_traits::select_on_container_copy_construction(alloc())))
         { return alloc_traits::select_on_container_copy_construction(alloc()); }
         
         template<typename U>
-        bool operator==(const tx_alloc_adaptor<U>& rhs) const
+        constexpr bool operator==(const tx_alloc_adaptor<U>& rhs) const
             noexcept(noexcept(alloc() == rhs.alloc()))
         { return alloc() == rhs.alloc(); }
         
         template<typename U>
-        bool operator!=(const tx_alloc_adaptor<U>& rhs) const
+        constexpr bool operator!=(const tx_alloc_adaptor<U>& rhs) const
             noexcept(noexcept(alloc() != rhs.alloc()))
         { return alloc() != rhs.alloc(); }
     };

@@ -59,24 +59,24 @@ LSTM_DETAIL_BEGIN
     
     public:
         alloc_ptr(std::nullptr_t = nullptr) = delete;
-        alloc_ptr(Alloc* in_alloc) noexcept
+        constexpr alloc_ptr(Alloc* in_alloc) noexcept
             : _alloc(in_alloc)
         { assert(_alloc); }
         
-        Alloc& alloc() const noexcept { return *_alloc; }
+        constexpr Alloc& alloc() const noexcept { return *_alloc; }
     };
     
     template<typename Alloc>
     struct alloc_ptr<Alloc, alloc_type::ebo> : private Alloc {
         LSTM_REQUIRES(std::is_trivially_default_constructible<Alloc>{})
-        alloc_ptr() noexcept {}
+        constexpr alloc_ptr() noexcept {}
         
         LSTM_REQUIRES(std::is_trivially_default_constructible<Alloc>{})
-        alloc_ptr(std::nullptr_t) noexcept {}
-        alloc_ptr(const Alloc* in_alloc) noexcept : Alloc(*in_alloc) {}
+        constexpr alloc_ptr(std::nullptr_t) noexcept {}
+        constexpr alloc_ptr(const Alloc* in_alloc) noexcept : Alloc(*in_alloc) {}
         
-        Alloc& alloc() noexcept { return *this; }
-        const Alloc& alloc() const noexcept { return *this; }
+        constexpr Alloc& alloc() noexcept { return *this; }
+        constexpr const Alloc& alloc() const noexcept { return *this; }
     };
     
     template<typename T, typename Alloc, var_type Var_type = var_type_switch<T>()>
