@@ -6,7 +6,6 @@
 #include <atomic>
 
 LSTM_BEGIN
-    // TODO: this naming is wrong now. nothing is locking except in the commit phase
     enum class var_type {
         heap,
         atomic,
