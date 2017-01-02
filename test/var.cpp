@@ -33,82 +33,10 @@ int main() {
         // static_assert(Same<const int&, decltype(x.unsafe())>, "");
         // static_assert(Same<const int&&, decltype(std::move(x).unsafe())>, "");
     }
-    {
-        // var<const int> x{42};
-        // NOEXCEPT_CHECK(x.unsafe_read() == 42);
-
-        // static_assert(Same<const int&, decltype(x.unsafe())>, "");
-        // static_assert(Same<const int&&, decltype(std::move(x).unsafe())>, "");
-    }
-    {
-        // const var<const int> x{42};
-        // NOEXCEPT_CHECK(x.unsafe_read() == 42);
-
-        // static_assert(Same<const int&, decltype(x.unsafe())>, "");
-        // static_assert(Same<const int&&, decltype(std::move(x).unsafe())>, "");
-    }
-
-    // reference tests
-    // {
-    //     struct foo {
-    //         char bar[30];
-    //     };
-    //     foo y; y.bar[0] = 42;
-    //     var<foo&> x{y};
-    //     NOEXCEPT_CHECK(x.unsafe().bar[0] == 42);
-    //
-    //     NOEXCEPT_CHECK(++x.unsafe().bar[0] == 43);
-    //     NOEXCEPT_CHECK(y.bar[0] == 43);
-    //
-    //     static_assert(Same<foo&, decltype(x.unsafe())>, "");
-    //     static_assert(Same<foo&, decltype(std::move(x).unsafe())>, "");
-    // }
-    // {
-    //     struct foo {
-    //         char bar[30];
-    //     };
-    //     foo y; y.bar[0] = 42;
-    //     const var<foo&> x{y};
-    //     NOEXCEPT_CHECK(x.unsafe().bar[0] == 42);
-    //
-    //     NOEXCEPT_CHECK(++x.unsafe().bar[0] == 43);
-    //     NOEXCEPT_CHECK(y.bar[0] == 43);
-    //
-    //     static_assert(Same<foo&, decltype(x.unsafe())>, "");
-    //     static_assert(Same<foo&, decltype(std::move(x).unsafe())>, "");
-    // }
-    // {
-    //     struct foo {
-    //         char bar[30];
-    //     };
-    //     foo y; y.bar[0] = 42;
-    //     var<const foo&> x{y};
-    //     NOEXCEPT_CHECK(x.unsafe().bar[0] == 42);
-    //
-    //     NOEXCEPT_CHECK(++y.bar[0] == 43);
-    //     NOEXCEPT_CHECK(x.unsafe().bar[0] == 43);
-    //
-    //     static_assert(Same<const foo&, decltype(x.unsafe())>, "");
-    //     static_assert(Same<const foo&, decltype(std::move(x).unsafe())>, "");
-    // }
-    // {
-    //     struct foo {
-    //         char bar[30];
-    //     };
-    //     foo y; y.bar[0] = 42;
-    //     const var<const foo&> x{y};
-    //     NOEXCEPT_CHECK(x.unsafe().bar[0] == 42);
-    //
-    //     NOEXCEPT_CHECK(++y.bar[0] == 43);
-    //     NOEXCEPT_CHECK(x.unsafe().bar[0] == 43);
-    //
-    //     static_assert(Same<const foo&, decltype(x.unsafe())>, "");
-    //     static_assert(Same<const foo&, decltype(std::move(x).unsafe())>, "");
-    // }
-
     // allocators
     {
-        var<std::vector<int>, std::scoped_allocator_adaptor<std::allocator<std::vector<int>>>> x;
+        var<std::vector<int>, std::scoped_allocator_adaptor<std::allocator<std::vector<int>>>> x_p;
+        var<std::vector<int>, std::scoped_allocator_adaptor<std::allocator<std::vector<int>>>> x{};
         auto foo = x.unsafe_read();
         foo.push_back(42);
         x.unsafe_write(std::move(foo));
@@ -118,7 +46,7 @@ int main() {
     }
     {
         using alloc = std::scoped_allocator_adaptor<std::allocator<std::vector<int>>>;
-        var<std::vector<int>, alloc> x{alloc{}};
+        var<std::vector<int>, alloc> x{std::allocator_arg, alloc{}};
         auto foo = x.unsafe_read();
         foo.push_back(42);
         x.unsafe_write(std::move(foo));
@@ -128,7 +56,7 @@ int main() {
     }
     {
         using alloc = std::scoped_allocator_adaptor<std::allocator<std::vector<int>>>;
-        var<std::vector<int>, alloc> x{alloc{}, std::vector<int>{0,1,2,3}};
+        var<std::vector<int>, alloc> x{std::allocator_arg, alloc{}, std::vector<int>{0,1,2,3}};
         auto foo = x.unsafe_read();
         foo.push_back(42);
         x.unsafe_write(std::move(foo));

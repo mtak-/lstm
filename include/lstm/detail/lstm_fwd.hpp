@@ -146,6 +146,18 @@ LSTM_DETAIL_BEGIN
     template<typename...>
     using void_ = void;
     
+    template<typename T>
+    void implicit_default_constructor_impl(T);
+    
+    template<typename T, typename = void>
+    struct implicit_default_constructor : std::false_type {};
+    
+    template<typename T>
+    struct implicit_default_constructor<
+        T,
+        void_<decltype(implicit_default_constructor_impl<T>({}))>
+    > : std::true_type {};
+    
     template<typename Func, typename Tx, typename = void>
     struct callable_with_tx : std::false_type {};
     
