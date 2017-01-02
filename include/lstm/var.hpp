@@ -31,7 +31,7 @@ LSTM_BEGIN
         // TODO: support construction from initializer_lists
         template<typename U, typename... Us,
             LSTM_REQUIRES_(std::is_constructible<T, U&&, Us&&...>() &&
-                           !std::is_same<detail::uncvref<U>, detail::uncvref<Alloc>>())>
+                           !std::is_same<detail::uncvref<U>, Alloc>())>
         constexpr var(U&& u, Us&&... us)
             noexcept(noexcept(base::allocate_construct((U&&)u, (Us&&)us...)))
         { detail::var_base::storage.store(base::allocate_construct((U&&)u, (Us&&)us...),
