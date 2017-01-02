@@ -37,7 +37,7 @@ LSTM_BEGIN
         { detail::var_base::storage.store(base::allocate_construct((U&&)u, (Us&&)us...),
                                           LSTM_RELAXED); }
         
-        LSTM_REQUIRES(std::is_constructible<T>())
+        LSTM_REQUIRES(std::is_default_constructible<T>())
         constexpr var() noexcept(noexcept(base::allocate_construct()))
         { detail::var_base::storage.store(base::allocate_construct(), LSTM_RELAXED); }
         

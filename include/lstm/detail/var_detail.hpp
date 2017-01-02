@@ -11,6 +11,11 @@ LSTM_BEGIN
         heap,
         atomic,
     };
+    
+    enum class alloc_type {
+        ebo,
+        pointer,
+    };
 LSTM_END
 
 LSTM_DETAIL_BEGIN
@@ -36,6 +41,42 @@ LSTM_DETAIL_BEGIN
             return var_type::atomic;
         return var_type::heap;
     }
+    
+    template<typename Alloc>
+    constexpr alloc_type alloc_type_switch() noexcept {
+        if (std::is_empty<Alloc>{}() &&
+                std::is_trivially_copy_constructible<Alloc>{}() &&
+                std::is_trivially_destructible<Alloc>{}() &&
+                !std::is_final<Alloc>{}())
+            return alloc_type::ebo;
+        return alloc_type::pointer;
+    }
+    
+    template<typename Alloc, alloc_type Alloc_type = alloc_type_switch<Alloc>()>
+    struct alloc_impl {
+    private:
+        Alloc* _alloc;
+    
+    public:
+        alloc_impl(std::nullptr_t = nullptr) = delete;
+        alloc_impl(Alloc* in_alloc) noexcept
+            : _alloc(in_alloc)
+        { assert(_alloc); }
+        
+        Alloc& alloc() const noexcept { return *_alloc; }
+    };
+    
+    template<typename Alloc>
+    struct alloc_impl<Alloc, alloc_type::ebo> : private Alloc {
+        LSTM_REQUIRES(std::is_trivially_default_constructible<Alloc>{})
+        alloc_impl() noexcept {}
+        
+        LSTM_REQUIRES(std::is_trivially_default_constructible<Alloc>{})
+        alloc_impl(std::nullptr_t) noexcept {}
+        alloc_impl(Alloc* in_alloc) noexcept : Alloc(*in_alloc) {}
+        
+        Alloc& alloc() const noexcept { return *this; }
+    };
     
     template<typename T, typename Alloc, var_type Var_type = var_type_switch<T>()>
     struct var_alloc_policy
