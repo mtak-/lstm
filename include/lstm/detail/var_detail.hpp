@@ -51,7 +51,8 @@ LSTM_DETAIL_BEGIN
         friend struct ::lstm::transaction;
         using alloc_traits = std::allocator_traits<Alloc>;
         
-        constexpr Alloc& alloc() noexcept { return static_cast<Alloc&>(*this); }
+        constexpr Alloc& alloc() noexcept { return *this; }
+        constexpr const Alloc& alloc() const noexcept { return *this; }
         
         using Alloc::Alloc;
         
@@ -105,7 +106,8 @@ LSTM_DETAIL_BEGIN
         friend struct ::lstm::transaction;
         using alloc_traits = std::allocator_traits<Alloc>;
         
-        constexpr Alloc& alloc() noexcept { return static_cast<Alloc&>(*this); }
+        constexpr Alloc& alloc() noexcept { return *this; }
+        constexpr const Alloc& alloc() const noexcept { return *this; }
         
         using Alloc::Alloc;
         

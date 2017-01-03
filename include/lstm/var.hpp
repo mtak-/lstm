@@ -133,6 +133,8 @@ LSTM_BEGIN
             : base{in_alloc}
         { detail::var_base::storage.store(base::allocate_construct((U&&)u), LSTM_RELAXED); }
         
+        Alloc get_allocator() const noexcept { return base::alloc(); }
+        
         T unsafe_read() const noexcept
         { return base::load(detail::var_base::storage.load(LSTM_RELAXED)); }
         
