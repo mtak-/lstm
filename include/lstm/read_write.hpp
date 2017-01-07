@@ -9,19 +9,13 @@ LSTM_DETAIL_BEGIN
     private:
         template<typename Func, typename Tx,
             LSTM_REQUIRES_(callable_with_tx<Func, Tx&>())>
-        static auto call(Func& func, Tx& tx) -> decltype(func(tx)) {
-            static_assert(!noexcept(func(tx)),
-                "functions passed to read_write must not be marked noexcept");
-            return func(tx);
-        }
+        static auto call(Func& func, Tx& tx) -> decltype(func(tx))
+        { return func(tx); }
         
         template<typename Func, typename Tx,
             LSTM_REQUIRES_(!callable_with_tx<Func, Tx&>())>
-        static auto call(Func& func, Tx&) -> decltype(func()) {
-            static_assert(!noexcept(func()),
-                "functions passed to read_write must not be marked noexcept");
-            return func();
-        }
+        static auto call(Func& func, Tx&) -> decltype(func())
+        { return func(); }
         
         template<typename Func, typename Tx>
         static void try_transact(Func& func, Tx& tx, tx_result_buffer<void>&)
@@ -87,7 +81,8 @@ LSTM_DETAIL_BEGIN
         
     public:
         template<typename Func,
-            LSTM_REQUIRES_(detail::is_transact_function<Func>())>
+            LSTM_REQUIRES_(is_transact_function<Func>() &&
+                           !is_nothrow_transact_function<Func>())>
         transact_result<Func> operator()(Func&& func,
                                          transaction_domain& domain = default_domain(),
                                          thread_data& tls_td = tls_thread_data()) const {
@@ -99,13 +94,16 @@ LSTM_DETAIL_BEGIN
         
 #ifndef LSTM_MAKE_SFINAE_FRIENDLY
         template<typename Func, typename... Args,
-            LSTM_REQUIRES_(!detail::is_transact_function<Func>())>
+            LSTM_REQUIRES_(!is_transact_function<Func>() ||
+                           is_nothrow_transact_function<Func>())>
         void operator()(Func&&,
                         transaction_domain& = default_domain(),
                         thread_data& = tls_thread_data()) const {
-            static_assert(detail::is_transact_function<Func>(),
+            static_assert(is_transact_function<Func>(),
                 "functions passed to lstm::read_write must either take no parameters, "
                 "lstm::transaction&, or auto&/T&");
+            static_assert(!is_nothrow_transact_function<Func>(),
+                "functions passed to lstm::read_write must not be marked noexcept");
         }
 #endif
     };

@@ -177,15 +177,23 @@ LSTM_DETAIL_BEGIN
     struct transact_result_impl;
 
     template<typename Func, bool b>
-    struct transact_result_impl<Func, true, b>
-    { using type = decltype(std::declval<Func&>()(std::declval<transaction&>())); };
+    struct transact_result_impl<Func, true, b> {
+        using type = decltype(std::declval<Func&>()(std::declval<transaction&>()));
+        static constexpr bool nothrow =
+            noexcept(std::declval<Func&>()(std::declval<transaction&>()));
+    };
     
     template<typename Func>
-    struct transact_result_impl<Func, false, true>
-    { using type = decltype(std::declval<Func&>()()); };
+    struct transact_result_impl<Func, false, true> {
+        using type = decltype(std::declval<Func&>()());
+        static constexpr bool nothrow = noexcept(std::declval<Func&>()());
+    };
 
     template<typename Func>
     using transact_result = typename transact_result_impl<Func>::type;
+
+    template<typename Func>
+    constexpr bool transact_nothrow = transact_result_impl<Func>::nothrow;
 
     template<typename Func, typename = void>
     struct is_void_transact_function : std::false_type {};
@@ -199,6 +207,13 @@ LSTM_DETAIL_BEGIN
 
     template<typename Func>
     struct is_transact_function<Func, void_<transact_result<Func>>> : std::true_type {};
+    
+    template<typename Func, typename = void>
+    struct is_nothrow_transact_function : std::false_type {};
+
+    template<typename Func>
+    struct is_nothrow_transact_function<Func, std::enable_if_t<transact_nothrow<Func>>>
+        : std::true_type {};
 
     template<typename T>
     using uninitialized = std::aligned_storage_t<sizeof(T), alignof(T)>;
