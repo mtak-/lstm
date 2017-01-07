@@ -9,11 +9,11 @@
 
 LSTM_BEGIN
     namespace detail {
-        template<typename Alloc, typename = void>
-        struct has_value_type : std::false_type {};
+        template<typename Alloc>
+        using has_value_type_ = typename Alloc::value_type;
         
         template<typename Alloc>
-        struct has_value_type<Alloc, void_<typename Alloc::value_type>> : std::true_type {};
+        using has_value_type = supports<has_value_type_, Alloc>;
     }
     
     template<typename Alloc,
@@ -284,8 +284,7 @@ LSTM_BEGIN
     
     namespace detail {
         template<typename Alloc, bool = std::is_empty<Alloc>{} &&
-                                        !std::is_final<Alloc>{} &&
-                                        std::is_trivially_destructible<Alloc>{}>
+                                        !std::is_final<Alloc>{}>
         struct tx_alloc_adaptor_base {
         private:
             Alloc _alloc;
