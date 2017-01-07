@@ -61,7 +61,8 @@ LSTM_BEGIN
         template<typename Ilist, typename... Us,
             LSTM_REQUIRES_(std::is_constructible<T, std::initializer_list<Ilist>&, Us&&...>{} &&
                            detail::is_convertible<T, std::initializer_list<Ilist>&, Us&&...>{} &&
-                           std::is_default_constructible<Alloc>{})>
+                           std::is_default_constructible<Alloc>{} &&
+                           sizeof...(Us) > 0)>
         constexpr var(std::initializer_list<Ilist> is, Us&&... us)
             noexcept(noexcept(base::allocate_construct(is, (Us&&)us...)))
         { detail::var_base::storage.store(base::allocate_construct(is, (Us&&)us...),
@@ -70,11 +71,28 @@ LSTM_BEGIN
         template<typename Ilist, typename... Us,
             LSTM_REQUIRES_(std::is_constructible<T, std::initializer_list<Ilist>&, Us&&...>{} &&
                            !detail::is_convertible<T, std::initializer_list<Ilist>&, Us&&...>{} &&
-                           std::is_default_constructible<Alloc>{})>
+                           std::is_default_constructible<Alloc>{} &&
+                           sizeof...(Us) > 0)>
         explicit constexpr var(std::initializer_list<Ilist> is, Us&&... us)
             noexcept(noexcept(base::allocate_construct(is, (Us&&)us...)))
         { detail::var_base::storage.store(base::allocate_construct(is, (Us&&)us...),
                                           LSTM_RELAXED); }
+        
+        template<typename Ilist,
+            LSTM_REQUIRES_(std::is_constructible<T, std::initializer_list<Ilist>&>{} &&
+                           detail::is_convertible<T, std::initializer_list<Ilist>&>{} &&
+                           std::is_default_constructible<Alloc>{})>
+        constexpr var(std::initializer_list<Ilist> is)
+            noexcept(noexcept(base::allocate_construct(is)))
+        { detail::var_base::storage.store(base::allocate_construct(is), LSTM_RELAXED); }
+        
+        template<typename Ilist,
+            LSTM_REQUIRES_(std::is_constructible<T, std::initializer_list<Ilist>&>{} &&
+                           !detail::is_convertible<T, std::initializer_list<Ilist>&>{} &&
+                           std::is_default_constructible<Alloc>{})>
+        explicit constexpr var(std::initializer_list<Ilist> is)
+            noexcept(noexcept(base::allocate_construct(is)))
+        { detail::var_base::storage.store(base::allocate_construct(is), LSTM_RELAXED); }
         
         template<typename Ilist, typename... Us,
             LSTM_REQUIRES_(std::is_constructible<T, std::initializer_list<Ilist>&, Us&&...>{} &&
