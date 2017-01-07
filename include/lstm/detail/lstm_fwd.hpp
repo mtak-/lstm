@@ -102,27 +102,6 @@
     #define LSTM_SIGNED_LOCKFREE_WORD std::intptr_t;
 #endif
 
-LSTM_DETAIL_BEGIN
-    using var_storage = void*;
-    
-    struct read_write_fn;
-    struct var_base;
-    
-    struct _tx_retry {};
-    [[noreturn]] LSTM_ALWAYS_INLINE void internal_retry() {
-        LSTM_INTERNAL_FAIL_TX();
-        throw detail::_tx_retry{};
-    }
-    
-    template<typename T>
-    using uncvref = std::remove_cv_t<std::remove_reference_t<T>>;
-    
-    template<typename... Bs>
-    using and_ = std::is_same<
-        std::integer_sequence<bool, Bs::value..., true>,
-        std::integer_sequence<bool, true, Bs::value...>>;
-LSTM_DETAIL_END
-
 LSTM_BEGIN
     // TODO verify lockfreeness of this on each platform
     using word = LSTM_SIGNED_LOCKFREE_WORD;
@@ -143,20 +122,55 @@ LSTM_BEGIN
 LSTM_END
 
 LSTM_DETAIL_BEGIN
+    using var_storage = void*;
+    
+    struct read_write_fn;
+    struct var_base;
+    
+    struct _tx_retry {};
+    
+    template<typename T>
+    using uncvref = std::remove_cv_t<std::remove_reference_t<T>>;
+    
+    template<typename... Bs>
+    using and_ = std::is_same<
+        std::integer_sequence<bool, Bs::value..., true>,
+        std::integer_sequence<bool, true, Bs::value...>>;
+    
     template<typename...>
     using void_ = void;
     
-    template<typename T>
-    void implicit_default_constructor_impl(T);
+    template<typename...>
+    struct list {};
     
-    template<typename T, typename = void>
-    struct implicit_default_constructor : std::false_type {};
+    template<template<typename...> class Trait, typename... Ts>
+    std::false_type detector(long);
+    
+    template<template<typename...> class Trait, typename... Ts>
+    std::true_type detector(decltype(std::declval<Trait<Ts...>>(), 42));
+    
+    template<template<typename...> class Trait, typename... Ts>
+    using supports = decltype(lstm::detail::detector<Trait, Ts...>(42));
     
     template<typename T>
-    struct implicit_default_constructor<
-        T,
-        void_<decltype(implicit_default_constructor_impl<T>({}))>
-    > : std::true_type {};
+    void implicit_constructor_impl(T);
+    
+    template<typename To, typename... Froms>
+    using is_convertible_ =
+        decltype(lstm::detail::implicit_constructor_impl<To>({std::declval<Froms>()...}));
+        
+    template<typename To, typename... Froms>
+    struct is_convertible;
+    
+    template<typename To>
+    struct is_convertible<To> : supports<is_convertible_, To> {};
+    
+    template<typename To, typename From>
+    struct is_convertible<To, From> : std::is_convertible<From, To> {};
+    
+    template<typename To, typename From0, typename From1, typename... FromTail>
+    struct is_convertible<To, From0, From1, FromTail...>
+        : supports<is_convertible_, To, From0, From1, FromTail...> {};
     
     template<typename Func, typename Tx, typename = void>
     struct callable_with_tx : std::false_type {};

@@ -18,6 +18,11 @@ LSTM_DETAIL_BEGIN
         inline constexpr bool success() const noexcept { return !hash; }
         inline constexpr var_storage& pending_write() const noexcept { return *pending_write_; }
     };
+    
+    [[noreturn]] LSTM_ALWAYS_INLINE void internal_retry() {
+        LSTM_INTERNAL_FAIL_TX();
+        throw detail::_tx_retry{};
+    }
 LSTM_DETAIL_END
 
 LSTM_BEGIN
