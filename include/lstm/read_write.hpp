@@ -100,7 +100,9 @@ LSTM_DETAIL_BEGIN
 #ifndef LSTM_MAKE_SFINAE_FRIENDLY
         template<typename Func, typename... Args,
             LSTM_REQUIRES_(!detail::is_transact_function<Func>())>
-        void operator()(Func&&, Args&&...) const {
+        void operator()(Func&&,
+                        transaction_domain& = default_domain(),
+                        thread_data& = tls_thread_data()) const {
             static_assert(detail::is_transact_function<Func>(),
                 "functions passed to lstm::read_write must either take no parameters, "
                 "lstm::transaction&, or auto&/T&");
