@@ -215,19 +215,17 @@ LSTM_DETAIL_BEGIN
                     !all_same<uncvref<From0>, uncvref<From1>, uncvref<FromTail>...>{}>>
     {};
     
-    template<typename Func, typename Tx, typename = void>
-    struct callable_with_tx : std::false_type {};
+    template<typename Func, typename Tx>
+    using callable_with_tx_ = decltype(std::declval<Func>()(std::declval<Tx>()));
     
     template<typename Func, typename Tx>
-    struct callable_with_tx<Func, Tx, void_<decltype(std::declval<Func>()(std::declval<Tx>()))>>
-        : std::true_type {};
-    
-    template<typename Func, typename = void>
-    struct callable : std::false_type {};
+    using callable_with_tx = supports<callable_with_tx_, Func, Tx>;
     
     template<typename Func>
-    struct callable<Func, void_<decltype(std::declval<Func>()())>>
-        : std::true_type {};
+    using callable_ = decltype(std::declval<Func>()());
+    
+    template<typename Func>
+    using callable = supports<callable_, Func>;
     
     template<typename Func, bool = callable_with_tx<Func&, transaction&>{}(),
                             bool = callable<Func&>{}()>
@@ -259,11 +257,8 @@ LSTM_DETAIL_BEGIN
     struct is_void_transact_function<Func, std::enable_if_t<std::is_void<transact_result<Func>>{}>>
         : std::true_type {};
         
-    template<typename Func, typename = void>
-    struct is_transact_function : std::false_type {};
-
     template<typename Func>
-    struct is_transact_function<Func, void_<transact_result<Func>>> : std::true_type {};
+    using is_transact_function = supports<transact_result, Func>;
     
     template<typename Func, typename = void>
     struct is_nothrow_transact_function : std::false_type {};
@@ -275,6 +270,7 @@ LSTM_DETAIL_BEGIN
     template<typename T>
     using uninitialized = std::aligned_storage_t<sizeof(T), alignof(T)>;
     
+// http://stackoverflow.com/questions/17864256/allocator-traitsconstruct-vs-allocator-traitsallocate
     template<typename T> inline T* to_raw_pointer(T* p) noexcept { return p; }
     template<typename Pointer,
         LSTM_REQUIRES_(!std::is_pointer<uncvref<Pointer>>())>
