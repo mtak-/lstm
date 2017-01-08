@@ -18,7 +18,10 @@ LSTM_DETAIL_BEGIN
         mutable std::atomic<gp_t> version_lock;
         std::atomic<var_storage> storage;
         
-        inline var_base() noexcept : version_lock{0} {}
+        inline var_base() noexcept : version_lock{0} {
+            assert(storage.is_lock_free());
+            assert(version_lock.is_lock_free());
+        }
         
         friend struct ::lstm::transaction;
         friend test::transaction_tester;
