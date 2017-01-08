@@ -4,6 +4,7 @@
 #include <lstm/detail/lstm_fwd.hpp>
 
 #include <atomic>
+#include <cassert>
 
 LSTM_BEGIN
     enum class var_type {
@@ -57,7 +58,10 @@ LSTM_DETAIL_BEGIN
         constexpr Alloc& alloc() noexcept { return *this; }
         constexpr const Alloc& alloc() const noexcept { return *this; }
         
-        using Alloc::Alloc;
+        var_alloc_policy() = default;
+        var_alloc_policy(const Alloc& alloc) noexcept
+            : Alloc(alloc)
+        {}
         
         ~var_alloc_policy() noexcept
         { var_alloc_policy::destroy_deallocate(alloc(), storage.load(LSTM_RELAXED)); }
@@ -112,7 +116,10 @@ LSTM_DETAIL_BEGIN
         constexpr Alloc& alloc() noexcept { return *this; }
         constexpr const Alloc& alloc() const noexcept { return *this; }
         
-        using Alloc::Alloc;
+        var_alloc_policy() = default;
+        var_alloc_policy(const Alloc& alloc) noexcept
+            : Alloc(alloc)
+        {}
         
         template<typename... Us>
         var_storage allocate_construct(Us&&... us)
