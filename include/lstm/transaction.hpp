@@ -198,7 +198,7 @@ LSTM_BEGIN
             if (!commit_lock_writes())
                 return false;
             
-            gp_t write_version = domain().bump_clock();
+            gp_t write_version = domain().fetch_and_bump_clock();
             
             if (write_version != read_version && !commit_validate_reads())
                 return false;
