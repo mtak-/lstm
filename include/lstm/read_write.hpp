@@ -112,7 +112,7 @@ LSTM_DETAIL_BEGIN
 LSTM_DETAIL_END
 
 LSTM_BEGIN
-    namespace { constexpr auto&& read_write = detail::static_const<detail::read_write_fn>; }
+    namespace { constexpr auto& read_write = detail::static_const<detail::read_write_fn>; }
 LSTM_END
 
 #endif /* LSTM_READ_WRITE_HPP */
