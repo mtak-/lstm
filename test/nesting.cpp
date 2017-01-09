@@ -22,7 +22,7 @@ void push(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x, int val
     lstm::read_write([&](lstm::transaction& tx) {
         auto var = tx.read(x);
         var.push_back(val);
-        tx.write(x, std::move(var));
+        tx.write(x, {std::move(var)});
     });
 }
 

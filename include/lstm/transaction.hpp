@@ -288,7 +288,7 @@ LSTM_BEGIN
             detail::internal_retry();
         }
         
-        template<typename T, typename Alloc0, typename U,
+        template<typename T, typename Alloc0, typename U = T,
             LSTM_REQUIRES_(!var<T, Alloc0>::atomic &&
                            std::is_assignable<T&, U&&>() &&
                            std::is_constructible<T, U&&>())>
@@ -318,7 +318,7 @@ LSTM_BEGIN
             detail::internal_retry();
         }
         
-        template<typename T, typename Alloc0, typename U,
+        template<typename T, typename Alloc0, typename U = T,
             LSTM_REQUIRES_(var<T, Alloc0>::atomic &&
                            std::is_assignable<T&, U&&>() &&
                            std::is_constructible<T, U&&>())>
