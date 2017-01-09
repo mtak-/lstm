@@ -16,13 +16,8 @@ LSTM_END
 LSTM_DETAIL_BEGIN
     struct var_base {
     protected:
-        mutable std::atomic<gp_t> version_lock;
+        mutable std::atomic<gp_t> version_lock{0};
         std::atomic<var_storage> storage;
-        
-        inline var_base() noexcept : version_lock{0} {
-            assert(storage.is_lock_free());
-            assert(version_lock.is_lock_free());
-        }
         
         friend struct ::lstm::transaction;
         friend test::transaction_tester;
@@ -41,11 +36,35 @@ LSTM_DETAIL_BEGIN
         return var_type::heap;
     }
     
-    // TODO: uses allocator constructors?
+    template<typename Alloc, bool = std::is_final<Alloc>{}>
+    struct alloc_wrapper {
+    private:
+        Alloc _alloc;
+    
+    public:
+        constexpr alloc_wrapper() = default;
+        constexpr alloc_wrapper(const Alloc& in_alloc) noexcept
+            : _alloc(in_alloc)
+        {}
+            
+        constexpr Alloc& alloc() noexcept { return _alloc; }
+        constexpr const Alloc& alloc() const noexcept { return _alloc; }
+    };
+    
+    template<typename Alloc>
+    struct alloc_wrapper<Alloc, false> : private Alloc {
+        constexpr alloc_wrapper() = default;
+        constexpr alloc_wrapper(const Alloc& in_alloc) noexcept
+            : Alloc(in_alloc)
+        {}
+            
+        constexpr Alloc& alloc() noexcept { return *this; }
+        constexpr const Alloc& alloc() const noexcept { return *this; }
+    };
     
     template<typename T, typename Alloc, var_type Var_type = var_type_switch<T>()>
     struct var_alloc_policy
-        : private Alloc
+        : private alloc_wrapper<Alloc>
         , var_base
     {
         static constexpr bool heap = true;
@@ -54,13 +73,11 @@ LSTM_DETAIL_BEGIN
     protected:
         friend struct ::lstm::transaction;
         using alloc_traits = std::allocator_traits<Alloc>;
+        using alloc_wrapper<Alloc>::alloc;
         
-        constexpr Alloc& alloc() noexcept { return *this; }
-        constexpr const Alloc& alloc() const noexcept { return *this; }
-        
-        var_alloc_policy() = default;
-        var_alloc_policy(const Alloc& alloc) noexcept
-            : Alloc(alloc)
+        constexpr var_alloc_policy() = default;
+        constexpr var_alloc_policy(const Alloc& in_alloc) noexcept
+            : alloc_wrapper<Alloc>(in_alloc)
         {}
         
         ~var_alloc_policy() noexcept
@@ -103,7 +120,7 @@ LSTM_DETAIL_BEGIN
     // TODO: extremely likely there's strict aliasing issues...
     template<typename T, typename Alloc>
     struct var_alloc_policy<T, Alloc, var_type::atomic>
-        : private Alloc
+        : private alloc_wrapper<Alloc>
         , var_base
     {
         static constexpr bool heap = false;
@@ -112,13 +129,11 @@ LSTM_DETAIL_BEGIN
     protected:
         friend struct ::lstm::transaction;
         using alloc_traits = std::allocator_traits<Alloc>;
+        using alloc_wrapper<Alloc>::alloc;
         
-        constexpr Alloc& alloc() noexcept { return *this; }
-        constexpr const Alloc& alloc() const noexcept { return *this; }
-        
-        var_alloc_policy() = default;
-        var_alloc_policy(const Alloc& alloc) noexcept
-            : Alloc(alloc)
+        constexpr var_alloc_policy() = default;
+        constexpr var_alloc_policy(const Alloc& in_alloc) noexcept
+            : alloc_wrapper<Alloc>(in_alloc)
         {}
         
         template<typename... Us>
