@@ -16,9 +16,13 @@ Techniques used include:
 ## Usage
 
 `lstm` is header only:
+
 1. Add `lstm/include` to your header search paths
+
 2. In your source files `#include <lstm/lstm.hpp>`
+
 3. All types/functions live in the `lstm::` namespace.
+
 4. Done
 
 ## Building Tests
