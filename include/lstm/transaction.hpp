@@ -127,30 +127,21 @@ LSTM_BEGIN
         
         void commit_remove_writes_from_reads() noexcept {
             // using the bloom filter seemed to be mostly unhelpful
-            for (auto& write_elem : tls_td->write_set) {
-                // TODO: weird to have this here
-                // typical usage patterns would probly be:
-                //   read shared variable
-                //   do stuff
-                //   store result
-                //   end transaction
-                // transactions are pretty composable which might matter a little
-                tls_td->read_set.set_end(std::remove_if(
-                            std::begin(tls_td->read_set),
-                            std::end(tls_td->read_set),
-                            [&](const detail::read_set_value_type& rsv) noexcept {
-                                return rsv.is_src_var(write_elem.dest_var());
-                            }));
+            // TODO: maybe check when adding to the read set? probly a faster data structure out
+            // there for this... (though the laziness on the read side is great)
+            for (auto read_iter = tls_td->read_set.begin();
+                    read_iter < tls_td->read_set.end();
+                    ++read_iter) {
+                for (auto& write_elem : tls_td->write_set) {
+                    while (read_iter < tls_td->read_set.end() && read_iter->is_src_var(write_elem.dest_var()))
+                        tls_td->read_set.unordered_erase(read_iter);
+                }
             }
         }
         
         bool commit_lock_writes() noexcept {
-            // TODO: substantial performance hit from these two calls :(
-            // commit_sort_writes(); // not needed in practice... but does guarantee progress
-            commit_remove_writes_from_reads();
-            
             write_set_iter write_begin = std::begin(tls_td->write_set);
-            write_set_iter write_end = std::end(tls_td->write_set);
+            const write_set_iter write_end = std::end(tls_td->write_set);
             
             for (write_set_iter write_iter = write_begin; write_iter != write_end; ++write_iter) {
                 // TODO: only care what version the var is, if it's also a read?
@@ -195,6 +186,9 @@ LSTM_BEGIN
         }
         
         bool commit_slow_path() noexcept {
+            // commit_sort_writes(); // not needed in practice... but does guarantee progress
+            commit_remove_writes_from_reads();
+            
             if (!commit_lock_writes())
                 return false;
             
