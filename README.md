@@ -52,7 +52,7 @@ struct var;
 
 ### var constructors
 
-`var`'s detects constructors in a similar fashion to `std::optional`, except `var`'s cannot be `null`, so there's no need to pass in a `std::nullopt_t` into the constructor.
+`var`'s detect constructors in a similar fashion to `std::optional`, except `var`'s cannot be `null`, so there's no need to pass in a `std::in_place_t` into the constructor.
 
 ```cpp
 var<int> x{0};
@@ -69,10 +69,9 @@ custom_alloc<std::vector<int>> vec_alloc;
 custom_alloc<std::string> string_alloc;
 
 var<int, custom_alloc<int>> x{std::allocator_arg, int_alloc, 0};
-var<std::vector<int>, custom_alloc<std::vector<int>>> y{
-    std::allocator_arg,
-    vec_alloc,
-    {1, 2, 3, 4, 5, 6, 7, 8}};
+var<std::vector<int>, custom_alloc<std::vector<int>>> y{std::allocator_arg,
+                                                        vec_alloc,
+                                                        {1, 2, 3, 4, 5, 6, 7, 8}};
 var<std::string, custom_alloc<std::string>> z{std::allocator_arg, string_alloc, "hello world"};
 var<std::string, custom_alloc<std::string>> w(std::allocator_arg, string_alloc, 3, '!');
 ```
@@ -89,13 +88,13 @@ Alloc get_allocator() const noexcept;
 ```cpp
 T unsafe_read() const noexcept;
 ```
-- `some_var.unsafe_read()` returns the value contained in `var`. This function is not safe to call while transactions may be executing in any thread, or while `unsafe_write` might be executing in another thread.
+- `some_var.unsafe_read()` returns the value contained in `var`. This function is not safe to call while transactions that might write to `some_var` are executing in any thread, or while `unsafe_write` might be executing in another thread.
 
 ```cpp
 void unsafe_write(const T& t) noexcept;
 void unsafe_write(T&& t) noexcept;
 ```
-- `some_var.unsafe_write(x)` writes the value `x` into `var`. This function is not safe to call while transactions may be executing in any thread, or while `unsafe_read` or `unsafe_write` might be executing in another thread.
+- `some_var.unsafe_write(x)` writes the value `x` into `var`. This function is not safe to call while transactions that might read or write to `some_var` are executing in any thread; or while `unsafe_read` or `unsafe_write` might be executing in another thread.
 
 ## read_write
 
@@ -111,12 +110,9 @@ transact_result<Func> operator()(Func&& func,
 ```
 
 **Parameters**
-- `Func&& func`
-    `func` must be callable with either no arguments, or a `transaction&` argument (preferred in the case `func` is callable under both circumstances).
-- `transaction_domain& domain = default_domain()`
-    An lvalue reference to the global version clock to use (optional).
-- `thread_data& tls_td = tls_thread_data()`
-    An lvalue reference to the current thread's `thread_data` instance (optional). This is provided in case accessing a `thread_local` is slow on a target. Typical uses would be to start a thread, and immediately call `thread_data& tls_td = tls_thread_data();` to avoid the `thread_local` overhead that would otherwise occur on every transaction.
+- `Func&& func`: `func` must be callable with either no arguments, or a `transaction&` argument (preferred in the case `func` is callable under both circumstances).
+- `transaction_domain& domain = default_domain()`: An lvalue reference to the global version clock to use (optional).
+- `thread_data& tls_td = tls_thread_data()`: An lvalue reference to the current thread's `thread_data` instance (optional). This is provided in case accessing a `thread_local` is slow on a target. Typical uses would be to start a thread, and immediately call `thread_data& tls_td = tls_thread_data();` to avoid the `thread_local` overhead that would otherwise occur on every transaction.
 
 ## easy_var (WIP)
 
