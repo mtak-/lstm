@@ -202,10 +202,12 @@ LSTM_BEGIN
         T unsafe_read() const noexcept
         { return base::load(detail::var_base::storage.load(LSTM_RELAXED)); }
         
-        void unsafe_write(const T& t) noexcept
+        void unsafe_write(const T& t)
+            noexcept(noexcept(base::store(detail::var_base::storage, t)))
         { return base::store(detail::var_base::storage, t); }
         
-        void unsafe_write(T&& t) noexcept
+        void unsafe_write(T&& t)
+            noexcept(noexcept(base::store(detail::var_base::storage, std::move(t))))
         { return base::store(detail::var_base::storage, std::move(t)); }
     };
 LSTM_END
