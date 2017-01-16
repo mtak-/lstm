@@ -188,12 +188,12 @@ LSTM_DETAIL_BEGIN
         decltype(lstm::detail::implicit_constructor_impl<To>(
                     {std::initializer_list<volatile uncvref<From>>{std::declval<From>(),
                                                                    std::declval<Froms>()...}}));
-       
-       template<typename To, typename From, typename... Froms>
-       using is_ilist_cv_convertible =
-           decltype(lstm::detail::implicit_constructor_impl<To>(
-                       {std::initializer_list<const volatile uncvref<From>>{std::declval<From>(),
-                                                                       std::declval<Froms>()...}}));
+    
+    template<typename To, typename From, typename... Froms>
+    using is_ilist_cv_convertible =
+        decltype(lstm::detail::implicit_constructor_impl<To>(
+                    {std::initializer_list<const volatile uncvref<From>>{std::declval<From>(),
+                                                                      std::declval<Froms>()...}}));
     
     template<typename To, typename... Froms>
     struct is_convertible;
@@ -208,11 +208,11 @@ LSTM_DETAIL_BEGIN
     struct is_convertible<To, From0, From1, FromTail...>
         : and_<supports<is_convertible_, To, From0, From1, FromTail...>,
                std::integral_constant<bool,
+                    !all_same<uncvref<From0>, uncvref<From1>, uncvref<FromTail>...>{} ||
                     (!supports<is_ilist_uncvref_convertible, To, From0, From1, FromTail...>{} &&
                      !supports<is_ilist_const_convertible, To, From0, From1, FromTail...>{} &&
                      !supports<is_ilist_volatile_convertible, To, From0, From1, FromTail...>{} &&
-                     !supports<is_ilist_cv_convertible, To, From0, From1, FromTail...>{}) ||
-                    !all_same<uncvref<From0>, uncvref<From1>, uncvref<FromTail>...>{}>>
+                     !supports<is_ilist_cv_convertible, To, From0, From1, FromTail...>{})>>
     {};
     
     template<typename Func, typename Tx>

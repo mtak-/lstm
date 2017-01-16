@@ -84,6 +84,7 @@ LSTM_BEGIN
         { detail::var_base::storage.store(base::allocate_construct(is, (Us&&)us...),
                                           LSTM_RELAXED); }
         
+        // support for var<std::vector<int>> = {1,2,3};
         template<typename Ilist,
             LSTM_REQUIRES_(std::is_constructible<T, std::initializer_list<Ilist>&>{} &&
                            detail::is_convertible<T, std::initializer_list<Ilist>&>{} &&
