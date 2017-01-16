@@ -133,7 +133,8 @@ LSTM_BEGIN
                     read_iter < tls_td->read_set.end();
                     ++read_iter) {
                 for (auto& write_elem : tls_td->write_set) {
-                    while (read_iter < tls_td->read_set.end() && read_iter->is_src_var(write_elem.dest_var()))
+                    while (read_iter < tls_td->read_set.end() &&
+                            read_iter->is_src_var(write_elem.dest_var()))
                         tls_td->read_set.unordered_erase(read_iter);
                 }
             }
