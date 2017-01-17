@@ -74,11 +74,11 @@ std::size_t publish_buffer() {
             // the same steps as a failed read/write are taken
         // if this is not the rootmost transaction:
             // the writes are not visible to other threads until the rootmost transaction completes
-            // they can however ALWAYS be seen from within the rootmost or, any child transaction
+            // however, the writes are always visible from within a read_write block on this thread
 }
 ```
 
-There's some (poorly) explained details in the comments, but basically, transactions work as you'd expect them to work. That's the point of STM, it lets engineers more or less pretend they're writing single threaded code.
+There's some (poorly) explained details in the comments, but basically, transactions work as you'd expect them to work. That's the point of STM.
 
 ## var
 
