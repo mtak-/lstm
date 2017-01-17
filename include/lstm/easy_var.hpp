@@ -33,6 +33,8 @@ LSTM_BEGIN
         
         inline operator T() const { return get(); }
         
+        Alloc get_allocator() const noexcept { return underlying.get_allocator(); }
+        
         T unsafe_read() const noexcept { return underlying().unsafe_read(); }
         void unsafe_write(const T& t) noexcept { return underlying().unsafe_write(t); }
         void unsafe_write(T&& t) noexcept { return underlying().unsafe_write(std::move(t)); }

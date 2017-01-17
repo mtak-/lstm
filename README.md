@@ -1,6 +1,6 @@
 # lstm
 
-*WIP: This library was written for fun, and is not meant for production code*
+*WIP: This library was written for fun and could have ubgs :)*
 
 `lstm` is a header only implementation of Software Transactional Memory (STM) designed to be simple to use, and flexible. It's only been tested on Apple Clang so YMMV.
 
@@ -78,18 +78,18 @@ std::size_t publish_buffer() {
 }
 ```
 
-There's some (poorly) explained details in the comments, but basically, transactions work as you'd expect them to work. That's the point of STM.
+There's some (poorly explained) details in the comments, but basically, transactions work as you'd expect them to work. That's the point of STM.
 
 ## var
 
-By default, `lstm` assumes data to be private. To let `lstm` know that a variable is shared, use the `var` template.
+`lstm` takes an implicitly private, explicitly shared approach to STM. To let `lstm` know that a variable is shared, use the `var` template.
 
 ```cpp
 template<typename T, typename Alloc = std::allocator<T>>
 struct var;
 ```
 
-### var constructors
+### var special member functions
 
 `var`'s detect constructors in a similar fashion to `std::optional`, except `var`'s cannot be `null`, so there's no need to pass in a `std::in_place_t` into the constructor.
 
@@ -115,7 +115,7 @@ var<std::string, custom_alloc<std::string>> z{std::allocator_arg, string_alloc, 
 var<std::string, custom_alloc<std::string>> w(std::allocator_arg, string_alloc, 3, '!');
 ```
 
-`var`'s are not copy/move constructible or assignable. These operations require accessing shared data, so it must be done from within a transaction context. See the section on `easy_var`.
+`var`'s are not copy/move constructible or assignable. These operations require accessing shared data, so it must be done from within a transaction context. See the section on [`easy_var`](#easy_var).
 
 ### var member functions
 
@@ -129,7 +129,7 @@ Alloc get_allocator() const noexcept;
 ```cpp
 T unsafe_read() const noexcept;
 ```
-`some_var.unsafe_read()` returns the value contained in `var`. This function is not safe to call while transactions that might write to `some_var` are executing in any thread, or while `unsafe_write` might be executing in another thread.
+`some_var.unsafe_read()` returns the value contained in `var`. This function is usually not safe to call while transactions that might write to `some_var` are executing in any thread, or while `unsafe_write` might be executing in another thread. *Note: There are ways to make concurrent `unsafe_read`'s and transactions work using `thread_data`'s interface.*
 
 -
 
@@ -153,17 +153,17 @@ transact_result<Func> operator()(Func&& func,
                                  thread_data& tls_td = tls_thread_data()) const;
 ```
 
-### parameters
+### read_write parameters
 
 - `Func&& func`: `func` must be callable with either no arguments, or a `transaction&` argument (preferred in the case `func` is callable under both circumstances).
 - `transaction_domain& domain = default_domain()`: An lvalue reference to the global version clock to use (optional).
 - `thread_data& tls_td = tls_thread_data()`: An lvalue reference to the current thread's `thread_data` instance (optional). This is provided in case accessing a `thread_local` is slow on a target. Typical uses would be to start a thread, and immediately call `thread_data& tls_td = tls_thread_data();` then perform lots of small, performance critical transactions.
 
-### return value
+### read_write return value
 
 `read_write` returns whatever `func` returns on transaction success.
 
-### examples
+### read_write examples
 
 ```cpp
 int x = read_write([&](transaction& tx) {
@@ -176,13 +176,65 @@ read_write([&] {
 });
 ```
 
-## easy_var (WIP)
+## easy_var
 
-The simplest way (sacrificing some efficiency) to use `lstm` is by storing shared data in `lstm::easy_var<T>`'s. To safely access the shared data, an `lstm::atomic()` block must be created.
+`easy_var` is a wrapper template that is much easier to use than `var`. It allows reading/writing without having to create a `read_write` block (it does that for you). `easy_var` can easily lead to slower code if you're not careful, whereas `var` forces you to write faster code. On my machine, the `transfer_funds` (write heavy, small transactions) is about 30% faster using either `var`'s or `easy_var::underlying` in place of the naive `easy_var` implementation.
+
+```cpp
+template<typename T, typename Alloc>
+struct easy_var;
+```
+
+### easy_var special member functions
+
+`easy_var` adds a copy constructor/assignment operators to `var`'s list of [special member functions](#var-special-member-functions).
+
+```cpp
+extern easy_var<int> x;
+void foo() {
+    easy_var<int> y{x};
+    
+    // ...
+    
+    y = x;
+    
+    // ...
+    
+    y = 5;
+}
+```
+
+### easy_var member functions
+
+`easy_var` adds to the member functions that [`var`](#var-member-functions) has with the following:
+
+```cpp
+T get() const;
+operator T() const;
+```
+`get` and `operator T` safely return whatever value a current transaction can see (via [`read_write`](#read_write)).
+
+-
+
+```cpp
+lstm::var<T, Alloc>& underlying() & noexcept;
+lstm::var<T, Alloc>&& underlying() && noexcept;
+const lstm::var<T, Alloc>& underlying() const & noexcept;
+const lstm::var<T, Alloc>&& underlying() const && noexcept;
+```
+
+`underlying` returns the [`var<T, Alloc>`](#var) contained by `easy_var<T, Alloc>`. Using `underlying` can lead to code that is as efficient as if it had been written using `var`.
+
+### easy_var operators
+
+All the usual operators are overloaded for `Integral` and `Arithmetic` types.
+
+### easy_var example
+
 ```cpp
 bool transfer_funds(int amount, lstm::easy_var<int>& fromAccount, lstm::easy_var<int>& toAccount) {
     assert(amount > 0);
-    return lstm::atomic([&]{
+    return lstm::read_write([&]{
         if (fromAccount >= amount) {
             fromAccount -= 20;
             toAccount += 20;
