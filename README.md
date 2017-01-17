@@ -18,11 +18,8 @@ Techniques used include:
 `lstm` is header only:
 
 1. Add `lstm/include` to your header search paths
-
 2. In your source files `#include <lstm/lstm.hpp>`
-
 3. All types/functions live in the `lstm::` namespace.
-
 4. Done
 
 ## Building Tests
@@ -39,6 +36,45 @@ Release
 $ mkdir -p build/release && cd build/release
 $ cmake -G"Unix Makefiles" -DCMAKE_BUILD_TYPE=Release ../..
 $ make -j8 && make test
+```
+
+## Getting Started
+
+Simply wrap shared data up in a `var`, and then start a `read_write` transaction as follows.
+
+```cpp
+// declare your shared variables, and initialize them as though they weren't wrapped by an lstm::var
+static lstm::var<std::vector<int>> buffer{0, 1, 2, 3, 4, 5, 6};
+static lstm::var<std::vector<int>> active;
+
+std::size_t publish_buffer() {
+    
+    // this line either gets access to the current transaction,
+    // or creates a transaction if the thread isn't currently in a critical section
+    return lstm::read_write([&](lstm::transaction& tx) {
+        
+        // shared data can be read by calling tx.read(src)
+        // if the read fails, no code below this line will be executed
+        // the stack will be unwound to the point of the rootmost read_write block,
+        // and the transaction will be retried
+        std::vector<int> tmp = tx.read(buffer);
+        const auto amount_published = tmp.size();
+        
+        // shared data can be written by calling tx.write(dest, data)
+        // a write can fail in the same way a read can
+        // because the stack is unwound, the tmp vector's destructor will free any memory it holds
+        tx.write(buffer, tx.read(active));
+        tx.write(active, std::move(tmp));
+        
+        // returns the size of the shared data that was published
+        return amount_published;
+    }); // if this was the rootmost transaction:
+            // at this point, all the writes are made visible atomically, if possible
+            // if that is not possible due to another write transaction on another thread
+            // the same steps as a failed/read/write are taken
+        // if this is not the rootmost transaction:
+            // the writes are not visible until the rootmost transaction completes
+}
 ```
 
 ## var
@@ -83,22 +119,27 @@ var<std::string, custom_alloc<std::string>> w(std::allocator_arg, string_alloc, 
 ```cpp
 Alloc get_allocator() const noexcept;
 ```
-- `some_var.get_allocator()` returns a copy of the allocator used by `some_var`.
+`some_var.get_allocator()` returns a copy of the allocator used by `some_var`.
+
+-
 
 ```cpp
 T unsafe_read() const noexcept;
 ```
-- `some_var.unsafe_read()` returns the value contained in `var`. This function is not safe to call while transactions that might write to `some_var` are executing in any thread, or while `unsafe_write` might be executing in another thread.
+`some_var.unsafe_read()` returns the value contained in `var`. This function is not safe to call while transactions that might write to `some_var` are executing in any thread, or while `unsafe_write` might be executing in another thread.
+
+-
 
 ```cpp
 void unsafe_write(const T& t) noexcept;
 void unsafe_write(T&& t) noexcept;
 ```
-- `some_var.unsafe_write(x)` writes the value `x` into `var`. This function is not safe to call while transactions that might read or write to `some_var` are executing in any thread; or while `unsafe_read` or `unsafe_write` might be executing in another thread.
+
+`some_var.unsafe_write(x)` writes the value `x` into `var`. This function is not safe to call while transactions that might read or write to `some_var` are executing in any thread; or while `unsafe_read` or `unsafe_write` might be executing in another thread.
 
 ## read_write
 
-In order to safely read or write to shared data, a transaction context is required. Currently `read_write` provides the only mechanism for obtaining a transaction context.
+In order to safely read or write to shared data, a transaction context is required. Currently `read_write` is the only mechanism for obtaining a transaction context.
 
 `read_write` is a function object of an empty and pod type providing only the callable operator.
 
@@ -109,10 +150,28 @@ transact_result<Func> operator()(Func&& func,
                                  thread_data& tls_td = tls_thread_data()) const;
 ```
 
-**Parameters**
+### parameters
+
 - `Func&& func`: `func` must be callable with either no arguments, or a `transaction&` argument (preferred in the case `func` is callable under both circumstances).
 - `transaction_domain& domain = default_domain()`: An lvalue reference to the global version clock to use (optional).
-- `thread_data& tls_td = tls_thread_data()`: An lvalue reference to the current thread's `thread_data` instance (optional). This is provided in case accessing a `thread_local` is slow on a target. Typical uses would be to start a thread, and immediately call `thread_data& tls_td = tls_thread_data();` to avoid the `thread_local` overhead that would otherwise occur on every transaction.
+- `thread_data& tls_td = tls_thread_data()`: An lvalue reference to the current thread's `thread_data` instance (optional). This is provided in case accessing a `thread_local` is slow on a target. Typical uses would be to start a thread, and immediately call `thread_data& tls_td = tls_thread_data();` then perform lots of small, performance critical transactions.
+
+### return value
+
+`read_write` returns whatever `func` returns on transaction success.
+
+### examples
+
+```cpp
+int x = read_write([&](transaction& tx) {
+    // reading/writing of shared variables here
+    return 5;
+});
+
+read_write([&] {
+    // reading/writing of shared variables here
+});
+```
 
 ## easy_var (WIP)
 
