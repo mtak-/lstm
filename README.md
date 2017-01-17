@@ -61,21 +61,24 @@ std::size_t publish_buffer() {
         const auto amount_published = tmp.size();
         
         // shared data can be written by calling tx.write(dest, data)
-        // a write can fail in the same way a read can
-        // because the stack is unwound, the tmp vector's destructor will free any memory it holds
+        // a failed write behaves the same as a failed read
+        // because the stack is unwound, tmp's destructor will free any memory it holds
         tx.write(buffer, tx.read(active));
         tx.write(active, std::move(tmp));
         
         // returns the size of the shared data that was published
         return amount_published;
     }); // if this was the rootmost transaction:
-            // at this point, all the writes are made visible atomically, if possible
+            // at this point, all the writes are made visible atomically
             // if that is not possible due to another write transaction on another thread
-            // the same steps as a failed/read/write are taken
+            // the same steps as a failed read/write are taken
         // if this is not the rootmost transaction:
-            // the writes are not visible until the rootmost transaction completes
+            // the writes are not visible to other threads until the rootmost transaction completes
+            // they can however ALWAYS be seen from within the rootmost or, any child transaction
 }
 ```
+
+There's some (poorly) explained details in the comments, but basically, transactions work as you'd expect them to work. That's the point of STM, it lets engineers more or less pretend they're writing single threaded code.
 
 ## var
 
