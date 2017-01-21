@@ -16,7 +16,7 @@ LSTM_END
 LSTM_DETAIL_BEGIN
     struct var_base {
     protected:
-        mutable std::atomic<gp_t> version_lock{0};
+        std::atomic<gp_t> version_lock{0};
         std::atomic<var_storage> storage;
         
         friend struct ::lstm::transaction;
