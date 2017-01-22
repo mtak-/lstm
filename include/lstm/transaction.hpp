@@ -242,7 +242,7 @@ LSTM_BEGIN
             if (!rw_valid(dest_var)) detail::internal_retry();
         }
         
-        detail::var_storage atomic_read_impl(const detail::var_base& src_var) {
+        detail::var_storage read_impl(const detail::var_base& src_var) {
             detail::write_set_lookup lookup = find_write_set(src_var);
             if (LSTM_LIKELY(!lookup.success())) {
                 const gp_t src_version = src_var.version_lock.load(LSTM_ACQUIRE);
@@ -268,26 +268,14 @@ LSTM_BEGIN
             LSTM_REQUIRES_(!var<T, Alloc0>::atomic)>
         const T& read(const var<T, Alloc0>& src_var) {
             static_assert(std::is_reference<decltype(var<T>::load(src_var.storage.load()))>{}, "");
-                      
-            detail::write_set_lookup lookup = find_write_set(src_var);
-            if (LSTM_LIKELY(!lookup.success())) {
-                const gp_t src_version = src_var.version_lock.load(LSTM_ACQUIRE);
-                const T& result = var<T>::load(src_var.storage.load(LSTM_ACQUIRE));
-                if (rw_valid(src_version)
-                        && src_var.version_lock.load(LSTM_RELAXED) == src_version) {
-                    add_read_set(src_var);
-                    return result;
-                }
-            } else if (rw_valid(src_var))
-                return var<T>::load(lookup.pending_write());
-            detail::internal_retry();
+            return var<T, Alloc0>::load(read_impl(src_var));
         }
         
         template<typename T, typename Alloc0,
             LSTM_REQUIRES_(var<T, Alloc0>::atomic)>
         T read(const var<T, Alloc0>& src_var) {
             static_assert(!std::is_reference<decltype(var<T>::load(src_var.storage.load()))>{}, "");
-            return var<T, Alloc0>::load(atomic_read_impl(src_var));
+            return var<T, Alloc0>::load(read_impl(src_var));
         }
         
         template<typename T, typename Alloc0, typename U = T,
