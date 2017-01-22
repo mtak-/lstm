@@ -232,6 +232,31 @@ LSTM_BEGIN
             tls_td->fail_callbacks.clear();
         }
         
+        void atomic_write_impl(detail::var_base& dest_var, detail::var_storage storage) {
+            detail::write_set_lookup lookup = find_write_set(dest_var);
+            if (LSTM_LIKELY(!lookup.success()))
+                add_write_set(dest_var, storage, lookup.hash);
+            else
+                lookup.pending_write() = storage;
+            
+            if (!rw_valid(dest_var)) detail::internal_retry();
+        }
+        
+        detail::var_storage atomic_read_impl(const detail::var_base& src_var) {
+            detail::write_set_lookup lookup = find_write_set(src_var);
+            if (LSTM_LIKELY(!lookup.success())) {
+                const gp_t src_version = src_var.version_lock.load(LSTM_ACQUIRE);
+                const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
+                if (rw_valid(src_version)
+                        && src_var.version_lock.load(LSTM_RELAXED) == src_version) {
+                    add_read_set(src_var);
+                    return result;
+                }
+            } else if (rw_valid(src_var))
+                return lookup.pending_write();
+            detail::internal_retry();
+        }
+        
     public:
         // transactions can only be passed by non-const lvalue reference
         transaction(const transaction&) = delete;
@@ -262,19 +287,7 @@ LSTM_BEGIN
             LSTM_REQUIRES_(var<T, Alloc0>::atomic)>
         T read(const var<T, Alloc0>& src_var) {
             static_assert(!std::is_reference<decltype(var<T>::load(src_var.storage.load()))>{}, "");
-            
-            detail::write_set_lookup lookup = find_write_set(src_var);
-            if (LSTM_LIKELY(!lookup.success())) {
-                const gp_t src_version = src_var.version_lock.load(LSTM_ACQUIRE);
-                const T result = var<T>::load(src_var.storage.load(LSTM_ACQUIRE));
-                if (rw_valid(src_version)
-                        && src_var.version_lock.load(LSTM_RELAXED) == src_version) {
-                    add_read_set(src_var);
-                    return result;
-                }
-            } else if (rw_valid(src_var))
-                return var<T>::load(lookup.pending_write());
-            detail::internal_retry();
+            return var<T, Alloc0>::load(atomic_read_impl(src_var));
         }
         
         template<typename T, typename Alloc0, typename U = T,
@@ -313,15 +326,8 @@ LSTM_BEGIN
             LSTM_REQUIRES_(var<T, Alloc0>::atomic &&
                            std::is_assignable<T&, U&&>() &&
                            std::is_constructible<T, U&&>())>
-        void write(var<T, Alloc0>& dest_var, U&& u) {
-            detail::write_set_lookup lookup = find_write_set(dest_var);
-            if (LSTM_LIKELY(!lookup.success()))
-                add_write_set(dest_var, dest_var.allocate_construct((U&&)u), lookup.hash);
-            else
-                var<T>::store(lookup.pending_write(), (U&&)u);
-            
-            if (!rw_valid(dest_var)) detail::internal_retry();
-        }
+        void write(var<T, Alloc0>& dest_var, U&& u)
+        { atomic_write_impl(dest_var, dest_var.allocate_construct((U&&)u)); }
         
         // reading/writing an rvalue probably never makes sense
         template<typename T, typename Alloc0> void read(var<T, Alloc0>&& v) = delete;
