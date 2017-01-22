@@ -219,17 +219,11 @@ LSTM_BEGIN
             return true;
         }
         
-        // if the transaction failed, cleanup calls a virtual function (:o) on var's
-        // therefore, access_lock() must be active
         void cleanup() noexcept {
-            // TODO: destroy only???
             tls_td->write_set.clear();
             tls_td->read_set.clear();
-            
-            tls_td->do_fail_callbacks();
-            
-            // TODO: batching
             tls_td->succ_callbacks.clear();
+            tls_td->do_fail_callbacks();
         }
         
         void reset_heap() noexcept {

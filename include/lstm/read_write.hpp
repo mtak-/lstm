@@ -19,18 +19,17 @@ LSTM_DETAIL_BEGIN
         
         template<typename Func, typename Tx>
         static void try_transact(Func& func, Tx& tx, tx_result_buffer<void>&)
-        { call(func, tx); }
+        { read_write_fn::call(func, tx); }
         
         template<typename Func, typename Tx>
         static void try_transact(Func& func, Tx& tx, tx_result_buffer<transact_result<Func>>& buf)
-        { buf.emplace(call(func, tx)); }
+        { buf.emplace(read_write_fn::call(func, tx)); }
         
         template<typename Tx>
         [[noreturn]] static void unhandled_exception(Tx& tx, thread_data& tls_td) {
-            tx.cleanup();
             tls_td.access_unlock();
+            tx.cleanup();
             tls_td.tx = nullptr;
-            tx.reset_heap();
             throw;
         }
         
@@ -61,6 +60,8 @@ LSTM_DETAIL_BEGIN
                 try {
                     assert(tls_td.read_set.size() == 0);
                     assert(tls_td.write_set.size() == 0);
+                    assert(tls_td.fail_callbacks.size() == 0);
+                    assert(tls_td.succ_callbacks.size() == 0);
                     
                     read_write_fn::try_transact(func, tx, buf);
                     
@@ -87,7 +88,7 @@ LSTM_DETAIL_BEGIN
                                          transaction_domain& domain = default_domain(),
                                          thread_data& tls_td = tls_thread_data()) const {
             if (tls_td.tx)
-                return call(func, *tls_td.tx);
+                return read_write_fn::call(func, *tls_td.tx);
             
             return read_write_fn::slow_path(func, domain, tls_td);
         }
