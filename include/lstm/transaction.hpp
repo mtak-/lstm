@@ -32,7 +32,7 @@ LSTM_BEGIN
     }
     
     struct transaction {
-    protected:
+    private:
         friend detail::read_write_fn;
         friend test::transaction_tester;
         
@@ -104,6 +104,13 @@ LSTM_BEGIN
             // up to caller to ensure dest_var is not already in the write_set
             assert(!find_write_set(dest_var).success());
             tls_td->write_set.push_back(&dest_var, pending_write, hash);
+            for (auto read_iter = tls_td->read_set.begin();
+                    read_iter < tls_td->read_set.end();
+                    ++read_iter) {
+                while (read_iter < tls_td->read_set.end() &&
+                        read_iter->is_src_var(dest_var))
+                    tls_td->read_set.unordered_erase(read_iter);
+            }
         }
         
         detail::write_set_lookup find_write_set(const detail::var_base& dest_var) noexcept {
@@ -122,23 +129,9 @@ LSTM_BEGIN
                 unlock(begin->dest_var());
         }
         
-        void commit_sort_writes() noexcept
-        { std::sort(std::begin(tls_td->write_set), std::end(tls_td->write_set)); }
-        
-        void commit_remove_writes_from_reads() noexcept {
-            // using the bloom filter seemed to be mostly unhelpful
-            // TODO: maybe check when adding to the read set? probly a faster data structure out
-            // there for this... (though the laziness on the read side is great)
-            for (auto read_iter = tls_td->read_set.begin();
-                    read_iter < tls_td->read_set.end();
-                    ++read_iter) {
-                for (auto& write_elem : tls_td->write_set) {
-                    while (read_iter < tls_td->read_set.end() &&
-                            read_iter->is_src_var(write_elem.dest_var()))
-                        tls_td->read_set.unordered_erase(read_iter);
-                }
-            }
-        }
+        // // this is not needed in practice but it does guarantee progress
+        // void commit_sort_writes() noexcept
+        // { std::sort(std::begin(tls_td->write_set), std::end(tls_td->write_set)); }
         
         bool commit_lock_writes() noexcept {
             write_set_iter write_begin = std::begin(tls_td->write_set);
@@ -188,19 +181,18 @@ LSTM_BEGIN
         
         bool commit_slow_path() noexcept {
             // commit_sort_writes(); // not needed in practice... but does guarantee progress
-            commit_remove_writes_from_reads();
             
             if (!commit_lock_writes())
                 return false;
             
-            gp_t write_version = domain().fetch_and_bump_clock();
+            gp_t prev_write_version = domain().fetch_and_bump_clock();
             
-            if (write_version != read_version && !commit_validate_reads())
+            if (prev_write_version != read_version && !commit_validate_reads())
                 return false;
             
-            commit_publish(write_version + 1);
+            commit_publish(prev_write_version + 1);
             
-            read_version = write_version;
+            read_version = prev_write_version;
             
             return true;
         }
@@ -232,16 +224,6 @@ LSTM_BEGIN
             tls_td->fail_callbacks.clear();
         }
         
-        void atomic_write_impl(detail::var_base& dest_var, detail::var_storage storage) {
-            detail::write_set_lookup lookup = find_write_set(dest_var);
-            if (LSTM_LIKELY(!lookup.success()))
-                add_write_set(dest_var, storage, lookup.hash);
-            else
-                lookup.pending_write() = storage;
-            
-            if (!rw_valid(dest_var)) detail::internal_retry();
-        }
-        
         detail::var_storage read_impl(const detail::var_base& src_var) {
             detail::write_set_lookup lookup = find_write_set(src_var);
             if (LSTM_LIKELY(!lookup.success())) {
@@ -257,6 +239,16 @@ LSTM_BEGIN
             detail::internal_retry();
         }
         
+        void atomic_write_impl(detail::var_base& dest_var, detail::var_storage storage) {
+            detail::write_set_lookup lookup = find_write_set(dest_var);
+            if (LSTM_LIKELY(!lookup.success()))
+                add_write_set(dest_var, storage, lookup.hash);
+            else
+                lookup.pending_write() = storage;
+            
+            if (!rw_valid(dest_var)) detail::internal_retry();
+        }
+        
     public:
         // transactions can only be passed by non-const lvalue reference
         transaction(const transaction&) = delete;
@@ -266,18 +258,20 @@ LSTM_BEGIN
         
         template<typename T, typename Alloc0,
             LSTM_REQUIRES_(!var<T, Alloc0>::atomic)>
-        const T& read(const var<T, Alloc0>& src_var) {
+        LSTM_ALWAYS_INLINE const T& read(const var<T, Alloc0>& src_var) {
             static_assert(std::is_reference<decltype(var<T>::load(src_var.storage.load()))>{}, "");
             return var<T, Alloc0>::load(read_impl(src_var));
         }
         
         template<typename T, typename Alloc0,
             LSTM_REQUIRES_(var<T, Alloc0>::atomic)>
-        T read(const var<T, Alloc0>& src_var) {
+        LSTM_ALWAYS_INLINE T read(const var<T, Alloc0>& src_var) {
             static_assert(!std::is_reference<decltype(var<T>::load(src_var.storage.load()))>{}, "");
             return var<T, Alloc0>::load(read_impl(src_var));
         }
         
+        // TODO: tease out the parts of this function that don't depend on template params
+        // probly don't wanna call allocate_construct unless it will for sure be used
         template<typename T, typename Alloc0, typename U = T,
             LSTM_REQUIRES_(!var<T, Alloc0>::atomic &&
                            std::is_assignable<T&, U&&>() &&
@@ -314,7 +308,7 @@ LSTM_BEGIN
             LSTM_REQUIRES_(var<T, Alloc0>::atomic &&
                            std::is_assignable<T&, U&&>() &&
                            std::is_constructible<T, U&&>())>
-        void write(var<T, Alloc0>& dest_var, U&& u)
+        LSTM_ALWAYS_INLINE void write(var<T, Alloc0>& dest_var, U&& u)
         { atomic_write_impl(dest_var, dest_var.allocate_construct((U&&)u)); }
         
         // reading/writing an rvalue probably never makes sense
