@@ -131,8 +131,8 @@ LSTM_BEGIN
         thread_data& operator=(const thread_data&) = delete;
         
     public:
-        inline bool in_transaction() const { return tx != nullptr; }
-        inline bool in_critical_section() const
+        inline bool in_transaction() const noexcept { return tx != nullptr; }
+        inline bool in_critical_section() const noexcept
         { return active.load(LSTM_RELAXED) != detail::off_state; }
         
         inline void access_lock(const gp_t gp) noexcept {
@@ -176,11 +176,13 @@ LSTM_BEGIN
         template<typename Func,
             LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
         void queue_succ_callback(Func&& func)
+            noexcept(noexcept(succ_callbacks.emplace_back((Func&&)func)))
         { succ_callbacks.emplace_back((Func&&)func); }
         
         template<typename Func,
             LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
         void queue_fail_callback(Func&& func)
+            noexcept(noexcept(fail_callbacks.emplace_back((Func&&)func)))
         { fail_callbacks.emplace_back((Func&&)func); }
         
         // TODO: when atomic swap on succ_callbacks is possible, this needs to do just that

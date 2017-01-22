@@ -23,13 +23,14 @@ LSTM_DETAIL_BEGIN
             (std::is_trivially_move_constructible<uncvref<F>>{} ||
              std::is_trivially_copy_constructible<uncvref<F>>{})>;
         
-        void operator()() { cb(payload); }
+        void operator()() noexcept { cb(payload); }
         
         gp_callback() noexcept = default;
         
         template<typename F,
             LSTM_REQUIRES_(sbo_concept<F>{})>
-        gp_callback(F&& f) noexcept(std::is_nothrow_copy_constructible<uncvref<F>>{}) {            
+        gp_callback(F&& f) noexcept(std::is_nothrow_copy_constructible<uncvref<F>>{}) {
+            static_assert(noexcept(f()), "gp_callbacks must be noexcept");
             ::new(&payload) uncvref<F>((F&&)f);
             cb = [](cb_payload_t& payload) { (*reinterpret_cast<uncvref<F>*>(&payload))(); };
         }
@@ -37,6 +38,7 @@ LSTM_DETAIL_BEGIN
         template<typename F,
             LSTM_REQUIRES_(!sbo_concept<F>{})>
         gp_callback(F&& f) {
+            static_assert(noexcept(f()), "gp_callbacks must be noexcept");
             ::new(&payload) uncvref<F>*(::new uncvref<F>((F&&)f));
             cb = [](cb_payload_t& payload) {
                 (**reinterpret_cast<uncvref<F>**>(&payload))();

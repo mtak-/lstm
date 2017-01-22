@@ -24,7 +24,7 @@ LSTM_BEGIN
     inline Pointer allocate(thread_data& tls_td, Alloc& alloc) {
         Pointer result = AllocTraits::allocate(alloc, 1);
         if (tls_td.in_critical_section()) {
-            tls_td.queue_fail_callback([alloc, result]() mutable {
+            tls_td.queue_fail_callback([alloc, result]() mutable noexcept {
                 AllocTraits::deallocate(alloc, result, 1);
             });
         }
@@ -41,7 +41,7 @@ LSTM_BEGIN
                             const std::size_t count) {
         Pointer result = AllocTraits::allocate(alloc, count);
         if (tls_td.in_critical_section()) {
-            tls_td.queue_fail_callback([alloc, result, count]() mutable {
+            tls_td.queue_fail_callback([alloc, result, count]() mutable noexcept {
                 AllocTraits::deallocate(alloc, result, count);
             });
         }
@@ -71,7 +71,7 @@ LSTM_BEGIN
     inline void deallocate(thread_data& tls_td,
                            Alloc& alloc,
                            typename AllocTraits::pointer ptr) {
-        tls_td.queue_succ_callback([alloc, ptr = std::move(ptr)]() mutable {
+        tls_td.queue_succ_callback([alloc, ptr = std::move(ptr)]() mutable noexcept {
             AllocTraits::deallocate(alloc, std::move(ptr), 1);
         });
     }
@@ -84,7 +84,7 @@ LSTM_BEGIN
                            Alloc& alloc,
                            typename AllocTraits::pointer ptr,
                            const std::size_t count) {
-        tls_td.queue_succ_callback([alloc, ptr = std::move(ptr), count]() mutable {
+        tls_td.queue_succ_callback([alloc, ptr = std::move(ptr), count]() mutable noexcept {
             AllocTraits::deallocate(alloc, std::move(ptr), count);
         });
     }
@@ -118,7 +118,7 @@ LSTM_BEGIN
                           Args&&... args) {
         AllocTraits::construct(alloc, t, (Args&&)args...);
         if (tls_td.in_critical_section()) {
-            tls_td.queue_fail_callback([alloc, t]() mutable {
+            tls_td.queue_fail_callback([alloc, t]() mutable noexcept {
                 AllocTraits::destroy(alloc, t);
             });
         }
@@ -170,7 +170,7 @@ LSTM_BEGIN
         LSTM_REQUIRES_(!std::is_const<Alloc>{} &&
                        !std::is_trivially_destructible<T>{})>
     inline void destroy(thread_data& tls_td, Alloc& alloc, T* t) {
-        tls_td.queue_succ_callback([alloc, t]() mutable {
+        tls_td.queue_succ_callback([alloc, t]() mutable noexcept {
             AllocTraits::destroy(alloc, t);
         });
     }
@@ -212,7 +212,7 @@ LSTM_BEGIN
         Pointer result = AllocTraits::allocate(alloc, 1);
         AllocTraits::construct(alloc, detail::to_raw_pointer(result), (Args&&)args...);
         if (tls_td.in_critical_section()) {
-            tls_td.queue_fail_callback([alloc, result]() mutable {
+            tls_td.queue_fail_callback([alloc, result]() mutable noexcept {
                 AllocTraits::destroy(alloc, detail::to_raw_pointer(result));
                 AllocTraits::deallocate(alloc, std::move(result), 1);
             });
@@ -233,7 +233,7 @@ LSTM_BEGIN
         Pointer result = AllocTraits::allocate(alloc, 1);
         AllocTraits::construct(alloc, detail::to_raw_pointer(result), (Args&&)args...);
         if (tls_td.in_critical_section()) {
-            tls_td.queue_fail_callback([alloc, result]() mutable {
+            tls_td.queue_fail_callback([alloc, result]() mutable noexcept {
                 AllocTraits::deallocate(alloc, std::move(result), 1);
             });
         }
@@ -256,7 +256,7 @@ LSTM_BEGIN
     inline void destroy_deallocate(thread_data& tls_td,
                                    Alloc& alloc,
                                    typename AllocTraits::pointer ptr) {
-        tls_td.queue_succ_callback([alloc, ptr = std::move(ptr)]() mutable {
+        tls_td.queue_succ_callback([alloc, ptr = std::move(ptr)]() mutable noexcept {
             AllocTraits::destroy(alloc, detail::to_raw_pointer(ptr));
             AllocTraits::deallocate(alloc, std::move(ptr), 1);
         });
@@ -270,7 +270,7 @@ LSTM_BEGIN
     inline void destroy_deallocate(thread_data& tls_td,
                                    Alloc& alloc,
                                    typename AllocTraits::pointer ptr) {
-        tls_td.queue_succ_callback([alloc, ptr = std::move(ptr)]() mutable {
+        tls_td.queue_succ_callback([alloc, ptr = std::move(ptr)]() mutable noexcept {
             AllocTraits::deallocate(alloc, std::move(ptr), 1);
         });
     }
@@ -298,8 +298,8 @@ LSTM_BEGIN
                 : _alloc(std::move(in_alloc))
             {}
             
-            Alloc& alloc() { return _alloc; }
-            const Alloc& alloc() const { return _alloc; }
+            Alloc& alloc() noexcept { return _alloc; }
+            const Alloc& alloc() const noexcept { return _alloc; }
         };
         
         template<typename Alloc>
@@ -314,8 +314,8 @@ LSTM_BEGIN
                 noexcept(std::is_nothrow_constructible<Alloc, Alloc&&>{})
                 : Alloc(std::move(in_alloc))
             {}
-            Alloc& alloc() { return *this; }
-            const Alloc& alloc() const { return *this; }
+            Alloc& alloc() noexcept { return *this; }
+            const Alloc& alloc() const noexcept { return *this; }
         };
     }
     

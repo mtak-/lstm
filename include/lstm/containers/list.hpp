@@ -37,8 +37,8 @@ LSTM_BEGIN
         using Alloc = detail::rebind_to<Alloc_, node_t>;
         using alloc_traits = std::allocator_traits<Alloc>;
         
-        lstm::var<node_t*> head{nullptr};
-        lstm::var<word> _size{0};
+        lstm::var<node_t*, detail::rebind_to<Alloc, node_t*>> head{nullptr};
+        lstm::var<word, detail::rebind_to<Alloc, word>> _size{0};
         
         Alloc& alloc() noexcept { return *this; }
         const Alloc& alloc() const noexcept { return *this; }
