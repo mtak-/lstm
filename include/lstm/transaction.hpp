@@ -77,22 +77,22 @@ LSTM_BEGIN
         
         bool lock(detail::var_base& v) const noexcept {
             gp_t version_buf = v.version_lock.load(LSTM_RELAXED);
-            // TODO: not convinced of this ordering
             return rw_valid(version_buf) &&
                     v.version_lock.compare_exchange_strong(version_buf,
                                                            as_locked(version_buf),
-                                                           LSTM_RELEASE);
+                                                           LSTM_RELAXED,
+                                                           LSTM_RELAXED);
         }
         
         static inline void unlock(const gp_t version_to_set, detail::var_base& v) noexcept {
             assert(locked(v.version_lock.load(LSTM_RELAXED)));
             assert(!locked(version_to_set));
-            v.version_lock.store(version_to_set, LSTM_RELEASE);
+            v.version_lock.store(version_to_set, LSTM_RELAXED);
         }
         
         static inline void unlock(detail::var_base& v) noexcept {
             assert(locked(v.version_lock.load(LSTM_RELAXED)));
-            v.version_lock.fetch_xor(lock_bit, LSTM_RELEASE);
+            v.version_lock.fetch_xor(lock_bit, LSTM_RELAXED);
         }
         
         void add_read_set(const detail::var_base& src_var)

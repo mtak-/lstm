@@ -16,8 +16,10 @@ LSTM_END
 LSTM_DETAIL_BEGIN
     struct var_base {
     protected:
-        std::atomic<gp_t> version_lock{0};
+        std::atomic<gp_t> version_lock;
         std::atomic<var_storage> storage;
+        
+        var_base() noexcept { version_lock.store(0, LSTM_RELAXED); }
         
         friend struct ::lstm::transaction;
         friend test::transaction_tester;
