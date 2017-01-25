@@ -7,7 +7,7 @@
 using lstm::read_write;
 using lstm::var;
 
-static constexpr std::size_t food_size = LSTM_TEST_INIT(10000, 1000);
+static constexpr std::size_t food_size = LSTM_TEST_INIT(10000, 10000);
 static constexpr std::size_t repeat_count = LSTM_TEST_INIT(300, 30);
 
 struct LSTM_CACHE_ALIGNED philosopher {
