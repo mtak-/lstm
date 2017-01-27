@@ -27,7 +27,7 @@ LSTM_DETAIL_BEGIN
         static_assert(sizeof(hash_t) >= sizeof(std::uintptr_t) - shift,
                       "type for hash_t is not large enough");
         constexpr hash_t one{1};
-        const auto raw_hash = (std::uintptr_t(&value) >> shift);
+        const auto raw_hash = (reinterpret_cast<std::uintptr_t>(&value) >> shift);
         return (one << (raw_hash & 63));
     }
     
