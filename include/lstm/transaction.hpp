@@ -209,19 +209,23 @@ LSTM_BEGIN
         void add_read_set(const detail::var_base& src_var)
         { tls_td->read_set.emplace_back(&src_var); }
         
+        void remove_read_set(const detail::var_base& src_var) {
+            for (auto read_iter = tls_td->read_set.begin();
+                    read_iter < tls_td->read_set.end();
+                    ++read_iter) {
+                while (read_iter < tls_td->read_set.end() &&
+                        read_iter->is_src_var(src_var))
+                    tls_td->read_set.unordered_erase(read_iter);
+            }
+        }
+        
         void add_write_set(detail::var_base& dest_var,
                            const detail::var_storage pending_write,
                            const detail::hash_t hash) {
             // up to caller to ensure dest_var is not already in the write_set
             assert(!find_write_set(dest_var).success());
+            remove_read_set(dest_var);
             tls_td->write_set.push_back(&dest_var, pending_write, hash);
-            for (auto read_iter = tls_td->read_set.begin();
-                    read_iter < tls_td->read_set.end();
-                    ++read_iter) {
-                while (read_iter < tls_td->read_set.end() &&
-                        read_iter->is_src_var(dest_var))
-                    tls_td->read_set.unordered_erase(read_iter);
-            }
         }
         
         detail::var_storage read_impl(const detail::var_base& src_var) {
