@@ -209,7 +209,7 @@ LSTM_BEGIN
         void add_read_set(const detail::var_base& src_var)
         { tls_td->read_set.emplace_back(&src_var); }
         
-        void remove_read_set(const detail::var_base& src_var) {
+        void remove_read_set(const detail::var_base& src_var) noexcept {
             for (auto read_iter = tls_td->read_set.begin();
                     read_iter < tls_td->read_set.end();
                     ++read_iter) {
