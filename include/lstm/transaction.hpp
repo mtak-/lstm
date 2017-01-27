@@ -12,8 +12,8 @@
 
 LSTM_DETAIL_BEGIN
     struct write_set_lookup {
-        var_storage* pending_write_;
         hash_t hash_;
+        var_storage* pending_write_;
         
         inline constexpr bool success() const noexcept { return !hash_; }
         inline constexpr var_storage& pending_write() const noexcept { return *pending_write_; }
@@ -198,16 +198,20 @@ LSTM_BEGIN
             tls_td->fail_callbacks.clear();
         }
         
-        detail::write_set_lookup find_write_set(const detail::var_base& dest_var) noexcept {
-            detail::write_set_lookup lookup;
-            lookup.hash_ = hash(dest_var);
-            if (LSTM_LIKELY(!(tls_td->write_set.filter() & lookup.hash_)))
-                return lookup;
+        LSTM_NOINLINE detail::write_set_lookup
+        slow_find_write_set(const detail::var_base& dest_var, const detail::hash_t hash) noexcept {
             write_set_iter iter = slow_find(tls_td->write_set.begin(), tls_td->write_set.end(),
                                             dest_var);
             return iter != tls_td->write_set.end()
-                ? detail::write_set_lookup{&iter->pending_write(), 0}
-                : lookup;
+                ? detail::write_set_lookup{0, &iter->pending_write()}
+                : detail::write_set_lookup{hash, nullptr};
+        }
+        
+        detail::write_set_lookup find_write_set(const detail::var_base& dest_var) noexcept {
+            const detail::hash_t hash = dumb_pointer_hash(dest_var);
+            if (LSTM_LIKELY(!(tls_td->write_set.filter() & hash)))
+                return detail::write_set_lookup{hash, nullptr};
+            return slow_find_write_set(dest_var, hash);
         }
         
         void add_read_set(const detail::var_base& src_var)

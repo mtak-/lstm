@@ -22,7 +22,7 @@ LSTM_DETAIL_BEGIN
     
     // dumb hash need to stress test it
     // constexpr std::uint64_t prime = 11400714819323198393ull;
-    inline hash_t hash(const var_base& value) noexcept {
+    inline hash_t dumb_pointer_hash(const var_base& value) noexcept {
         constexpr hash_t shift = calcShift<var_base>();
         static_assert(sizeof(hash_t) >= sizeof(std::uintptr_t) - shift,
                       "type for hash_t is not large enough");
@@ -32,9 +32,7 @@ LSTM_DETAIL_BEGIN
     }
     
     template<typename T>
-    LSTM_NOINLINE inline T* slow_find(T* begin,
-                                      const uncvref<T>* const end,
-                                      const var_base& value) noexcept {
+    inline T* slow_find(T* begin, const uncvref<T>* const end, const var_base& value) noexcept {
         for (; begin != end; ++begin)
             if (&begin->dest_var() == &value)
                 break;
