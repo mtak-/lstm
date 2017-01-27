@@ -28,7 +28,7 @@ LSTM_DETAIL_BEGIN
                       "type for hash_t is not large enough");
         constexpr hash_t one{1};
         const auto raw_hash = (std::uintptr_t(&value) >> shift);
-        return (one << (raw_hash % 64));
+        return (one << (raw_hash & 63));
     }
     
     template<typename T>
@@ -79,10 +79,11 @@ LSTM_DETAIL_BEGIN
         
         // TODO: this is the reason it only works with write_set_value_type
         // if more instantiations of this class are needed, probly just put hash
-        // first and make it a template (could cause registers to be swapped)
+        // first and make it a template
         void push_back(var_base* const value,
                        const var_storage pending_write,
                        const hash_t hash) {
+            assert(hash != 0);
             filter_ |= hash;
             data.emplace_back(value, pending_write);
         }

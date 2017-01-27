@@ -95,35 +95,6 @@ LSTM_BEGIN
             v.version_lock.fetch_xor(lock_bit, LSTM_RELEASE);
         }
         
-        void add_read_set(const detail::var_base& src_var)
-        { tls_td->read_set.emplace_back(&src_var); }
-        
-        void add_write_set(detail::var_base& dest_var,
-                           const detail::var_storage pending_write,
-                           const detail::hash_t hash) {
-            // up to caller to ensure dest_var is not already in the write_set
-            assert(!find_write_set(dest_var).success());
-            tls_td->write_set.push_back(&dest_var, pending_write, hash);
-            for (auto read_iter = tls_td->read_set.begin();
-                    read_iter < tls_td->read_set.end();
-                    ++read_iter) {
-                while (read_iter < tls_td->read_set.end() &&
-                        read_iter->is_src_var(dest_var))
-                    tls_td->read_set.unordered_erase(read_iter);
-            }
-        }
-        
-        detail::write_set_lookup find_write_set(const detail::var_base& dest_var) noexcept {
-            detail::write_set_lookup lookup;
-            lookup.hash = hash(dest_var);
-            if (LSTM_LIKELY(!(tls_td->write_set.filter() & lookup.hash)))
-                return lookup;
-            write_set_iter iter = slow_find(tls_td->write_set.begin(), tls_td->write_set.end(), dest_var);
-            return iter != tls_td->write_set.end()
-                ? detail::write_set_lookup{&iter->pending_write(), 0}
-                : lookup;
-        }
-        
         static void unlock_write_set(write_set_iter begin, write_set_iter end) noexcept {
             for (; begin != end; ++begin)
                 unlock(begin->dest_var());
@@ -223,6 +194,36 @@ LSTM_BEGIN
             tls_td->fail_callbacks.clear();
         }
         
+        detail::write_set_lookup find_write_set(const detail::var_base& dest_var) noexcept {
+            detail::write_set_lookup lookup;
+            lookup.hash = hash(dest_var);
+            if (LSTM_LIKELY(!(tls_td->write_set.filter() & lookup.hash)))
+                return lookup;
+            write_set_iter iter = slow_find(tls_td->write_set.begin(), tls_td->write_set.end(),
+                                            dest_var);
+            return iter != tls_td->write_set.end()
+                ? detail::write_set_lookup{&iter->pending_write(), 0}
+                : lookup;
+        }
+        
+        void add_read_set(const detail::var_base& src_var)
+        { tls_td->read_set.emplace_back(&src_var); }
+        
+        void add_write_set(detail::var_base& dest_var,
+                           const detail::var_storage pending_write,
+                           const detail::hash_t hash) {
+            // up to caller to ensure dest_var is not already in the write_set
+            assert(!find_write_set(dest_var).success());
+            tls_td->write_set.push_back(&dest_var, pending_write, hash);
+            for (auto read_iter = tls_td->read_set.begin();
+                    read_iter < tls_td->read_set.end();
+                    ++read_iter) {
+                while (read_iter < tls_td->read_set.end() &&
+                        read_iter->is_src_var(dest_var))
+                    tls_td->read_set.unordered_erase(read_iter);
+            }
+        }
+        
         detail::var_storage read_impl(const detail::var_base& src_var) {
             detail::write_set_lookup lookup = find_write_set(src_var);
             if (LSTM_LIKELY(!lookup.success())) {
@@ -238,7 +239,7 @@ LSTM_BEGIN
             detail::internal_retry();
         }
         
-        void atomic_write_impl(detail::var_base& dest_var, detail::var_storage storage) {
+        void atomic_write_impl(detail::var_base& dest_var, const detail::var_storage storage) {
             detail::write_set_lookup lookup = find_write_set(dest_var);
             if (LSTM_LIKELY(!lookup.success()))
                 add_write_set(dest_var, storage, lookup.hash);
