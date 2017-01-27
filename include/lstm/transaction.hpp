@@ -237,7 +237,7 @@ LSTM_BEGIN
         }
         
         detail::var_storage read_impl(const detail::var_base& src_var) {
-            detail::write_set_lookup lookup = find_write_set(src_var);
+            const detail::write_set_lookup lookup = find_write_set(src_var);
             if (LSTM_LIKELY(!lookup.success())) {
                 const gp_t src_version = src_var.version_lock.load(LSTM_ACQUIRE);
                 const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
@@ -252,7 +252,7 @@ LSTM_BEGIN
         }
         
         void atomic_write_impl(detail::var_base& dest_var, const detail::var_storage storage) {
-            detail::write_set_lookup lookup = find_write_set(dest_var);
+            const detail::write_set_lookup lookup = find_write_set(dest_var);
             if (LSTM_LIKELY(!lookup.success()))
                 add_write_set(dest_var, storage, lookup.hash());
             else
@@ -289,7 +289,7 @@ LSTM_BEGIN
                            std::is_assignable<T&, U&&>() &&
                            std::is_constructible<T, U&&>())>
         void write(var<T, Alloc0>& dest_var, U&& u) {
-            detail::write_set_lookup lookup = find_write_set(dest_var);
+            const detail::write_set_lookup lookup = find_write_set(dest_var);
             if (LSTM_LIKELY(!lookup.success())) {
                 const gp_t dest_version = dest_var.version_lock.load(LSTM_ACQUIRE);
                 const detail::var_storage cur_storage = dest_var.storage.load(LSTM_ACQUIRE);
