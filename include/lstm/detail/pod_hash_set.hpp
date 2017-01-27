@@ -20,8 +20,6 @@ LSTM_DETAIL_BEGIN
         return l - 1;
     }
     
-    // dumb hash need to stress test it
-    // constexpr std::uint64_t prime = 11400714819323198393ull;
     inline hash_t dumb_pointer_hash(const var_base& value) noexcept {
         constexpr hash_t shift = calcShift<var_base>();
         static_assert(sizeof(hash_t) >= sizeof(std::uintptr_t) - shift,
@@ -85,25 +83,11 @@ LSTM_DETAIL_BEGIN
             filter_ |= hash;
             data.emplace_back(value, pending_write);
         }
-        
-        void unordered_erase(const pointer ptr) noexcept
-        { data.unordered_erase(ptr); }
-        
-        void unordered_erase(const const_pointer ptr) noexcept
-        { data.unordered_erase(ptr); }
             
         iterator begin() noexcept { return data.begin(); }
         iterator end() noexcept { return data.end(); }
         const_iterator begin() const noexcept { return data.begin(); }
         const_iterator end() const noexcept { return data.end(); }
-        const_iterator cbegin() const noexcept { return data.cbegin(); }
-        const_iterator cend() const noexcept { return data.cend(); }
-        
-        reference operator[](const int i) noexcept { return data[i]; }
-        const_reference operator[](const int i) const noexcept { return data[i]; }
-        
-        reference back() noexcept { return data.back(); }
-        const_reference back() const noexcept { return data.back(); }
     };
 LSTM_DETAIL_END
 

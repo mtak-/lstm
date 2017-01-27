@@ -97,25 +97,12 @@ LSTM_DETAIL_BEGIN
             std::memmove((void*)ptr, --end_, sizeof(value_type));
         }
         
-        void set_end(const pointer ptr) noexcept {
-            assert(ptr >= begin_ && ptr <= end_);
-            end_ = ptr;
-        }
-        
         void clear() noexcept { end_ = begin_; }
         
         iterator begin() noexcept { return begin_; }
         iterator end() noexcept { return end_; }
         const_iterator begin() const noexcept { return begin_; }
         const_iterator end() const noexcept { return end_; }
-        const_iterator cbegin() const noexcept { return begin_; }
-        const_iterator cend() const noexcept { return end_; }
-        
-        reference operator[](const int i) noexcept { return begin_[i]; }
-        const_reference operator[](const int i) const noexcept { return begin_[i]; }
-        
-        reference back() noexcept { return end_[-1]; }
-        const_reference back() const noexcept { return end_[-1]; }
     };
 LSTM_DETAIL_END
 
