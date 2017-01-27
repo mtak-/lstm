@@ -13,10 +13,12 @@
 LSTM_DETAIL_BEGIN
     struct write_set_lookup {
         var_storage* pending_write_;
-        hash_t hash;
+        hash_t hash_;
         
-        inline constexpr bool success() const noexcept { return !hash; }
+        inline constexpr bool success() const noexcept { return !hash_; }
         inline constexpr var_storage& pending_write() const noexcept { return *pending_write_; }
+        inline constexpr hash_t& hash() noexcept { return hash_; }
+        inline constexpr hash_t hash() const noexcept { return hash_; }
     };
     
     [[noreturn]] LSTM_ALWAYS_INLINE void internal_retry() {
@@ -181,6 +183,7 @@ LSTM_BEGIN
             return true;
         }
         
+        // TODO: rename this or consider moving it out of this class
         void cleanup() noexcept {
             tls_td->write_set.clear();
             tls_td->read_set.clear();
@@ -188,6 +191,7 @@ LSTM_BEGIN
             tls_td->do_fail_callbacks();
         }
         
+        // TODO: rename this or consider moving it out of this class
         void reset_heap() noexcept {
             tls_td->write_set.clear();
             tls_td->read_set.clear();
@@ -196,8 +200,8 @@ LSTM_BEGIN
         
         detail::write_set_lookup find_write_set(const detail::var_base& dest_var) noexcept {
             detail::write_set_lookup lookup;
-            lookup.hash = hash(dest_var);
-            if (LSTM_LIKELY(!(tls_td->write_set.filter() & lookup.hash)))
+            lookup.hash_ = hash(dest_var);
+            if (LSTM_LIKELY(!(tls_td->write_set.filter() & lookup.hash_)))
                 return lookup;
             write_set_iter iter = slow_find(tls_td->write_set.begin(), tls_td->write_set.end(),
                                             dest_var);
@@ -246,7 +250,7 @@ LSTM_BEGIN
         void atomic_write_impl(detail::var_base& dest_var, const detail::var_storage storage) {
             detail::write_set_lookup lookup = find_write_set(dest_var);
             if (LSTM_LIKELY(!lookup.success()))
-                add_write_set(dest_var, storage, lookup.hash);
+                add_write_set(dest_var, storage, lookup.hash());
             else
                 lookup.pending_write() = storage;
             
@@ -288,7 +292,7 @@ LSTM_BEGIN
                 if (rw_valid(dest_version)
                         && dest_var.version_lock.load(LSTM_RELAXED) == dest_version) {
                     const detail::var_storage new_storage = dest_var.allocate_construct((U&&)u);
-                    add_write_set(dest_var, new_storage, lookup.hash);
+                    add_write_set(dest_var, new_storage, lookup.hash());
                     tls_td->queue_succ_callback([alloc = dest_var.alloc(),
                                                  cur_storage]() mutable noexcept {
                         var<T, Alloc0>::destroy_deallocate(alloc, cur_storage);
