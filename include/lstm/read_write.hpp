@@ -77,6 +77,8 @@ LSTM_DETAIL_BEGIN
                     unhandled_exception(tx, tls_td);
                 }
                 tx_internal_failed(tx);
+                
+                // TODO: add backoff here?
             }
         }
         
