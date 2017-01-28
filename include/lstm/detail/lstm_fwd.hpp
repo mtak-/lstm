@@ -123,6 +123,7 @@ LSTM_END
 
 LSTM_DETAIL_BEGIN
     using var_storage = void*;
+    using hash_t = std::uint64_t;
     
     struct read_write_fn;
     struct var_base;

@@ -1,14 +1,12 @@
 #ifndef LSTM_DETAIL_POD_HASH_SET_HPP
 #define LSTM_DETAIL_POD_HASH_SET_HPP
 
-#include <lstm/detail/lstm_fwd.hpp>
+#include <lstm/detail/write_set_lookup.hpp>
 
 #include <algorithm>
 #include <cmath>
 
 LSTM_DETAIL_BEGIN
-    using hash_t = std::uint64_t;
-    
     template<typename T>
     static constexpr hash_t calcShift() noexcept {
         hash_t l = 0;
@@ -29,14 +27,6 @@ LSTM_DETAIL_BEGIN
         return (one << (raw_hash & 63));
     }
     
-    template<typename T>
-    inline T* slow_find(T* begin, const uncvref<T>* const end, const var_base& value) noexcept {
-        for (; begin != end; ++begin)
-            if (&begin->dest_var() == &value)
-                break;
-        return begin;
-    }
-    
     // TODO: this class is only designed to work with write_set_value_type
     template<typename Underlying>
     struct pod_hash_set {
@@ -53,6 +43,22 @@ LSTM_DETAIL_BEGIN
     private:
         hash_t filter_;
         data_t data;
+        
+        iterator find(const var_base& value) noexcept {
+            iterator result = begin();
+            for (; result != end(); ++result)
+                if (&result->dest_var() == &value)
+                    break;
+            return result;
+        }
+        
+        LSTM_NOINLINE write_set_lookup slow_lookup(const var_base& dest_var,
+                                                   const hash_t hash) noexcept {
+            iterator iter = find(dest_var);
+            return iter != end()
+                ? write_set_lookup{0, &iter->pending_write()}
+                : write_set_lookup{hash, nullptr};
+        }
         
     public:
         pod_hash_set(const allocator_type& alloc = {})
@@ -88,6 +94,14 @@ LSTM_DETAIL_BEGIN
         iterator end() noexcept { return data.end(); }
         const_iterator begin() const noexcept { return data.begin(); }
         const_iterator end() const noexcept { return data.end(); }
+        
+        // biased against finding the var
+        write_set_lookup lookup(const var_base& dest_var) noexcept {
+            const hash_t hash = dumb_pointer_hash(dest_var);
+            if (LSTM_LIKELY(!(filter_ & hash)))
+                return write_set_lookup{hash, nullptr};
+            return slow_lookup(dest_var, hash);
+        }
     };
 LSTM_DETAIL_END
 
