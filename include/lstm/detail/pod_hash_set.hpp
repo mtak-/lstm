@@ -55,9 +55,13 @@ LSTM_DETAIL_BEGIN
         LSTM_NOINLINE write_set_lookup slow_lookup(const var_base& dest_var,
                                                    const hash_t hash) noexcept {
             iterator iter = find(dest_var);
-            return iter != end()
-                ? write_set_lookup{0, &iter->pending_write()}
-                : write_set_lookup{hash, nullptr};
+            if (iter != end()) {
+                return write_set_lookup{0, &iter->pending_write()};
+            } else {
+                LSTM_LOG_BLOOM_COLLISION();
+                
+                return write_set_lookup{hash, nullptr};
+            }
         }
         
     public:

@@ -58,6 +58,7 @@
     #define LSTM_SUCC_TX() lstm::detail::transaction_log::get().add_success()
     #define LSTM_LOG_REGISTER_THREAD_ID(id) lstm::detail::transaction_log::get().register_thread(id)
     #define LSTM_LOG_CLEAR() lstm::detail::transaction_log::get().clear()
+    #define LSTM_LOG_BLOOM_COLLISION() lstm::detail::transaction_log::get().add_bloom_collision()
     #ifndef LSTM_LOG_DUMP
         #include <iostream>
         #define LSTM_LOG_DUMP() (std::cout << lstm::detail::transaction_log::get().results())
@@ -68,6 +69,7 @@
     #define LSTM_SUCC_TX() /**/
     #define LSTM_LOG_REGISTER_THREAD_ID(id) /**/
     #define LSTM_LOG_CLEAR() /**/
+    #define LSTM_LOG_BLOOM_COLLISION() /**/
     #ifndef LSTM_LOG_DUMP
         #define LSTM_LOG_DUMP() /**/
     #endif /* LSTM_LOG_DUMP */
