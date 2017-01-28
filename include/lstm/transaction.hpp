@@ -2,8 +2,6 @@
 #define LSTM_TRANSACTION_HPP
 
 #include <lstm/detail/var_detail.hpp>
-#include <lstm/detail/pod_hash_set.hpp>
-#include <lstm/detail/write_set_lookup.hpp>
 
 #include <lstm/thread_data.hpp>
 #include <lstm/transaction_domain.hpp>
@@ -29,8 +27,7 @@ LSTM_BEGIN
         friend detail::read_write_fn;
         friend test::transaction_tester;
         
-        using read_set_const_iter = typename thread_data::read_set_t::const_iterator;
-        using write_set_iter = typename thread_data::write_set_t::iterator;
+        using write_set_iter = typename thread_data::write_set_iter;
         
         static constexpr gp_t lock_bit = gp_t(1) << (sizeof(gp_t) * 8 - 1);
         
@@ -189,52 +186,14 @@ LSTM_BEGIN
             tls_td->fail_callbacks.clear();
         }
         
-        LSTM_NOINLINE detail::write_set_lookup
-        slow_find_write_set(const detail::var_base& dest_var, const detail::hash_t hash) noexcept {
-            write_set_iter iter = slow_find(tls_td->write_set.begin(), tls_td->write_set.end(),
-                                            dest_var);
-            return iter != tls_td->write_set.end()
-                ? detail::write_set_lookup{0, &iter->pending_write()}
-                : detail::write_set_lookup{hash, nullptr};
-        }
-        
-        detail::write_set_lookup find_write_set(const detail::var_base& dest_var) noexcept {
-            const detail::hash_t hash = dumb_pointer_hash(dest_var);
-            if (LSTM_LIKELY(!(tls_td->write_set.filter() & hash)))
-                return detail::write_set_lookup{hash, nullptr};
-            return slow_find_write_set(dest_var, hash);
-        }
-        
-        void add_read_set(const detail::var_base& src_var)
-        { tls_td->read_set.emplace_back(&src_var); }
-        
-        void remove_read_set(const detail::var_base& src_var) noexcept {
-            for (auto read_iter = tls_td->read_set.begin();
-                    read_iter < tls_td->read_set.end();
-                    ++read_iter) {
-                while (read_iter < tls_td->read_set.end() &&
-                        read_iter->is_src_var(src_var))
-                    tls_td->read_set.unordered_erase(read_iter);
-            }
-        }
-        
-        void add_write_set(detail::var_base& dest_var,
-                           const detail::var_storage pending_write,
-                           const detail::hash_t hash) {
-            // up to caller to ensure dest_var is not already in the write_set
-            assert(!find_write_set(dest_var).success());
-            remove_read_set(dest_var);
-            tls_td->write_set.push_back(&dest_var, pending_write, hash);
-        }
-        
         detail::var_storage read_impl(const detail::var_base& src_var) {
-            const detail::write_set_lookup lookup = find_write_set(src_var);
+            const detail::write_set_lookup lookup = tls_td->find_write_set(src_var);
             if (LSTM_LIKELY(!lookup.success())) {
                 const gp_t src_version = src_var.version_lock.load(LSTM_ACQUIRE);
                 const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
                 if (rw_valid(src_version)
                         && src_var.version_lock.load(LSTM_RELAXED) == src_version) {
-                    add_read_set(src_var);
+                    tls_td->add_read_set(src_var);
                     return result;
                 }
             } else if (rw_valid(src_var))
@@ -243,9 +202,9 @@ LSTM_BEGIN
         }
         
         void atomic_write_impl(detail::var_base& dest_var, const detail::var_storage storage) {
-            const detail::write_set_lookup lookup = find_write_set(dest_var);
+            const detail::write_set_lookup lookup = tls_td->find_write_set(dest_var);
             if (LSTM_LIKELY(!lookup.success()))
-                add_write_set(dest_var, storage, lookup.hash());
+                tls_td->add_write_set(dest_var, storage, lookup.hash());
             else
                 lookup.pending_write() = storage;
             
@@ -280,14 +239,14 @@ LSTM_BEGIN
                            std::is_assignable<T&, U&&>() &&
                            std::is_constructible<T, U&&>())>
         void write(var<T, Alloc0>& dest_var, U&& u) {
-            const detail::write_set_lookup lookup = find_write_set(dest_var);
+            const detail::write_set_lookup lookup = tls_td->find_write_set(dest_var);
             if (LSTM_LIKELY(!lookup.success())) {
                 const gp_t dest_version = dest_var.version_lock.load(LSTM_ACQUIRE);
                 const detail::var_storage cur_storage = dest_var.storage.load(LSTM_ACQUIRE);
                 if (rw_valid(dest_version)
                         && dest_var.version_lock.load(LSTM_RELAXED) == dest_version) {
                     const detail::var_storage new_storage = dest_var.allocate_construct((U&&)u);
-                    add_write_set(dest_var, new_storage, lookup.hash());
+                    tls_td->add_write_set(dest_var, new_storage, lookup.hash());
                     tls_td->queue_succ_callback([alloc = dest_var.alloc(),
                                                  cur_storage]() mutable noexcept {
                         var<T, Alloc0>::destroy_deallocate(alloc, cur_storage);

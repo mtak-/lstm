@@ -7,6 +7,7 @@
 #include <lstm/detail/pod_hash_set.hpp>
 #include <lstm/detail/pod_vector.hpp>
 #include <lstm/detail/read_set_value_type.hpp>
+#include <lstm/detail/write_set_lookup.hpp>
 #include <lstm/detail/write_set_value_type.hpp>
 
 LSTM_DETAIL_BEGIN
@@ -48,6 +49,8 @@ LSTM_BEGIN
         
         using read_set_t = detail::pod_vector<detail::read_set_value_type>;
         using write_set_t = detail::pod_hash_set<detail::pod_vector<detail::write_set_value_type>>;
+        using read_set_const_iter = typename read_set_t::const_iterator;
+        using write_set_iter = typename write_set_t::iterator;
         
         read_set_t read_set;
         write_set_t write_set;
@@ -81,6 +84,43 @@ LSTM_BEGIN
                 while (q->not_in_grace_period(gp))
                     backoff();
             }
+        }
+        
+        LSTM_NOINLINE detail::write_set_lookup
+        slow_find_write_set(const detail::var_base& dest_var, const detail::hash_t hash) noexcept {
+            write_set_iter iter = slow_find(write_set.begin(), write_set.end(), dest_var);
+            return iter != write_set.end()
+                ? detail::write_set_lookup{0, &iter->pending_write()}
+                : detail::write_set_lookup{hash, nullptr};
+        }
+        
+        detail::write_set_lookup find_write_set(const detail::var_base& dest_var) noexcept {
+            const detail::hash_t hash = dumb_pointer_hash(dest_var);
+            if (LSTM_LIKELY(!(write_set.filter() & hash)))
+                return detail::write_set_lookup{hash, nullptr};
+            return slow_find_write_set(dest_var, hash);
+        }
+        
+        void add_read_set(const detail::var_base& src_var)
+        { read_set.emplace_back(&src_var); }
+        
+        void remove_read_set(const detail::var_base& src_var) noexcept {
+            for (auto read_iter = read_set.begin();
+                    read_iter < read_set.end();
+                    ++read_iter) {
+                while (read_iter < read_set.end() &&
+                        read_iter->is_src_var(src_var))
+                    read_set.unordered_erase(read_iter);
+            }
+        }
+        
+        void add_write_set(detail::var_base& dest_var,
+                           const detail::var_storage pending_write,
+                           const detail::hash_t hash) {
+            // up to caller to ensure dest_var is not already in the write_set
+            assert(!find_write_set(dest_var).success());
+            remove_read_set(dest_var);
+            write_set.push_back(&dest_var, pending_write, hash);
         }
         
         LSTM_NOINLINE thread_data() noexcept
