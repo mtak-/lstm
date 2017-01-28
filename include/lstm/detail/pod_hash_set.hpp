@@ -56,6 +56,8 @@ LSTM_DETAIL_BEGIN
                                                    const hash_t hash) noexcept {
             iterator iter = find(dest_var);
             if (iter != end()) {
+                LSTM_LOG_BLOOM_SUCCESS();
+                
                 return write_set_lookup{0, &iter->pending_write()};
             } else {
                 LSTM_LOG_BLOOM_COLLISION();
@@ -102,8 +104,11 @@ LSTM_DETAIL_BEGIN
         // biased against finding the var
         write_set_lookup lookup(const var_base& dest_var) noexcept {
             const hash_t hash = dumb_pointer_hash(dest_var);
-            if (LSTM_LIKELY(!(filter_ & hash)))
+            if (LSTM_LIKELY(!(filter_ & hash))) {
+                LSTM_LOG_BLOOM_SUCCESS();
+                
                 return write_set_lookup{hash, nullptr};
+            }
             return slow_lookup(dest_var, hash);
         }
     };

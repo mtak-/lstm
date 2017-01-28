@@ -19,12 +19,14 @@ LSTM_DETAIL_BEGIN
         std::size_t internal_failures;
         std::size_t successes;
         std::size_t bloom_collisions;
+        std::size_t bloom_successes;
         
         constexpr inline thread_record() noexcept
             : user_failures{0}
             , internal_failures{0}
             , successes{0}
             , bloom_collisions{0}
+            , bloom_successes{0}
         {}
         
         inline constexpr std::size_t total_failures() const noexcept
@@ -45,6 +47,15 @@ LSTM_DETAIL_BEGIN
         inline constexpr float user_failure_rate() const noexcept
         { return user_failures / float(total_transactions()); }
         
+        inline constexpr std::size_t total_bloom_checks() const noexcept
+        { return bloom_collisions + bloom_successes; }
+        
+        inline constexpr float bloom_success_rate() const noexcept
+        { return bloom_successes / float(total_bloom_checks()); }
+        
+        inline constexpr float bloom_collision_rate() const noexcept
+        { return bloom_collisions / float(total_bloom_checks()); }
+        
         std::string results() const {
             std::ostringstream ostr;
             ostr << "    Total Transactions:    " << total_transactions() << '\n'
@@ -56,7 +67,11 @@ LSTM_DETAIL_BEGIN
                  << "    Failure Rate:          " << failure_rate() << '\n'
                  << "    Internal Failure Rate: " << internal_failure_rate() << '\n'
                  << "    User Failure Rate:     " << user_failure_rate() << '\n'
+                 << "    Total Bloom Checks:    " << total_bloom_checks() << '\n'
                  << "    Bloom Collisions:      " << bloom_collisions << '\n'
+                 << "    Bloom Successes:       " << bloom_successes << '\n'
+                 << "    Bloom Collision Rate:  " << bloom_collision_rate() << '\n'
+                 << "    Bloom Success Rate:    " << bloom_success_rate() << '\n'
                  ;
             return ostr.str();
         }
@@ -75,15 +90,8 @@ LSTM_DETAIL_BEGIN
         transaction_log(const transaction_log&) = delete;
         transaction_log& operator=(const transaction_log&) = delete;
         
-        records_iter find_or_register() {
-            auto tid = std::this_thread::get_id();
-            auto iter = _records.find(tid);
-            if (iter == std::end(_records)) {
-                LSTM_GUARD_RECORDS();
-                iter = register_thread(tid);
-            }
-            return iter;
-        }
+        records_iter find_or_register()
+        { return _records.find(std::this_thread::get_id()); }
         
         std::size_t
         total_count(std::function<std::size_t(const thread_record*)> accessor) const noexcept {
@@ -120,6 +128,11 @@ LSTM_DETAIL_BEGIN
             ++iter->second.user_failures;
         }
         
+        void add_bloom_success() noexcept {
+            auto iter = find_or_register();
+            ++iter->second.bloom_successes;
+        }
+        
         void add_bloom_collision() noexcept {
             auto iter = find_or_register();
             ++iter->second.bloom_collisions;
@@ -143,6 +156,12 @@ LSTM_DETAIL_BEGIN
         std::size_t total_bloom_collisions() const noexcept
         { return total_count(&thread_record::bloom_collisions); }
         
+        std::size_t total_bloom_successes() const noexcept
+        { return total_count(&thread_record::bloom_successes); }
+        
+        std::size_t total_bloom_checks() const noexcept
+        { return total_count(&thread_record::total_bloom_checks); }
+        
         inline float success_rate() const noexcept
         { return total_successes() / float(total_transactions()); }
         
@@ -154,6 +173,12 @@ LSTM_DETAIL_BEGIN
         
         inline float user_failure_rate() const noexcept
         { return total_user_failures() / float(total_transactions()); }
+        
+        inline float bloom_success_rate() const noexcept
+        { return total_bloom_successes() / float(total_bloom_checks()); }
+        
+        inline float bloom_collision_rate() const noexcept
+        { return total_bloom_collisions() / float(total_bloom_checks()); }
         
         std::size_t thread_count() const noexcept { return _records.size(); }
         
@@ -181,7 +206,11 @@ LSTM_DETAIL_BEGIN
                  << "Failure Rate:            " << failure_rate() << '\n'
                  << "Internal Failure Rate:   " << internal_failure_rate() << '\n'
                  << "User Failure Rate:       " << user_failure_rate() << '\n'
-                 << "Bloom Collisions:        " << total_bloom_collisions() << "\n\n"
+                 << "Total Bloom Checks:      " << total_bloom_checks() << '\n'
+                 << "Bloom Collisions:        " << total_bloom_collisions() << '\n'
+                 << "Bloom Successes:         " << total_bloom_successes() << '\n'
+                 << "Bloom Collision Rate:    " << bloom_collision_rate() << '\n'
+                 << "Bloom Success Rate:      " << bloom_success_rate() <<  "\n\n"
                  ;
                  
             if (per_thread) {
