@@ -3,6 +3,7 @@
 
 #include <lstm/detail/var_detail.hpp>
 #include <lstm/detail/pod_hash_set.hpp>
+#include <lstm/detail/write_set_lookup.hpp>
 
 #include <lstm/thread_data.hpp>
 #include <lstm/transaction_domain.hpp>
@@ -11,16 +12,6 @@
 #include <cassert>
 
 LSTM_DETAIL_BEGIN
-    struct write_set_lookup {
-        hash_t hash_;
-        var_storage* pending_write_;
-        
-        inline constexpr bool success() const noexcept { return !hash_; }
-        inline constexpr var_storage& pending_write() const noexcept { return *pending_write_; }
-        inline constexpr hash_t& hash() noexcept { return hash_; }
-        inline constexpr hash_t hash() const noexcept { return hash_; }
-    };
-    
     [[noreturn]] LSTM_ALWAYS_INLINE void internal_retry() {
         LSTM_INTERNAL_FAIL_TX();
         throw detail::_tx_retry{};
