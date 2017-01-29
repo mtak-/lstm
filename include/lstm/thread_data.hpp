@@ -31,20 +31,22 @@ LSTM_BEGIN
         friend transaction;
         friend LSTM_NOINLINE inline thread_data& detail::tls_data_init() noexcept;
         
+        using read_set_t = detail::pod_vector<detail::read_set_value_type>;
+        using write_set_t = detail::pod_hash_set<detail::pod_vector<detail::write_set_value_type>>;
+        using callbacks_t = detail::pod_vector<detail::gp_callback>;
+        using read_set_const_iter = typename read_set_t::const_iterator;
+        using write_set_iter = typename write_set_t::iterator;
+        using callbacks_iter = typename callbacks_t::iterator;
+        
         LSTM_CACHE_ALIGNED mutex_type mut;
         LSTM_CACHE_ALIGNED thread_data* next;
         transaction* tx;
         
         // TODO: this is not the best type for these callbacks as it doesn't support sharing
         // how could sharing be made fast for small tx's?
-        detail::pod_vector<detail::gp_callback> succ_callbacks;
-        detail::pod_vector<detail::gp_callback> fail_callbacks;
+        callbacks_t succ_callbacks;
+        callbacks_t fail_callbacks;
         LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
-        
-        using read_set_t = detail::pod_vector<detail::read_set_value_type>;
-        using write_set_t = detail::pod_hash_set<detail::pod_vector<detail::write_set_value_type>>;
-        using read_set_const_iter = typename read_set_t::const_iterator;
-        using write_set_iter = typename write_set_t::iterator;
         
         read_set_t read_set;
         write_set_t write_set;
@@ -206,18 +208,34 @@ LSTM_BEGIN
         
         // TODO: when atomic swap on succ_callbacks is possible, this needs to do just that
         void do_succ_callbacks() noexcept {
+        #ifndef NDEBUG
+            const std::size_t fail_start_size = fail_callbacks.size();
+            const std::size_t succ_start_size = succ_callbacks.size();
+        #endif
             // TODO: if a callback adds a callback, this fails, again need a different type
             for (auto& succ_callback : succ_callbacks)
                 succ_callback();
+            
+            assert(fail_start_size == fail_callbacks.size());
+            assert(succ_start_size == succ_callbacks.size());
+            
             succ_callbacks.clear();
         }
         
         // TODO: when atomic swap on succ_callbacks is possible, this needs to do just that
         void do_fail_callbacks() noexcept {
+        #ifndef NDEBUG
+            const std::size_t fail_start_size = fail_callbacks.size();
+            const std::size_t succ_start_size = succ_callbacks.size();
+        #endif
             // TODO: if a callback adds a callback, this fails, again need a different type
-            for (auto riter = fail_callbacks.end(); riter != fail_callbacks.begin();)
-                (*--riter)(); // fail callbacks are sooo similar to destructors, so they happen
-                              // in reverse order
+            const callbacks_iter begin = fail_callbacks.begin();
+            for (callbacks_iter riter = fail_callbacks.end(); riter != begin;)
+                (*--riter)();
+            
+            assert(fail_start_size == fail_callbacks.size());
+            assert(succ_start_size == succ_callbacks.size());
+            
             fail_callbacks.clear();
         }
     };
