@@ -48,10 +48,10 @@ LSTM_DETAIL_BEGIN
             "");
     
     struct yield {
-        LSTM_ALWAYS_INLINE void operator()() noexcept
+        LSTM_ALWAYS_INLINE void operator()() const noexcept
         { std::this_thread::yield(); }
         
-        LSTM_ALWAYS_INLINE void reset() noexcept {}
+        LSTM_ALWAYS_INLINE void reset() const noexcept {}
     };
     
     static_assert(is_backoff_strategy<yield>{}, "");

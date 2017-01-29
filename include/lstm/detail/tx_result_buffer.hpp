@@ -58,6 +58,7 @@ LSTM_DETAIL_BEGIN
         tx_result_buffer(const tx_result_buffer&) = delete;
         tx_result_buffer& operator=(const tx_result_buffer&) = delete;
         
+        // t is a reference in case you forgot
         void emplace(T t) noexcept {
             data = &t;
             initialized = true;
