@@ -22,7 +22,7 @@ LSTM_BEGIN
         
         // returns the previous version
         inline gp_t fetch_and_bump_clock() noexcept {
-            gp_t result = clock.fetch_add(1, LSTM_RELAXED);
+            const gp_t result = clock.fetch_add(1, LSTM_RELAXED);
             assert(result < max_version - 1);
             return result;
         }
