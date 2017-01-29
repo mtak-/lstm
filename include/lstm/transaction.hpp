@@ -12,14 +12,14 @@
 LSTM_DETAIL_BEGIN
     [[noreturn]] LSTM_ALWAYS_INLINE void internal_retry() {
         LSTM_INTERNAL_FAIL_TX();
-        throw detail::_tx_retry{};
+        throw tx_retry{};
     }
 LSTM_DETAIL_END
 
 LSTM_BEGIN
     [[noreturn]] inline void retry() {
         LSTM_USER_FAIL_TX();
-        throw detail::_tx_retry{};
+        throw detail::tx_retry{};
     }
     
     struct transaction {
@@ -31,18 +31,18 @@ LSTM_BEGIN
         
         static constexpr gp_t lock_bit = gp_t(1) << (sizeof(gp_t) * 8 - 1);
         
-        transaction_domain* _domain;
+        transaction_domain* domain_;
         thread_data* tls_td;
         gp_t read_version;
         
-        inline transaction_domain& domain() noexcept { return *_domain; }
-        inline const transaction_domain& domain() const noexcept { return *_domain; }
+        inline transaction_domain& domain() noexcept { return *domain_; }
+        inline const transaction_domain& domain() const noexcept { return *domain_; }
         
         inline void reset_read_version() noexcept
         { tls_td->access_relock(read_version = domain().get_clock()); }
         
         inline transaction(transaction_domain& in_domain, thread_data& in_tls_td) noexcept
-            : _domain(&in_domain)
+            : domain_(&in_domain)
             , tls_td(&in_tls_td)
         {
             assert(&tls_thread_data() == tls_td);

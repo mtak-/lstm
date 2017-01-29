@@ -287,19 +287,19 @@ LSTM_BEGIN
                                         !std::is_final<Alloc>{}>
         struct tx_alloc_adaptor_base {
         private:
-            Alloc _alloc;
+            Alloc alloc_;
             
         protected:
             constexpr tx_alloc_adaptor_base() = default;
             constexpr tx_alloc_adaptor_base(const Alloc& in_alloc)
-                : _alloc(in_alloc)
+                : alloc_(in_alloc)
             {}
             constexpr tx_alloc_adaptor_base(Alloc&& in_alloc)
-                : _alloc(std::move(in_alloc))
+                : alloc_(std::move(in_alloc))
             {}
             
-            Alloc& alloc() noexcept { return _alloc; }
-            const Alloc& alloc() const noexcept { return _alloc; }
+            Alloc& alloc() noexcept { return alloc_; }
+            const Alloc& alloc() const noexcept { return alloc_; }
         };
         
         template<typename Alloc>

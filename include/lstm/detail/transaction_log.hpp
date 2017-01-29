@@ -9,10 +9,6 @@
 #include <string>
 #include <thread>
 
-#ifndef LSTM_GUARD_RECORDS
-    #define LSTM_GUARD_RECORDS() std::lock_guard<std::mutex> _guard{records_mut}
-#endif
-
 LSTM_DETAIL_BEGIN
     struct thread_record {
         std::size_t user_failures;
@@ -83,7 +79,7 @@ LSTM_DETAIL_BEGIN
         using records_iter = typename records_t::iterator;
         using records_value_type = typename records_t::value_type;
         
-        records_t _records;
+        records_t records_;
         std::mutex records_mut;
         
         transaction_log() = default;
@@ -91,12 +87,12 @@ LSTM_DETAIL_BEGIN
         transaction_log& operator=(const transaction_log&) = delete;
         
         records_iter find_or_register()
-        { return _records.find(std::this_thread::get_id()); }
+        { return records_.find(std::this_thread::get_id()); }
         
         std::size_t
         total_count(std::function<std::size_t(const thread_record*)> accessor) const noexcept {
             std::size_t result = 0;
-            for (auto& tid_record : _records)
+            for (auto& tid_record : records_)
                 result += accessor(&tid_record.second);
             return result;
         }
@@ -108,7 +104,7 @@ LSTM_DETAIL_BEGIN
         }
         
         inline records_iter register_thread(const std::thread::id& id) noexcept {
-            auto iter_success = _records.emplace(id, thread_record());
+            auto iter_success = records_.emplace(id, thread_record());
             assert(iter_success.second);
             return iter_success.first;
         }
@@ -180,18 +176,18 @@ LSTM_DETAIL_BEGIN
         inline float bloom_collision_rate() const noexcept
         { return total_bloom_collisions() / float(total_bloom_checks()); }
         
-        std::size_t thread_count() const noexcept { return _records.size(); }
+        std::size_t thread_count() const noexcept { return records_.size(); }
         
-        const records_t& records() const noexcept { return _records; }
+        const records_t& records() const noexcept { return records_; }
         
-        void clear() noexcept { _records.clear(); }
+        void clear() noexcept { records_.clear(); }
         
         bool each_threads_successes_equals(std::size_t count) const noexcept {
-            return std::find_if(std::begin(_records),
-                                std::end(_records),
+            return std::find_if(std::begin(records_),
+                                std::end(records_),
                                 [count](const records_value_type& thread_record) noexcept -> bool
                                 { return thread_record.second.successes != count; })
-                == std::end(_records);
+                == std::end(records_);
         }
         
         std::string results(bool per_thread = true) const {
@@ -215,7 +211,7 @@ LSTM_DETAIL_BEGIN
                  
             if (per_thread) {
                 std::size_t i = 0;
-                for (auto& record : _records) {
+                for (auto& record : records_) {
                     ostr << "--== Thread: "<< std::setw(4) << i++ << " ==--" << '\n';
                     ostr << record.second.results() << '\n';
                 }
@@ -224,7 +220,5 @@ LSTM_DETAIL_BEGIN
         }
     };
 LSTM_DETAIL_END
-
-#undef LSTM_GUARD_RECORDS
 
 #endif /*LSTM_DETAIL_TRANSACTION_LOG_HPP*/

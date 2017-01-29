@@ -41,16 +41,16 @@ LSTM_DETAIL_BEGIN
     template<typename Alloc, bool = std::is_final<Alloc>{}>
     struct alloc_wrapper {
     private:
-        Alloc _alloc;
+        Alloc alloc_;
     
     public:
         constexpr alloc_wrapper() = default;
         constexpr alloc_wrapper(const Alloc& in_alloc) noexcept
-            : _alloc(in_alloc)
+            : alloc_(in_alloc)
         {}
             
-        constexpr Alloc& alloc() noexcept { return _alloc; }
-        constexpr const Alloc& alloc() const noexcept { return _alloc; }
+        constexpr Alloc& alloc() noexcept { return alloc_; }
+        constexpr const Alloc& alloc() const noexcept { return alloc_; }
     };
     
     template<typename Alloc>

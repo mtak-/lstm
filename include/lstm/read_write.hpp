@@ -71,7 +71,7 @@ LSTM_DETAIL_BEGIN
                         return return_tx_result_buffer_fn{}(buf);
                     }
                     buf.reset();
-                } catch(const _tx_retry&) {
+                } catch(const tx_retry&) {
                     // nothing
                 } catch(...) {
                     unhandled_exception(tx, tls_td);

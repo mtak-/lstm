@@ -9,20 +9,20 @@ LSTM_BEGIN
         using rebind_to = typename std::allocator_traits<Alloc>::template rebind_alloc<T>;
         
         template<typename T, typename Alloc>
-        struct _list_node {
+        struct list_node_ {
             lstm::var<T, rebind_to<Alloc, T>> value;
-            lstm::var<void*, rebind_to<Alloc, void*>> _prev;
-            lstm::var<void*, rebind_to<Alloc, void*>> _next;
+            lstm::var<void*, rebind_to<Alloc, void*>> prev_;
+            lstm::var<void*, rebind_to<Alloc, void*>> next_;
             
             template<typename... Us,
                 LSTM_REQUIRES_(sizeof...(Us) != 1)>
-            _list_node(Us&&... us) noexcept(std::is_nothrow_constructible<T, Us&&...>{})
+            list_node_(Us&&... us) noexcept(std::is_nothrow_constructible<T, Us&&...>{})
                 : value((Us&&)us...)
             {}
             
             template<typename U,
-                LSTM_REQUIRES_(!std::is_same<uncvref<U>, _list_node<T, Alloc>>{})>
-            _list_node(U&& u) noexcept(std::is_nothrow_constructible<T, U&&>{})
+                LSTM_REQUIRES_(!std::is_same<uncvref<U>, list_node_<T, Alloc>>{})>
+            list_node_(U&& u) noexcept(std::is_nothrow_constructible<T, U&&>{})
                 : value((U&&)u)
             {}
         };
@@ -30,46 +30,46 @@ LSTM_BEGIN
     
     template<typename T, typename Alloc_ = std::allocator<T>>
     struct list
-        : private detail::rebind_to<Alloc_, detail::_list_node<T, Alloc_>>
+        : private detail::rebind_to<Alloc_, detail::list_node_<T, Alloc_>>
     {
     private:
-        using node_t = detail::_list_node<T, Alloc_>;
+        using node_t = detail::list_node_<T, Alloc_>;
         using Alloc = detail::rebind_to<Alloc_, node_t>;
         using alloc_traits = std::allocator_traits<Alloc>;
         
         lstm::var<node_t*, detail::rebind_to<Alloc, node_t*>> head{nullptr};
-        lstm::var<word, detail::rebind_to<Alloc, word>> _size{0};
+        lstm::var<word, detail::rebind_to<Alloc, word>> size_{0};
         
         Alloc& alloc() noexcept { return *this; }
         const Alloc& alloc() const noexcept { return *this; }
         
         template<typename Transaction>
         static node_t* prev(node_t& n, Transaction& tx)
-        { return reinterpret_cast<node_t*>(tx.read(n._prev)); }
+        { return reinterpret_cast<node_t*>(tx.read(n.prev_)); }
         
         template<typename Transaction>
         static const node_t* prev(const node_t& n, Transaction& tx)
-        { return reinterpret_cast<const node_t*>(tx.read(n._prev)); }
+        { return reinterpret_cast<const node_t*>(tx.read(n.prev_)); }
         
         template<typename Transaction>
         static node_t* next(node_t& n, Transaction& tx)
-        { return reinterpret_cast<node_t*>(tx.read(n._next)); }
+        { return reinterpret_cast<node_t*>(tx.read(n.next_)); }
         
         template<typename Transaction>
         static const node_t* next(const node_t& n, Transaction& tx)
-        { return reinterpret_cast<const node_t*>(tx.read(n._next)); }
+        { return reinterpret_cast<const node_t*>(tx.read(n.next_)); }
         
         static node_t* unsafe_prev(node_t& n) noexcept
-        { return reinterpret_cast<node_t*>(n._prev.unsafe_read()); }
+        { return reinterpret_cast<node_t*>(n.prev_.unsafe_read()); }
         
         static const node_t* unsafe_prev(const node_t& n) noexcept
-        { return reinterpret_cast<const node_t*>(n._prev.unsafe_read()); }
+        { return reinterpret_cast<const node_t*>(n.prev_.unsafe_read()); }
         
         static node_t* unsafe_next(node_t& n) noexcept
-        { return reinterpret_cast<node_t*>(n._next.unsafe_read()); }
+        { return reinterpret_cast<node_t*>(n.next_.unsafe_read()); }
         
         static const node_t* unsafe_next(const node_t& n) noexcept
-        { return reinterpret_cast<const node_t*>(n._next.unsafe_read()); }
+        { return reinterpret_cast<const node_t*>(n.next_.unsafe_read()); }
         
     public:
         constexpr list() noexcept(std::is_nothrow_default_constructible<Alloc>{}) = default;
@@ -91,7 +91,7 @@ LSTM_BEGIN
         void clear() {
             thread_data& tls_td = tls_thread_data();
             auto* node = lstm::read_write([&](auto& tx) {
-                tx.write(_size, 0);
+                tx.write(size_, 0);
                 auto result = tx.read(head);
                 tx.write(head, nullptr);
                 return result;
@@ -115,18 +115,18 @@ LSTM_BEGIN
             thread_data& tls_td = tls_thread_data();
             node_t* new_head = lstm::allocate_construct(tls_td, alloc(), (Us&&)us...);
             lstm::read_write([&](auto& tx) {
-                auto _head = tx.read(head);
-                new_head->_next.unsafe_write(_head);
+                auto head_ = tx.read(head);
+                new_head->next_.unsafe_write(head_);
                 
-                if (_head)
-                    tx.write(_head->_prev, (void*)new_head);
-                tx.write(_size, tx.read(_size) + 1);
+                if (head_)
+                    tx.write(head_->prev_, (void*)new_head);
+                tx.write(size_, tx.read(size_) + 1);
                 tx.write(head, new_head);
             }, default_domain(), tls_td);
         }
         
         word size() const {
-            return lstm::read_write([&](auto& tx) { return tx.read(_size); });
+            return lstm::read_write([&](auto& tx) { return tx.read(size_); });
         }
     };
 LSTM_END

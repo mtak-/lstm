@@ -238,20 +238,20 @@ LSTM_BEGIN
     };
     
     namespace detail {
-        LSTM_INLINE_VAR LSTM_THREAD_LOCAL thread_data* _tls_thread_data_ptr = nullptr;
+        LSTM_INLINE_VAR LSTM_THREAD_LOCAL thread_data* tls_thread_data_ptr = nullptr;
         
         // TODO: still feel like this garbage is overkill, maybe this only applies to darwin
         LSTM_NOINLINE inline thread_data& tls_data_init() noexcept {
-            static LSTM_THREAD_LOCAL thread_data _tls_thread_data{};
-            LSTM_ACCESS_INLINE_VAR(_tls_thread_data_ptr) = &_tls_thread_data;
-            return *LSTM_ACCESS_INLINE_VAR(_tls_thread_data_ptr);
+            static LSTM_THREAD_LOCAL thread_data tls_thread_data{};
+            LSTM_ACCESS_INLINE_VAR(tls_thread_data_ptr) = &tls_thread_data;
+            return *LSTM_ACCESS_INLINE_VAR(tls_thread_data_ptr);
         }
     }
     
     LSTM_ALWAYS_INLINE thread_data& tls_thread_data() noexcept {
-        if (LSTM_UNLIKELY(!LSTM_ACCESS_INLINE_VAR(detail::_tls_thread_data_ptr)))
+        if (LSTM_UNLIKELY(!LSTM_ACCESS_INLINE_VAR(detail::tls_thread_data_ptr)))
             return detail::tls_data_init();
-        return *LSTM_ACCESS_INLINE_VAR(detail::_tls_thread_data_ptr);
+        return *LSTM_ACCESS_INLINE_VAR(detail::tls_thread_data_ptr);
     }
     
     static_assert(std::is_standard_layout<thread_data>{}, "");

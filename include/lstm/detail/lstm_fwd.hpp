@@ -135,7 +135,7 @@ LSTM_DETAIL_BEGIN
     struct read_write_fn;
     struct var_base;
     
-    struct _tx_retry {};
+    struct tx_retry {};
     
     template<typename T>
     using uncvref = std::remove_cv_t<std::remove_reference_t<T>>;
