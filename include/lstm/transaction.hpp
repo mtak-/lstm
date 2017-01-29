@@ -17,7 +17,7 @@ LSTM_DETAIL_BEGIN
 LSTM_DETAIL_END
 
 LSTM_BEGIN
-    [[noreturn]] inline void retry() {
+    [[noreturn]] LSTM_ALWAYS_INLINE void retry() {
         LSTM_USER_FAIL_TX();
         throw detail::tx_retry{};
     }
@@ -74,18 +74,21 @@ LSTM_BEGIN
                                                            LSTM_RELAXED);
         }
         
+        // x86_64: likely compiles to mov
         static inline void unlock(const gp_t version_to_set, detail::var_base& v) noexcept {
             assert(locked(v.version_lock.load(LSTM_RELAXED)));
             assert(!locked(version_to_set));
             v.version_lock.store(version_to_set, LSTM_RELEASE);
         }
         
+        // x86: likely compiles to xor
         static inline void unlock(detail::var_base& v) noexcept {
-            assert(locked(v.version_lock.load(LSTM_RELAXED)));
-            v.version_lock.fetch_xor(lock_bit, LSTM_RELEASE);
+            const gp_t locked_version = v.version_lock.load(LSTM_RELAXED);
+            assert(locked(locked_version));
+            v.version_lock.store(locked_version ^ lock_bit, LSTM_RELEASE);
         }
         
-        static void unlock_write_set(write_set_iter begin, write_set_iter end) noexcept {
+        static void unlock_write_set(write_set_iter begin, const write_set_iter end) noexcept {
             for (; begin != end; ++begin)
                 unlock(begin->dest_var());
         }
