@@ -8,32 +8,22 @@
 LSTM_DETAIL_BEGIN
     struct read_set_value_type {
     private:
-        const var_base* _src_var;
+        const var_base* src_var_;
         
     public:
         inline read_set_value_type() noexcept = default;
         inline constexpr read_set_value_type(const var_base* const in_src_var) noexcept
-            : _src_var(in_src_var)
-        { assert(_src_var); }
+            : src_var_(in_src_var)
+        { assert(src_var_); }
         
         inline constexpr const var_base& src_var() const noexcept {
-            assert(_src_var);
-            return *_src_var;
+            assert(src_var_);
+            return *src_var_;
         }
         
         inline constexpr bool is_src_var(const var_base& rhs) const noexcept {
-            assert(_src_var);
-            return _src_var == &rhs;
-        }
-        
-        inline constexpr bool operator<(const read_set_value_type& rhs) const noexcept {
-            assert(_src_var && rhs._src_var);
-            return _src_var < rhs._src_var;
-        }
-        
-        inline constexpr bool operator==(const read_set_value_type& rhs) const noexcept {
-            assert(_src_var && rhs._src_var);
-            return _src_var == rhs._src_var;
+            assert(src_var_);
+            return src_var_ == &rhs;
         }
     };
 LSTM_DETAIL_END

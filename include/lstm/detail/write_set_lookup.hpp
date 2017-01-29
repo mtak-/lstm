@@ -10,12 +10,12 @@ LSTM_DETAIL_BEGIN
         var_storage* pending_write_;
         
     public:
-        constexpr write_set_lookup(var_storage* const in_pending_write) noexcept
+        inline constexpr write_set_lookup(var_storage* const in_pending_write) noexcept
             : hash_(0)
             , pending_write_(in_pending_write)
         { assert(pending_write_ != nullptr); }
         
-        write_set_lookup(const hash_t in_hash) noexcept
+        inline write_set_lookup(const hash_t in_hash) noexcept
             : hash_(in_hash)
         { assert(hash_ != 0); }
         
