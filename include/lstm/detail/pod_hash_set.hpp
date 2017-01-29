@@ -58,11 +58,11 @@ LSTM_DETAIL_BEGIN
             if (iter != end()) {
                 LSTM_LOG_BLOOM_SUCCESS();
                 
-                return write_set_lookup{0, &iter->pending_write()};
+                return write_set_lookup{&iter->pending_write()};
             } else {
                 LSTM_LOG_BLOOM_COLLISION();
                 
-                return write_set_lookup{hash, nullptr};
+                return write_set_lookup{hash};
             }
         }
         
@@ -107,7 +107,7 @@ LSTM_DETAIL_BEGIN
             if (LSTM_LIKELY(!(filter_ & hash))) {
                 LSTM_LOG_BLOOM_SUCCESS();
                 
-                return write_set_lookup{hash, nullptr};
+                return write_set_lookup{hash};
             }
             return slow_lookup(dest_var, hash);
         }
