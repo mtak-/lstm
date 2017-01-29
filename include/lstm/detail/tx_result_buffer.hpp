@@ -12,12 +12,18 @@ LSTM_DETAIL_BEGIN
     struct tx_result_buffer {
     private:
         uninitialized<T> data;
+    #ifndef NDEBUG
         bool initialized;
+    #endif
         
         friend return_tx_result_buffer_fn;
         
     public:
-        tx_result_buffer() noexcept : initialized{false} {}
+        constexpr tx_result_buffer() noexcept
+        #ifndef NDEBUG
+            : initialized{false}
+        #endif
+        {}
         tx_result_buffer(const tx_result_buffer&) = delete;
         tx_result_buffer& operator=(const tx_result_buffer&) = delete;
         
@@ -25,13 +31,16 @@ LSTM_DETAIL_BEGIN
         void emplace(U&& u) noexcept(std::is_nothrow_constructible<T, U&&>{}) {
             assert(!initialized);
             ::new (&data) T((U&&)u);
+        #ifndef NDEBUG
             initialized = true;
+        #endif
         }
         
-        bool is_initialized() const noexcept { return initialized; }
         void reset() noexcept {
             assert(initialized);
+        #ifndef NDEBUG
             initialized = false;
+        #endif
             reinterpret_cast<T&>(data).~T();
         }
     };
@@ -45,7 +54,7 @@ LSTM_DETAIL_BEGIN
         friend return_tx_result_buffer_fn;
         
     public:
-        tx_result_buffer() noexcept : initialized{false} {}
+        constexpr tx_result_buffer() noexcept : initialized{false} {}
         tx_result_buffer(const tx_result_buffer&) = delete;
         tx_result_buffer& operator=(const tx_result_buffer&) = delete;
         
@@ -54,7 +63,6 @@ LSTM_DETAIL_BEGIN
             initialized = true;
         }
         
-        bool is_initialized() const noexcept { return initialized; }
         void reset() noexcept {
             assert(initialized);
             initialized = false;
@@ -70,12 +78,11 @@ LSTM_DETAIL_BEGIN
         tx_result_buffer(const tx_result_buffer&) = delete;
         tx_result_buffer& operator=(const tx_result_buffer&) = delete;
         
-        bool is_initialized() const noexcept { return false; }
-        void reset() noexcept {}
+        constexpr void reset() noexcept {}
     };
     
     struct return_tx_result_buffer_fn {
-        void operator()(tx_result_buffer<void, false>&) noexcept {}
+        constexpr void operator()(tx_result_buffer<void, false>&) noexcept {}
         
         template<typename T>
         T& operator()(tx_result_buffer<T&, true>& buf) noexcept {
