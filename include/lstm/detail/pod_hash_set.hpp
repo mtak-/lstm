@@ -95,11 +95,6 @@ LSTM_DETAIL_BEGIN
             filter_ |= hash;
             data.emplace_back(value, pending_write);
         }
-            
-        iterator begin() noexcept { return data.begin(); }
-        iterator end() noexcept { return data.end(); }
-        const_iterator begin() const noexcept { return data.begin(); }
-        const_iterator end() const noexcept { return data.end(); }
         
         // biased against finding the var
         write_set_lookup lookup(const var_base& dest_var) noexcept {
@@ -111,6 +106,11 @@ LSTM_DETAIL_BEGIN
             }
             return slow_lookup(dest_var, hash);
         }
+            
+        iterator begin() noexcept { return data.begin(); }
+        iterator end() noexcept { return data.end(); }
+        const_iterator begin() const noexcept { return data.begin(); }
+        const_iterator end() const noexcept { return data.end(); }
     };
 LSTM_DETAIL_END
 
