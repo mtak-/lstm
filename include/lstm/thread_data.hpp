@@ -86,11 +86,8 @@ LSTM_BEGIN
         { read_set.emplace_back(&src_var); }
         
         void remove_read_set(const detail::var_base& src_var) noexcept {
-            for (auto read_iter = read_set.begin();
-                    read_iter < read_set.end();
-                    ++read_iter) {
-                while (read_iter < read_set.end() &&
-                        read_iter->is_src_var(src_var))
+            for (auto read_iter = read_set.begin(); read_iter < read_set.end(); ++read_iter) {
+                while (read_iter < read_set.end() && read_iter->is_src_var(src_var))
                     read_set.unordered_erase(read_iter);
             }
         }
