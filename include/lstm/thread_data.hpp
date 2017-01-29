@@ -25,10 +25,6 @@ LSTM_DETAIL_END
 LSTM_BEGIN
     LSTM_ALWAYS_INLINE thread_data& tls_thread_data() noexcept;
     
-    // with the guarantee of no nested critical sections only one bit is needed
-    // to say a thread is active.
-    // this means the remaining bits can be used for the grace period, resulting
-    // in concurrent writes
     struct LSTM_CACHE_ALIGNED thread_data {
     private:
         friend struct detail::read_write_fn;
@@ -39,9 +35,8 @@ LSTM_BEGIN
         LSTM_CACHE_ALIGNED thread_data* next;
         transaction* tx;
         
-        // TODO: this is a terrible type for succ_callbacks
-        // also probly should be a few different kinds of callbacks (succ/fail/always)
-        // sharing of succ_callbacks would be nice, but how could it be made fast for small tx's?
+        // TODO: this is not the best type for these callbacks as it doesn't support sharing
+        // how could sharing be made fast for small tx's?
         detail::pod_vector<detail::gp_callback> succ_callbacks;
         detail::pod_vector<detail::gp_callback> fail_callbacks;
         LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
