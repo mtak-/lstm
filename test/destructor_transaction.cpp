@@ -8,19 +8,27 @@ using lstm::var;
 
 static constexpr auto loop_count = LSTM_TEST_INIT(1000000, 40000);
 
-struct vec4 {
+struct vec4
+{
     long long x, y, z, w;
-    
+
     vec4(long long a, long long b, long long c, long long d)
-        : x(a), y(b), z(c), w(d) {}
+        : x(a)
+        , y(b)
+        , z(c)
+        , w(d)
+    {
+    }
 };
 
 static_assert(var<vec4>::atomic == false);
 
 var<vec4> x{0, 0, 0, 0};
 
-struct destruct {
-    ~destruct() noexcept(false) {
+struct destruct
+{
+    ~destruct() noexcept(false)
+    {
         read_write([&](auto& tx) {
             auto y = tx.read(x);
             ++y.w;
@@ -29,10 +37,11 @@ struct destruct {
     }
 };
 
-int main() {
+int main()
+{
     {
         thread_manager tm;
-        
+
         tm.queue_thread([&] {
             for (int j = 0; j < loop_count; ++j) {
                 read_write([&](auto& tx) {
@@ -42,7 +51,7 @@ int main() {
                 });
             }
         });
-        
+
         tm.queue_thread([&] {
             for (int j = 0; j < loop_count; ++j) {
                 read_write([&](auto& tx) {
@@ -52,7 +61,7 @@ int main() {
                 });
             }
         });
-        
+
         tm.queue_thread([&] {
             static std::allocator<destruct> alloc{};
             for (int j = 0; j < loop_count; ++j) {
@@ -65,14 +74,14 @@ int main() {
                 });
             }
         });
-        
+
         tm.run();
     }
-    
+
     CHECK(x.unsafe_read().x == loop_count);
     CHECK(x.unsafe_read().y == loop_count);
     CHECK(x.unsafe_read().z == loop_count);
     CHECK(x.unsafe_read().w == loop_count);
-    
+
     return test_result();
 }

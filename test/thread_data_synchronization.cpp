@@ -9,10 +9,11 @@ static constexpr auto loop_count0 = LSTM_TEST_INIT(5000000, 200000);
 
 using lstm::uword;
 
-int main() {
-    thread_manager manager;
+int main()
+{
+    thread_manager          manager;
     std::atomic<lstm::gp_t> gp{0};
-    
+
     for (int j = 0; j < 5; ++j) {
         manager.queue_thread([&] {
             auto& tls_td = lstm::tls_thread_data();
@@ -23,8 +24,8 @@ int main() {
             }
         });
     }
-    
+
     manager.run();
-    
+
     return test_result();
 }
