@@ -12,10 +12,11 @@ using lstm::easy_var;
 static easy_var<int, debug_alloc<int>> account0{300};
 static easy_var<int, debug_alloc<int>> account1{300};
 
-int main() {
+int main()
+{
     {
         thread_manager manager;
-        
+
         manager.queue_thread([] {
             for (int i = 0; i < loop_count0; ++i) {
                 lstm::read_write([] {
@@ -27,7 +28,7 @@ int main() {
                 });
             }
         });
-        
+
         manager.queue_thread([] {
             for (int i = 0; i < loop_count1; ++i) {
                 lstm::read_write([] {
@@ -39,13 +40,13 @@ int main() {
                 });
             }
         });
-        
+
         manager.run();
-        
+
         CHECK(account0.unsafe_read() == 280);
         CHECK(account1.unsafe_read() == 320);
     }
     CHECK(debug_live_allocations<> == 0);
-    
+
     return test_result();
 }

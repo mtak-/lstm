@@ -7,7 +7,8 @@
 
 using lstm::var;
 
-int main() {
+int main()
+{
     CHECK(std::atomic<int>{0}.is_lock_free());
     // value tests
     {
@@ -56,7 +57,7 @@ int main() {
     }
     {
         using alloc = std::scoped_allocator_adaptor<std::allocator<std::vector<int>>>;
-        var<std::vector<int>, alloc> x{std::allocator_arg, alloc{}, std::vector<int>{0,1,2,3}};
+        var<std::vector<int>, alloc> x{std::allocator_arg, alloc{}, std::vector<int>{0, 1, 2, 3}};
         auto foo = x.unsafe_read();
         foo.push_back(42);
         x.unsafe_write(std::move(foo));

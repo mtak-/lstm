@@ -5,16 +5,16 @@
 #include "simple_test.hpp"
 
 LSTM_TEST_BEGIN
-    struct transaction_tester {
-        static int run_tests();
-    };
+struct transaction_tester
+{
+    static int run_tests();
+};
 LSTM_TEST_END
 
-int main() {
-    return lstm::test::transaction_tester::run_tests();
-}
+int main() { return lstm::test::transaction_tester::run_tests(); }
 
-int lstm::test::transaction_tester::run_tests() {
+int lstm::test::transaction_tester::run_tests()
+{
     // using tx_t = detail::transaction_impl<std::allocator<int>, 4, 4, 4>;
     // // init
     // {
