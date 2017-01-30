@@ -9,97 +9,120 @@ LSTM_DETAIL_BEGIN
     struct return_tx_result_buffer_fn;
 
     template<typename T, bool = std::is_reference<T>{}>
-    struct tx_result_buffer {
+    struct tx_result_buffer
+    {
     private:
         uninitialized<T> data;
-    #ifndef NDEBUG
+#ifndef NDEBUG
         bool initialized;
-    #endif
-        
+#endif
+
         friend return_tx_result_buffer_fn;
-        
+
     public:
         constexpr tx_result_buffer() noexcept
-        #ifndef NDEBUG
-            : initialized{false}
-        #endif
-        {}
+#ifndef NDEBUG
+            : initialized(false)
+#endif
+        {
+        }
+
         tx_result_buffer(const tx_result_buffer&) = delete;
         tx_result_buffer& operator=(const tx_result_buffer&) = delete;
-        
+
         template<typename U>
-        void emplace(U&& u) noexcept(std::is_nothrow_constructible<T, U&&>{}) {
+        void emplace(U&& u) noexcept(std::is_nothrow_constructible<T, U&&>{})
+        {
             assert(!initialized);
-            ::new (&data) T((U&&)u);
-        #ifndef NDEBUG
+            ::new (&data) T((U &&) u);
+#ifndef NDEBUG
             initialized = true;
-        #endif
+#endif
         }
-        
-        void reset() noexcept {
+
+        void reset() noexcept
+        {
             assert(initialized);
-        #ifndef NDEBUG
+#ifndef NDEBUG
             initialized = false;
-        #endif
+#endif
             reinterpret_cast<T&>(data).~T();
         }
     };
 
     template<typename T>
-    struct tx_result_buffer<T, true> {
+    struct tx_result_buffer<T, true>
+    {
     private:
         std::remove_reference_t<T>* data;
-        bool initialized{false};
-        
+        bool                        initialized{false};
+
         friend return_tx_result_buffer_fn;
-        
+
     public:
-        constexpr tx_result_buffer() noexcept : initialized{false} {}
+        constexpr tx_result_buffer() noexcept
+#ifndef NDEBUG
+            : initialized(false)
+#endif
+        {
+        }
+
         tx_result_buffer(const tx_result_buffer&) = delete;
         tx_result_buffer& operator=(const tx_result_buffer&) = delete;
-        
+
         // t is a reference in case you forgot
-        void emplace(T t) noexcept {
+        void emplace(T t) noexcept
+        {
+            assert(!initialized);
             data = &t;
+#ifndef NDEBUG
             initialized = true;
+#endif
         }
-        
-        void reset() noexcept {
+
+        void reset() noexcept
+        {
             assert(initialized);
+#ifndef NDEBUG
             initialized = false;
+#endif
         }
     };
-    
+
     template<>
-    struct tx_result_buffer<void, false> {
+    struct tx_result_buffer<void, false>
+    {
         friend return_tx_result_buffer_fn;
-        
+
     public:
-        tx_result_buffer() noexcept = default;
+        tx_result_buffer() noexcept               = default;
         tx_result_buffer(const tx_result_buffer&) = delete;
         tx_result_buffer& operator=(const tx_result_buffer&) = delete;
-        
+
         constexpr void reset() noexcept {}
     };
-    
-    struct return_tx_result_buffer_fn {
+
+    struct return_tx_result_buffer_fn
+    {
         constexpr void operator()(tx_result_buffer<void, false>&) noexcept {}
-        
+
         template<typename T>
-        T& operator()(tx_result_buffer<T&, true>& buf) noexcept {
+        T& operator()(tx_result_buffer<T&, true>& buf) noexcept
+        {
             assert(buf.initialized);
             return *buf.data;
         }
-        
+
         template<typename T>
-        T&& operator()(tx_result_buffer<T&&, true>& buf) noexcept {
+        T&& operator()(tx_result_buffer<T&&, true>& buf) noexcept
+        {
             assert(buf.initialized);
             return std::move(*buf.data);
         }
-        
+
         template<typename T>
-        T operator()(tx_result_buffer<T, false>& buf)
-            noexcept(std::is_nothrow_move_constructible<T>{})
+        T operator()(tx_result_buffer<T, false>& buf) noexcept(
+            std::is_nothrow_move_constructible<T>{})
         {
             assert(buf.initialized);
             return std::move(reinterpret_cast<T&>(buf.data));
