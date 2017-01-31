@@ -71,8 +71,8 @@ JavaScriptQuotes: Leave
 JavaScriptWrapImports: true
 KeepEmptyLinesAtTheStartOfBlocks: false
 Language: Cpp
-MacroBlockBegin: '^(LSTM_BEGIN|LSTM_DETAIL_BEGIN)$'
-MacroBlockEnd:   '^(LSTM_END|LSTM_DETAIL_END)$'
+MacroBlockBegin: '^(LSTM_BEGIN|LSTM_DETAIL_BEGIN|LSTM_TEST_BEGIN)$'
+MacroBlockEnd:   '^(LSTM_END|LSTM_DETAIL_END|LSTM_TEST_END)$'
 MaxEmptyLinesToKeep: 1
 NamespaceIndentation: All
 ObjCBlockIndentWidth: 4
