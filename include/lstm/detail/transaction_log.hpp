@@ -8,6 +8,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <tuple>
 
 LSTM_DETAIL_BEGIN
     struct thread_record
@@ -107,60 +108,39 @@ LSTM_DETAIL_BEGIN
         transaction_log(const transaction_log&) = delete;
         transaction_log& operator=(const transaction_log&) = delete;
 
-        records_iter find_or_register() { return records_.find(std::this_thread::get_id()); }
+        thread_record& find_record() noexcept
+        {
+            return records_.find(std::this_thread::get_id())->second;
+        }
 
         std::size_t
         total_count(std::function<std::size_t(const thread_record*)> accessor) const noexcept
         {
             std::size_t result = 0;
-            for (auto& tid_record : records_)
+            for (thread_record& tid_record : records_)
                 result += accessor(&tid_record.second);
             return result;
         }
 
     public:
-        static transaction_log& get()
+        static transaction_log& get() noexcept
         {
             static transaction_log singleton;
             return singleton;
         }
 
-        inline records_iter register_thread(const std::thread::id& id) noexcept
+        inline void register_thread(const std::thread::id& id) noexcept
         {
-            auto iter_success = records_.emplace(id, thread_record());
-            assert(iter_success.second);
-            return iter_success.first;
+            bool success;
+            std::tie(std::ignore, success) = records_.emplace(id, thread_record());
+            assert(success);
         }
 
-        void add_success() noexcept
-        {
-            auto iter = find_or_register();
-            ++iter->second.successes;
-        }
-
-        void add_internal_failure() noexcept
-        {
-            auto iter = find_or_register();
-            ++iter->second.internal_failures;
-        }
-
-        void add_user_failure() noexcept
-        {
-            auto iter = find_or_register();
-            ++iter->second.user_failures;
-        }
-
-        void add_bloom_success() noexcept
-        {
-            auto iter = find_or_register();
-            ++iter->second.bloom_successes;
-        }
-
-        void add_bloom_collision() noexcept
-        {
-            auto iter = find_or_register();
-            ++iter->second.bloom_collisions;
-        }
+        void add_success() noexcept { ++find_record().successes; }
+        void add_internal_failure() noexcept { ++find_record().internal_failures; }
+        void add_user_failure() noexcept { ++find_record().user_failures; }
+        void add_bloom_success() noexcept { ++find_record().bloom_successes; }
+        void add_bloom_collision() noexcept { ++find_record().bloom_collisions; }
 
         std::size_t total_transactions() const noexcept
         {
