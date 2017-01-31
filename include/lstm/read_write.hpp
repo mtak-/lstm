@@ -1,8 +1,6 @@
 #ifndef LSTM_READ_WRITE_HPP
 #define LSTM_READ_WRITE_HPP
 
-#include <lstm/detail/tx_result_buffer.hpp>
-
 #include <lstm/transaction.hpp>
 
 LSTM_DETAIL_BEGIN
@@ -10,27 +8,15 @@ LSTM_DETAIL_BEGIN
     {
     private:
         template<typename Func, typename Tx, LSTM_REQUIRES_(callable_with_tx<Func, Tx&>())>
-        static auto call(Func& func, Tx& tx) -> decltype(func(tx))
+        static transact_result<Func> call(Func& func, Tx& tx)
         {
             return func(tx);
         }
 
         template<typename Func, typename Tx, LSTM_REQUIRES_(!callable_with_tx<Func, Tx&>())>
-        static auto call(Func& func, Tx&) -> decltype(func())
+        static transact_result<Func> call(Func& func, Tx&)
         {
             return func();
-        }
-
-        template<typename Func, typename Tx>
-        static void try_transact(Func& func, Tx& tx, tx_result_buffer<void>&)
-        {
-            read_write_fn::call(func, tx);
-        }
-
-        template<typename Func, typename Tx>
-        static void try_transact(Func& func, Tx& tx, tx_result_buffer<transact_result<Func>>& buf)
-        {
-            buf.emplace(read_write_fn::call(func, tx));
         }
 
         template<typename Tx>
@@ -58,13 +44,11 @@ LSTM_DETAIL_BEGIN
             tx.reset_heap();
         }
 
-        template<typename Func>
+        template<typename Func, LSTM_REQUIRES_(!is_void_transact_function<Func>())>
         static transact_result<Func>
         slow_path(Func& func, transaction_domain& domain, thread_data& tls_td)
         {
-            tx_result_buffer<transact_result<Func>> buf;
-            transaction                             tx{domain, tls_td};
-
+            transaction tx{domain, tls_td};
             tls_td.tx = &tx;
 
             while (true) {
@@ -74,14 +58,48 @@ LSTM_DETAIL_BEGIN
                     assert(tls_td.fail_callbacks.size() == 0);
                     assert(tls_td.succ_callbacks.size() == 0);
 
-                    read_write_fn::try_transact(func, tx, buf);
+                    transact_result<Func> result = read_write_fn::call(func, tx);
 
                     // commit does not throw
                     if (tx.commit()) {
                         tx_success(tx, tls_td);
-                        return return_tx_result_buffer_fn{}(buf);
+
+                        if (std::is_reference<transact_result<Func>>{})
+                            return static_cast<transact_result<Func>&&>(result);
+                        else
+                            return result;
                     }
-                    buf.reset();
+                } catch (const tx_retry&) {
+                    // nothing
+                } catch (...) {
+                    unhandled_exception(tx, tls_td);
+                }
+                tx_internal_failed(tx);
+
+                // TODO: add backoff here?
+            }
+        }
+
+        template<typename Func, LSTM_REQUIRES_(is_void_transact_function<Func>())>
+        static void slow_path(Func& func, transaction_domain& domain, thread_data& tls_td)
+        {
+            transaction tx{domain, tls_td};
+            tls_td.tx = &tx;
+
+            while (true) {
+                try {
+                    assert(tls_td.read_set.size() == 0);
+                    assert(tls_td.write_set.size() == 0);
+                    assert(tls_td.fail_callbacks.size() == 0);
+                    assert(tls_td.succ_callbacks.size() == 0);
+
+                    read_write_fn::call(func, tx);
+
+                    // commit does not throw
+                    if (tx.commit()) {
+                        tx_success(tx, tls_td);
+                        return;
+                    }
                 } catch (const tx_retry&) {
                     // nothing
                 } catch (...) {
