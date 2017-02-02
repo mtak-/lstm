@@ -65,7 +65,6 @@ LSTM_BEGIN
         static inline gp_t as_locked(const gp_t version) noexcept { return version | lock_bit; }
 
         inline bool rw_valid(const gp_t version) const noexcept { return version <= read_version; }
-
         inline bool rw_valid(const detail::var_base& v) const noexcept
         {
             return rw_valid(v.version_lock.load(LSTM_RELAXED));
@@ -129,7 +128,7 @@ LSTM_BEGIN
         bool commit_validate_reads() noexcept
         {
             // reads do not need to be locked to be validated
-            for (auto& read_set_vaue : tls_td->read_set) {
+            for (detail::read_set_value_type read_set_vaue : tls_td->read_set) {
                 if (!rw_valid(read_set_vaue.src_var())) {
                     unlock_write_set(std::begin(tls_td->write_set), std::end(tls_td->write_set));
                     return false;
@@ -141,8 +140,8 @@ LSTM_BEGIN
         // TODO: emplace_back can throw exceptions...
         void commit_publish(const gp_t write_version) noexcept
         {
-            for (auto& write_set_value : tls_td->write_set) {
-                write_set_value.dest_var().storage.store(std::move(write_set_value.pending_write()),
+            for (detail::write_set_value_type write_set_value : tls_td->write_set) {
+                write_set_value.dest_var().storage.store(write_set_value.pending_write(),
                                                          LSTM_RELAXED);
                 unlock(write_version, write_set_value.dest_var());
             }
