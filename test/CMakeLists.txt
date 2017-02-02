@@ -27,3 +27,6 @@ add_test(test.destructor_transaction destructor_transaction)
 
 add_executable(delete_var_and_modify delete_var_and_modify.cpp)
 add_test(test.delete_var_and_modify delete_var_and_modify)
+
+add_executable(rbtree rbtree.cpp)
+add_test(test.rbtree rbtree)
