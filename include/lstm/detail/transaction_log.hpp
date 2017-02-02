@@ -117,7 +117,7 @@ LSTM_DETAIL_BEGIN
         total_count(std::function<std::size_t(const thread_record*)> accessor) const noexcept
         {
             std::size_t result = 0;
-            for (thread_record& tid_record : records_)
+            for (auto& tid_record : records_)
                 result += accessor(&tid_record.second);
             return result;
         }
