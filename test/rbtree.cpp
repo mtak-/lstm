@@ -44,7 +44,13 @@ int main()
             });
         }
 
+        auto start = std::chrono::high_resolution_clock::now();
         manager.run();
+        auto elapsed = std::chrono::high_resolution_clock::now() - start;
+        std::cout << "Elapsed: "
+                  << std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count()
+                         / 1000000.f
+                  << "s" << std::endl;
 
         assert(lstm::read_write([&](lstm::transaction& tx) { return intmap.verify(tx); }));
     }
