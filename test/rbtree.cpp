@@ -12,7 +12,7 @@ static_assert(iter_count % thread_count == 0, "");
 
 LSTM_NOINLINE std::vector<int> get_data()
 {
-    std::vector<int> data(iter_count * 2); // key, value
+    std::vector<int> data(iter_count * 2);
     std::iota(std::begin(data), std::end(data) - iter_count, 0);
     std::iota(std::begin(data) + iter_count, std::end(data), 0);
 

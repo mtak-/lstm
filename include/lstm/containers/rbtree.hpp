@@ -234,10 +234,8 @@ LSTM_BEGIN
             auto* cur = &root_;
 
             while ((parent = (node_t*)tx.read(*cur))) {
-                if (compare(new_node->key.unsafe_read(), tx.read(parent->key)))
-                    cur = &parent->left_;
-                else // key >= root->key
-                    cur     = &parent->right_;
+                cur = compare(new_node->key.unsafe_read(), tx.read(parent->key)) ? &parent->left_
+                                                                                 : &parent->right_;
                 prev_parent = parent;
             }
 
