@@ -41,6 +41,12 @@ LSTM_DETAIL_BEGIN
         {
         }
     };
+    struct height_info
+    {
+        std::size_t min_height;
+        std::size_t max_height;
+        std::size_t black_height;
+    };
 LSTM_DETAIL_END
 
 LSTM_BEGIN
@@ -245,21 +251,33 @@ LSTM_BEGIN
             insert_case1(tx, new_node);
         }
 
-        std::pair<std::size_t, std::size_t> minmax_height(transaction& tx, node_t* node) const
+        detail::height_info minmax_height(transaction& tx, node_t* node) const
         {
             if (!node)
-                return {0, 0};
+                return {0, 0, 0};
 
             auto left     = (node_t*)tx.read(node->left_);
             auto right    = (node_t*)tx.read(node->right_);
             auto height_l = minmax_height(tx, left);
             auto height_r = minmax_height(tx, right);
 
+            assert(height_l.black_height == height_r.black_height);
+
             assert(!left || tx.read(left->parent_) == node);
             assert(!right || tx.read(right->parent_) == node);
 
-            return {std::min(height_l.first, height_r.first) + 1,
-                    std::max(height_l.second, height_r.second) + 1};
+            assert(!left || !compare(tx.read(node->key), tx.read(left->key)));
+            assert(!right || !compare(tx.read(right->key), tx.read(node->key)));
+
+            if (tx.read(node->color_) == detail::color::red) {
+                assert(!left || tx.read(left->color_) == detail::color::black);
+                assert(!right || tx.read(right->color_) == detail::color::black);
+            }
+
+            return {std::min(height_l.min_height, height_r.min_height) + 1,
+                    std::max(height_l.max_height, height_r.max_height) + 1,
+                    height_l.black_height
+                        + (tx.read(node->color_) == detail::color::black ? 1 : 0)};
         }
 
         static void destroy_deallocate_subtree(alloc_t alloc, node_t* node)
@@ -329,10 +347,13 @@ LSTM_BEGIN
             push_impl(tx, lstm::allocate_construct(alloc(), (Us &&) us...));
         }
 
-        bool verify(transaction& tx) const
+        void verify(transaction& tx) const
         {
-            const auto heights = minmax_height(tx, (node_t*)tx.read(root_));
-            return heights.first * 2 >= heights.second;
+            auto root = (node_t*)tx.read(root_);
+            if (root)
+                assert(tx.read(root->color_) == detail::color::black);
+            const detail::height_info heights = minmax_height(tx, root);
+            assert(heights.min_height * 2 >= heights.max_height);
         }
 
         //        const node_t* begin(transaction& tx) const

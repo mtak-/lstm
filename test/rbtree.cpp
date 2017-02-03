@@ -52,7 +52,9 @@ int main()
                          / 1000000.f
                   << "s" << std::endl;
 
-        assert(lstm::read_write([&](lstm::transaction& tx) { return intmap.verify(tx); }));
+#ifndef NDEBUG
+        lstm::read_write([&](lstm::transaction& tx) { return intmap.verify(tx); });
+#endif
     }
 
     return test_result();
