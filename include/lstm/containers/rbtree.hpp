@@ -52,8 +52,9 @@ LSTM_BEGIN
                     private detail::rebind_to<Alloc, detail::rb_node_<Key, Value, Alloc>>
     {
     private:
-        using node_t  = detail::rb_node_<Key, Value, Alloc>;
-        using alloc_t = detail::rebind_to<Alloc, node_t>;
+        using node_t       = detail::rb_node_<Key, Value, Alloc>;
+        using alloc_t      = detail::rebind_to<Alloc, node_t>;
+        using alloc_traits = std::allocator_traits<alloc_t>;
         lstm::var<void*, detail::rebind_to<Alloc, void*>> root_;
 
         const Compare& comparer() const noexcept { return *this; }
@@ -261,6 +262,24 @@ LSTM_BEGIN
                     std::max(height_l.second, height_r.second) + 1};
         }
 
+        static void destroy_deallocate_subtree(alloc_t alloc, node_t* node)
+        {
+            while (node->left_.unsafe_read()) {
+                node_t* parent = node;
+                auto    leaf   = (node_t*)node->left_.unsafe_read();
+                while (leaf->left_.unsafe_read()) {
+                    parent = leaf;
+                    leaf   = (node_t*)leaf->left_.unsafe_read();
+                }
+                parent->left_.unsafe_write(parent->right_.unsafe_read());
+                parent->right_.unsafe_write(nullptr);
+                alloc_traits::destroy(alloc, leaf);
+                alloc_traits::deallocate(alloc, leaf, 1);
+            }
+            alloc_traits::destroy(alloc, node);
+            alloc_traits::deallocate(alloc, node, 1);
+        }
+
     public:
         rbtree() noexcept
             : root_{nullptr}
@@ -270,7 +289,23 @@ LSTM_BEGIN
         // TODO: these
         rbtree(const rbtree&) = delete;
         rbtree& operator=(const rbtree&) = delete;
-        ~rbtree() {}
+        ~rbtree()
+        {
+            auto root = (node_t*)root_.unsafe_read();
+            if (root)
+                destroy_deallocate_subtree(alloc(), root);
+        }
+
+        void clear(transaction& tx)
+        {
+            auto root = (node_t*)tx.read(root_);
+            tx.write(root_, nullptr);
+            if (root)
+                lstm::tls_thread_data().queue_succ_callback(
+                    [ alloc = this->alloc(), root ]() noexcept {
+                        destroy_deallocate_subtree(alloc, root);
+                    });
+        }
 
         // todo concept check
         template<typename U>
@@ -293,8 +328,6 @@ LSTM_BEGIN
         {
             push_impl(tx, lstm::allocate_construct(alloc(), (Us &&) us...));
         }
-
-        void clear() { throw "todo"; }
 
         bool verify(transaction& tx) const
         {
