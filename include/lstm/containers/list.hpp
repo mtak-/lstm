@@ -87,6 +87,16 @@ LSTM_BEGIN
             return reinterpret_cast<const node_t*>(n.next_.unsafe_read());
         }
 
+        static void destroy_deallocate_sublist(Alloc alloc, node_t* node)
+        {
+            while (node) {
+                auto next_ = unsafe_next(*node);
+                alloc_traits::destroy(alloc, node);
+                alloc_traits::deallocate(alloc, node, 1);
+                node = next_;
+            }
+        }
+
     public:
         constexpr list() noexcept(std::is_nothrow_default_constructible<Alloc>{}) = default;
         constexpr list(const Alloc_& alloc) noexcept(
@@ -95,41 +105,24 @@ LSTM_BEGIN
         {
         }
 
-        ~list()
-        {
-            auto node = head.unsafe_read();
-            while (node) {
-                auto next_ = unsafe_next(*node);
-                alloc_traits::destroy(alloc(), node);
-                alloc_traits::deallocate(alloc(), node, 1);
-                node = next_;
-            }
-        }
+        ~list() { destroy_deallocate_sublist(alloc(), head.unsafe_read()); }
 
         void clear()
         {
             thread_data& tls_td = tls_thread_data();
-            auto*        node   = lstm::read_write(
+            lstm::read_write(
                 [&](auto& tx) {
                     tx.write(size_, 0);
-                    auto result = tx.read(head);
+                    auto root = tx.read(head);
                     tx.write(head, nullptr);
-                    return result;
+                    if (root) {
+                        tls_td.queue_succ_callback([ alloc = alloc(), root ]() noexcept {
+                            destroy_deallocate_sublist(alloc, root);
+                        });
+                    }
                 },
                 default_domain(),
                 tls_td);
-            if (node) {
-                const gp_t clock = default_domain().get_clock();
-                while (node) {
-                    auto next_ = unsafe_next(*node);
-                    lstm::destroy_deallocate(tls_td, alloc(), node);
-                    node = next_;
-                }
-                if (!tls_td.in_critical_section()) {
-                    tls_td.synchronize(clock);
-                    tls_td.do_succ_callbacks();
-                }
-            }
         }
 
         template<typename... Us>
