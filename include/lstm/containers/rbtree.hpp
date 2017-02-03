@@ -34,7 +34,6 @@ LSTM_DETAIL_BEGIN
                                         && std::is_nothrow_constructible<Value, U&&>{})
             : key((T &&) t)
             , value((U &&) u)
-            , parent_(nullptr)
             , left_(nullptr)
             , right_(nullptr)
             , color_(color::red)
@@ -246,7 +245,7 @@ LSTM_BEGIN
                 prev_parent = parent;
             }
 
-            tx.write(new_node->parent_, prev_parent);
+            new_node->parent_.unsafe_write(prev_parent);
             tx.write(*cur, new_node);
             insert_case1(tx, new_node);
         }
@@ -309,20 +308,19 @@ LSTM_BEGIN
         rbtree& operator=(const rbtree&) = delete;
         ~rbtree()
         {
-            auto root = (node_t*)root_.unsafe_read();
-            if (root)
+            if (auto root = (node_t*)root_.unsafe_read())
                 destroy_deallocate_subtree(alloc(), root);
         }
 
         void clear(transaction& tx)
         {
-            auto root = (node_t*)tx.read(root_);
-            tx.write(root_, nullptr);
-            if (root)
+            if (auto root = (node_t*)tx.read(root_)) {
+                tx.write(root_, nullptr);
                 lstm::tls_thread_data().queue_succ_callback(
                     [ alloc = this->alloc(), root ]() noexcept {
                         destroy_deallocate_subtree(alloc, root);
                     });
+            }
         }
 
         // todo concept check
@@ -353,38 +351,9 @@ LSTM_BEGIN
             if (root)
                 assert(tx.read(root->color_) == detail::color::black);
             const detail::height_info heights = minmax_height(tx, root);
+            (void)heights;
             assert(heights.min_height * 2 >= heights.max_height);
         }
-
-        //        const node_t* begin(transaction& tx) const
-        //        {
-        //            const node_t* cur = (const node_t*)tx.read(root_);
-        //            while (cur) {
-        //                const node_t* next = (const node_t*)tx.read(cur->left_);
-        //                if (!next)
-        //                    return cur;
-        //                cur = next;
-        //            }
-        //            return cur;
-        //        }
-        //
-        //        const node_t* succ(transaction& tx, const node_t* n) const
-        //        {
-        //            if (const node_t* p = (const node_t*)tx.read(n->right_)) {
-        //                do {
-        //                    const node_t* next = (const node_t*)tx.read(p->left_);
-        //                    if (!next)
-        //                        return p;
-        //                    p = next;
-        //                } while (true);
-        //            } else {
-        //				const node_t* parent = (const node_t*)tx.read(n->parent_);
-        //				if (parent && n != (const node_t*)tx.read(parent->left_))
-        //					return (const node_t*)tx.read(parent->parent_);
-        //				else
-        //					return parent;
-        //            }
-        //        }
 
         void print_impl(transaction& tx, const node_t* n) const
         {
