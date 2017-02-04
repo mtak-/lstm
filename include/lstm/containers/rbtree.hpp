@@ -62,6 +62,10 @@ LSTM_BEGIN
         using alloc_traits = std::allocator_traits<alloc_t>;
         lstm::var<void*, detail::rebind_to<Alloc, void*>> root_;
 
+        template<typename T, typename U>
+        using comparable
+            = decltype(std::declval<const Compare&>()(std::declval<T>(), std::declval<U>()));
+
         const Compare& comparer() const noexcept { return *this; }
 
         alloc_t&       alloc() noexcept { return *this; }
@@ -98,6 +102,19 @@ LSTM_BEGIN
                 return left;
         }
 
+        node_t* sibling(transaction& tx, node_t* n)
+        {
+            if (n == nullptr)
+                return nullptr;
+            if (auto parent = (node_t*)tx.read(n->parent_)) {
+                auto p_left = (node_t*)tx.read(parent->left_);
+                if (n == p_left)
+                    return tx.read(parent->right_);
+                return p_left;
+            }
+            return nullptr;
+        }
+
         void insert_case1(transaction& tx, node_t* n)
         {
             if (tx.read(n->parent_) == nullptr)
@@ -108,9 +125,7 @@ LSTM_BEGIN
 
         void insert_case2(transaction& tx, node_t* n)
         {
-            if (tx.read(((node_t*)tx.read(n->parent_))->color_) == detail::color::black)
-                return;
-            else
+            if (tx.read(((node_t*)tx.read(n->parent_))->color_) == detail::color::red)
                 insert_case3(tx, n);
         }
 
@@ -181,9 +196,8 @@ LSTM_BEGIN
             tx.write(g->color_, detail::color::red);
             if (n == tx.read(((node_t*)tx.read(n->parent_))->left_))
                 rotate_right(tx, g);
-            else {
+            else
                 rotate_left(tx, g);
-            }
         }
 
         void rotate_left(transaction& tx, node_t* n)
@@ -237,11 +251,11 @@ LSTM_BEGIN
             node_t* prev_parent = nullptr;
             node_t* parent;
 
-            auto* cur = &root_;
+            auto*       cur = &root_;
+            const auto& key = new_node->key.unsafe_read();
 
             while ((parent = (node_t*)tx.read(*cur))) {
-                cur = compare(new_node->key.unsafe_read(), tx.read(parent->key)) ? &parent->left_
-                                                                                 : &parent->right_;
+                cur         = compare(key, tx.read(parent->key)) ? &parent->left_ : &parent->right_;
                 prev_parent = parent;
             }
 
@@ -250,6 +264,7 @@ LSTM_BEGIN
             insert_case1(tx, new_node);
         }
 
+#ifndef NDEBUG
         detail::height_info minmax_height(transaction& tx, node_t* node) const
         {
             if (!node)
@@ -278,6 +293,7 @@ LSTM_BEGIN
                     height_l.black_height
                         + (tx.read(node->color_) == detail::color::black ? 1 : 0)};
         }
+#endif
 
         static void destroy_deallocate_subtree(alloc_t alloc, node_t* node)
         {
@@ -345,6 +361,15 @@ LSTM_BEGIN
             push_impl(tx, lstm::allocate_construct(alloc(), (Us &&) us...));
         }
 
+        template<typename KeyU,
+                 LSTM_REQUIRES_(detail::supports<comparable, const Key&, const KeyU&>())>
+        std::size_t erase(transaction& tx, const KeyU& u)
+        {
+            (void)tx, (void)u;
+            throw "Todo";
+        }
+
+#ifndef NDEBUG
         void verify(transaction& tx) const
         {
             auto root = (node_t*)tx.read(root_);
@@ -354,28 +379,7 @@ LSTM_BEGIN
             (void)heights;
             assert(heights.min_height * 2 >= heights.max_height);
         }
-
-        void print_impl(transaction& tx, const node_t* n) const
-        {
-            if (!n)
-                return;
-
-            if (auto left = (const node_t*)tx.read(n->left_)) {
-                std::cout << "left: {";
-                print_impl(tx, left);
-                std::cout << "}";
-            }
-            std::cout << '[' << tx.read(n->key) << ", " << tx.read(n->value) << "], "
-                      << static_cast<bool>(tx.read(n->color_)) << std::flush;
-
-            if (auto right = (const node_t*)tx.read(n->right_)) {
-                std::cout << "right: {";
-                print_impl(tx, right);
-                std::cout << "}";
-            }
-        }
-
-        void print(transaction& tx) const { print_impl(tx, (const node_t*)tx.read(root_)); }
+#endif
     };
 LSTM_END
 
