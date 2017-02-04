@@ -29,12 +29,13 @@ LSTM_BEGIN
             return result;
         }
     };
+LSTM_END
 
-    namespace detail
-    {
-        LSTM_INLINE_VAR transaction_domain _default_domain{};
-    }
+LSTM_DETAIL_BEGIN
+    LSTM_INLINE_VAR transaction_domain _default_domain{};
+LSTM_DETAIL_END
 
+LSTM_BEGIN
     inline transaction_domain& default_domain() noexcept
     {
         return LSTM_ACCESS_INLINE_VAR(detail::_default_domain);
