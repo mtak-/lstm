@@ -281,8 +281,6 @@ LSTM_BEGIN
             return detail::tls_data_init();
         return *LSTM_ACCESS_INLINE_VAR(detail::tls_thread_data_ptr);
     }
-
-    static_assert(std::is_standard_layout<thread_data>{}, "");
 LSTM_END
 
 #endif /* LSTM_THREAD_DATA_HPP */

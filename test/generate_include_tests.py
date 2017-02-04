@@ -21,7 +21,8 @@ def main():
         without_ext = os.path.splitext(path)[0]
         if not os.path.exists(os.path.dirname(path)):
             os.makedirs(os.path.dirname(path))
-        open(without_ext + '.cpp', 'w').write(_FORMAT_STRING.format(header))
+        if not os.path.exists(without_ext + '.cpp'):
+            open(without_ext + '.cpp', 'w').write(_FORMAT_STRING.format(header))
         cmake_data += _CMAKE_TEMPLATE.format(os.path.splitext(header)[0].replace('/', '_'), os.path.relpath(without_ext, test_dir))
     open(os.path.join(test_dir, 'CMakeLists.txt'), 'w').write(cmake_data)
 
