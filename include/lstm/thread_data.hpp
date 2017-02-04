@@ -6,6 +6,7 @@
 #include <lstm/detail/pod_hash_set.hpp>
 #include <lstm/detail/pod_vector.hpp>
 #include <lstm/detail/read_set_value_type.hpp>
+#include <lstm/detail/var_detail.hpp>
 #include <lstm/detail/write_set_value_type.hpp>
 
 LSTM_DETAIL_BEGIN
