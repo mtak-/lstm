@@ -18,12 +18,6 @@ LSTM_DETAIL_BEGIN
 LSTM_DETAIL_END
 
 LSTM_BEGIN
-    [[noreturn]] LSTM_ALWAYS_INLINE void retry()
-    {
-        LSTM_USER_FAIL_TX();
-        throw detail::tx_retry{};
-    }
-
     struct transaction
     {
     private:
