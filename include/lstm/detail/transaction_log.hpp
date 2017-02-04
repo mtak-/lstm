@@ -1,6 +1,8 @@
 #ifndef LSTM_DETAIL_TRANSACTION_LOG_HPP
 #define LSTM_DETAIL_TRANSACTION_LOG_HPP
 
+#include <lstm/detail/namespace_macros.hpp>
+
 #include <cassert>
 #include <iomanip>
 #include <map>

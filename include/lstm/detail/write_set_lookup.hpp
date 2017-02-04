@@ -3,6 +3,8 @@
 
 #include <lstm/detail/lstm_fwd.hpp>
 
+#include <cassert>
+
 LSTM_DETAIL_BEGIN
     struct write_set_lookup
     {

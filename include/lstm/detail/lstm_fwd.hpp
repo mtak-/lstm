@@ -10,28 +10,13 @@
 // clang-format on
 
 #include <lstm/detail/compiler.hpp>
+#include <lstm/detail/namespace_macros.hpp>
 
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <type_traits>
 #include <utility>
-
-// clang-format off
-#ifndef NDEBUG
-    #define LSTM_BEGIN namespace lstm { inline namespace v1 { inline namespace debug {
-    #define LSTM_END }}}
-#else
-    #define LSTM_BEGIN namespace lstm { inline namespace v1 {
-    #define LSTM_END }}
-#endif /* NDEBUG */
-
-#define LSTM_DETAIL_BEGIN LSTM_BEGIN namespace detail {
-#define LSTM_DETAIL_END LSTM_END }
-
-#define LSTM_TEST_BEGIN LSTM_BEGIN namespace test {
-#define LSTM_TEST_END LSTM_END }
-// clang-format on
 
 // from rangev3
 #define LSTM_PP_CAT_(X, Y) X##Y

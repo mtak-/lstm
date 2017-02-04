@@ -19,9 +19,10 @@ LSTM_DETAIL_BEGIN
         return l - 1;
     }
 
-    inline hash_t dumb_pointer_hash(const var_base& value) noexcept
+    template<typename T>
+    inline hash_t dumb_pointer_hash(const T& value) noexcept
     {
-        constexpr hash_t shift = calcShift<var_base>();
+        constexpr hash_t shift = calcShift<T>();
         static_assert(sizeof(hash_t) >= sizeof(std::uintptr_t) - shift,
                       "type for hash_t is not large enough");
         constexpr hash_t one{1};

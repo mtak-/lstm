@@ -1,16 +1,12 @@
 #ifndef LSTM_THREAD_DATA_HPP
 #define LSTM_THREAD_DATA_HPP
 
-// clang-format off
-// TODO: fix include bug here
 #include <lstm/detail/backoff.hpp>
 #include <lstm/detail/gp_callback.hpp>
-#include <lstm/detail/var_detail.hpp>
 #include <lstm/detail/pod_hash_set.hpp>
 #include <lstm/detail/pod_vector.hpp>
 #include <lstm/detail/read_set_value_type.hpp>
 #include <lstm/detail/write_set_value_type.hpp>
-// clang-format on
 
 LSTM_DETAIL_BEGIN
     namespace
