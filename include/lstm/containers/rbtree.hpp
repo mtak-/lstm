@@ -30,13 +30,16 @@ LSTM_DETAIL_BEGIN
                  typename U,
                  LSTM_REQUIRES_(std::is_constructible<Key, T&&>{}
                                 && std::is_constructible<Value, U&&>{})>
-        rb_node_(T&& t, U&& u) noexcept(std::is_nothrow_constructible<Key, T&&>{}
-                                        && std::is_nothrow_constructible<Value, U&&>{})
-            : key((T &&) t)
-            , value((U &&) u)
-            , left_(nullptr)
-            , right_(nullptr)
-            , color_(color::red)
+        rb_node_(const Alloc& alloc,
+                 T&&          t,
+                 U&&          u) noexcept(std::is_nothrow_constructible<Key, T&&>{}
+                                 && std::is_nothrow_constructible<Value, U&&>{})
+            : key(std::allocator_arg, alloc, (T &&) t)
+            , value(std::allocator_arg, alloc, (U &&) u)
+            , parent_(std::allocator_arg, alloc, nullptr)
+            , left_(std::allocator_arg, alloc, nullptr)
+            , right_(std::allocator_arg, alloc, nullptr)
+            , color_(std::allocator_arg, alloc, color::red)
         {
         }
     };
@@ -314,8 +317,9 @@ LSTM_BEGIN
         }
 
     public:
-        rbtree() noexcept
-            : root_{nullptr}
+        rbtree(const Alloc& alloc = {}) noexcept
+            : alloc_t(alloc)
+            , root_{std::allocator_arg, alloc, nullptr}
         {
         }
 
@@ -355,10 +359,10 @@ LSTM_BEGIN
             return cur;
         }
 
-        template<typename... Us, LSTM_REQUIRES_(std::is_constructible<node_t, Us&&...>{})>
+        template<typename... Us, LSTM_REQUIRES_(std::is_constructible<node_t, alloc_t&, Us&&...>{})>
         void emplace(transaction& tx, Us&&... us)
         {
-            push_impl(tx, lstm::allocate_construct(alloc(), (Us &&) us...));
+            push_impl(tx, lstm::allocate_construct(alloc(), alloc(), (Us &&) us...));
         }
 
         template<typename KeyU,
