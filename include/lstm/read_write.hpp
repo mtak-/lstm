@@ -29,10 +29,13 @@ LSTM_DETAIL_BEGIN
         }
 
         template<typename Tx>
-        LSTM_ALWAYS_INLINE static void tx_internal_failed(Tx& tx) noexcept
+        LSTM_ALWAYS_INLINE static void
+        tx_internal_failed(Tx& tx, transaction_domain& domain, thread_data& tls_td) noexcept
         {
             tx.cleanup();
-            tx.reset_read_version();
+            const gp_t new_read_version = domain.get_clock();
+            tx.reset_read_version(new_read_version);
+            tls_td.access_relock(new_read_version);
         }
 
         template<typename Tx>
@@ -48,7 +51,9 @@ LSTM_DETAIL_BEGIN
         static transact_result<Func>
         slow_path(Func& func, transaction_domain& domain, thread_data& tls_td)
         {
-            transaction tx{domain, tls_td};
+            const gp_t read_version = domain.get_clock();
+            tls_td.access_lock(read_version);
+            transaction tx{tls_td, read_version};
             tls_td.tx = &tx;
 
             while (true) {
@@ -61,7 +66,7 @@ LSTM_DETAIL_BEGIN
                     transact_result<Func> result = read_write_fn::call(func, tx);
 
                     // commit does not throw
-                    if (tx.commit()) {
+                    if (tx.commit(domain)) {
                         tx_success(tx, tls_td);
 
                         if (std::is_reference<transact_result<Func>>{})
@@ -74,7 +79,7 @@ LSTM_DETAIL_BEGIN
                 } catch (...) {
                     unhandled_exception(tx, tls_td);
                 }
-                tx_internal_failed(tx);
+                tx_internal_failed(tx, domain, tls_td);
 
                 // TODO: add backoff here?
             }
@@ -83,7 +88,9 @@ LSTM_DETAIL_BEGIN
         template<typename Func, LSTM_REQUIRES_(is_void_transact_function<Func>())>
         static void slow_path(Func& func, transaction_domain& domain, thread_data& tls_td)
         {
-            transaction tx{domain, tls_td};
+            const gp_t read_version = domain.get_clock();
+            tls_td.access_lock(read_version);
+            transaction tx{tls_td, read_version};
             tls_td.tx = &tx;
 
             while (true) {
@@ -96,7 +103,7 @@ LSTM_DETAIL_BEGIN
                     read_write_fn::call(func, tx);
 
                     // commit does not throw
-                    if (tx.commit()) {
+                    if (tx.commit(domain)) {
                         tx_success(tx, tls_td);
                         return;
                     }
@@ -105,7 +112,7 @@ LSTM_DETAIL_BEGIN
                 } catch (...) {
                     unhandled_exception(tx, tls_td);
                 }
-                tx_internal_failed(tx);
+                tx_internal_failed(tx, domain, tls_td);
 
                 // TODO: add backoff here?
             }

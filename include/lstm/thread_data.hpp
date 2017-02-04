@@ -176,6 +176,7 @@ LSTM_BEGIN
         inline void access_relock(const gp_t gp) noexcept
         {
             assert(active.load(LSTM_RELAXED) != detail::off_state);
+            assert(active.load(LSTM_RELAXED) <= gp);
             assert(gp != detail::off_state);
 
             active.store(gp, LSTM_RELEASE);

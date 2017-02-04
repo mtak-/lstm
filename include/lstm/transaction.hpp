@@ -28,27 +28,22 @@ LSTM_BEGIN
 
         static constexpr gp_t lock_bit = gp_t(1) << (sizeof(gp_t) * 8 - 1);
 
-        transaction_domain* domain_;
-        thread_data*        tls_td;
-        gp_t                read_version;
+        thread_data* tls_td;
+        gp_t         read_version;
 
-        inline transaction_domain&       domain() noexcept { return *domain_; }
-        inline const transaction_domain& domain() const noexcept { return *domain_; }
-
-        inline void reset_read_version() noexcept
+        inline void reset_read_version(const gp_t new_read_version) noexcept
         {
-            tls_td->access_relock(read_version = domain().get_clock());
+            assert(read_version <= new_read_version);
+            read_version = new_read_version;
         }
 
-        inline transaction(transaction_domain& in_domain, thread_data& in_tls_td) noexcept
-            : domain_(&in_domain)
-            , tls_td(&in_tls_td)
+        inline transaction(thread_data& in_tls_td, const gp_t in_read_version) noexcept
+            : tls_td(&in_tls_td)
+            , read_version(in_read_version)
         {
             assert(&tls_thread_data() == tls_td);
             assert(tls_td->tx == nullptr);
-            assert(tls_td->active.load(LSTM_RELAXED) == detail::off_state);
-
-            tls_td->access_lock(read_version = domain().get_clock());
+            assert(tls_td->active.load(LSTM_RELAXED) != detail::off_state);
         }
 
 #ifndef NDEBUG
@@ -154,30 +149,37 @@ LSTM_BEGIN
                 commit_reclaim_slow_path();
         }
 
-        bool commit_slow_path() noexcept
+        void commit_slowerer_path(const gp_t prev_write_version) noexcept
+        {
+            commit_publish(prev_write_version + 1);
+
+            read_version = prev_write_version;
+        }
+
+        bool commit_slower_path(transaction_domain& domain) noexcept
+        {
+            const gp_t prev_write_version = domain.fetch_and_bump_clock();
+
+            if (prev_write_version != read_version && !commit_validate_reads())
+                return false;
+            commit_slowerer_path(prev_write_version);
+            return true;
+        }
+
+        bool commit_slow_path(transaction_domain& domain) noexcept
         {
             // commit_sort_writes(); // not needed in practice... but does guarantee progress
 
             if (!commit_lock_writes())
                 return false;
-
-            const gp_t prev_write_version = domain().fetch_and_bump_clock();
-
-            if (prev_write_version != read_version && !commit_validate_reads())
-                return false;
-
-            commit_publish(prev_write_version + 1);
-
-            read_version = prev_write_version;
-
-            return true;
+            return commit_slower_path(domain);
         }
 
         // TODO: optimize for the following case?
         // write_set.size() == 1
-        bool commit() noexcept
+        bool commit(transaction_domain& domain) noexcept
         {
-            if (!tls_td->write_set.empty() && !commit_slow_path()) {
+            if (!tls_td->write_set.empty() && !commit_slow_path(domain)) {
                 LSTM_INTERNAL_FAIL_TX();
                 return false;
             }
