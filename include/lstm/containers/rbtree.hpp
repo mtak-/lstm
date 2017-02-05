@@ -255,16 +255,38 @@ LSTM_BEGIN
             node_t* parent;
 
             auto*       cur = &root_;
-            const auto& key = new_node->key.unsafe_read();
+            const auto& key = tx.read(new_node->key);
 
             while ((parent = (node_t*)tx.read(*cur))) {
-                cur = compare(key, parent->key.unsafe_read()) ? &parent->left_ : &parent->right_;
+                cur         = compare(key, tx.read(parent->key)) ? &parent->left_ : &parent->right_;
                 prev_parent = parent;
             }
 
             new_node->parent_.unsafe_write(prev_parent);
             tx.write(*cur, new_node);
             insert_case1(tx, new_node);
+        }
+
+        void erase_impl(transaction& tx, node_t* to_erase)
+        {
+            // TODO: node with only one child or no child
+
+            node_t* temp = min_node(tx.read(to_erase->right_));
+
+            tx.write(to_erase->key, tx.read(temp->key));
+            tx.write(to_erase->value, tx.read(temp->value));
+
+            erase_impl(tx, temp);
+        }
+
+        node_t* min_node(transaction& tx, node_t* current) const
+        {
+            node_t* next;
+            /* loop down to find the leftmost leaf */
+            while ((next = tx.read(current->left_)))
+                current = next;
+
+            return current;
         }
 
 #ifndef NDEBUG
@@ -343,15 +365,14 @@ LSTM_BEGIN
             }
         }
 
-        // todo concept check
-        template<typename U>
-        node_t* find(transaction& tx, const U& u) const
+        node_t* find(transaction& tx, const Key& u) const
         {
             node_t* cur = (node_t*)tx.read(root_);
             while (cur) {
-                if (compare(u, cur->key.unsafe_read()))
+                const auto& key = tx.read(cur->key);
+                if (compare(u, key))
                     cur = (node_t*)tx.read(cur->left_);
-                else if (compare(cur->key.unsafe_read(), u))
+                else if (compare(key, u))
                     cur = (node_t*)tx.read(cur->right_);
                 else
                     break;
@@ -365,12 +386,13 @@ LSTM_BEGIN
             push_impl(tx, lstm::allocate_construct(alloc(), alloc(), (Us &&) us...));
         }
 
-        template<typename KeyU,
-                 LSTM_REQUIRES_(detail::supports<comparable, const Key&, const KeyU&>())>
-        std::size_t erase(transaction& tx, const KeyU& u)
+        bool erase_one(transaction& tx, const Key& key)
         {
-            (void)tx, (void)u;
-            throw "Todo";
+            if (auto to_erase = find(tx, key)) {
+                erase_impl(tx, to_erase);
+                return true;
+            }
+            return false;
         }
 
 #ifndef NDEBUG
