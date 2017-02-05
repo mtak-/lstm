@@ -51,28 +51,27 @@ LSTM_DETAIL_BEGIN
     struct easy_var_impl : private var<T, Alloc>
     {
     protected:
-        using var_t   = var<T, Alloc>;
-        using derived = easy_var<T, Alloc>;
+        using underlying_type = var<T, Alloc>;
+        using derived         = easy_var<T, Alloc>;
 
-    public:
-        using var_t::var;
+        using var<T, Alloc>::var;
 
-        lstm::var<T, Alloc>&        underlying() & noexcept { return *this; }
-        lstm::var<T, Alloc>&&       underlying() && noexcept { return std::move(*this); }
-        const lstm::var<T, Alloc>&  underlying() const & noexcept { return *this; }
-        const lstm::var<T, Alloc>&& underlying() const && noexcept { return std::move(*this); }
+        underlying_type&        underlying() & noexcept { return *this; }
+        underlying_type&&       underlying() && noexcept { return std::move(*this); }
+        const underlying_type&  underlying() const & noexcept { return *this; }
+        const underlying_type&& underlying() const && noexcept { return std::move(*this); }
     };
 
     template<typename T, typename Alloc>
     struct easy_var_impl<T, Alloc, true, false> : easy_var_impl<T, Alloc, false, false>
     {
     protected:
-        using derived = easy_var<T, Alloc>;
+        using underlying_type = typename easy_var_impl<T, Alloc, false, false>::underlying_type;
+        using derived         = typename easy_var_impl<T, Alloc, false, false>::derived;
+        using easy_var_impl<T, Alloc, false, false>::underlying;
+        using easy_var_impl<T, Alloc, false, false>::easy_var_impl;
 
     public:
-        using easy_var_impl<T, Alloc, false, false>::easy_var_impl;
-        using easy_var_impl<T, Alloc, false, false>::underlying;
-
         LSTM_ASSIGN_OP(+, std::is_arithmetic)
         LSTM_ASSIGN_OP(-, std::is_arithmetic)
         LSTM_ASSIGN_OP(*, std::is_arithmetic)
@@ -86,12 +85,12 @@ LSTM_DETAIL_BEGIN
     struct easy_var_impl<T, Alloc, true, true> : easy_var_impl<T, Alloc, true, false>
     {
     protected:
-        using derived = easy_var<T, Alloc>;
+        using underlying_type = typename easy_var_impl<T, Alloc, true, false>::underlying_type;
+        using derived         = typename easy_var_impl<T, Alloc, true, false>::derived;
+        using easy_var_impl<T, Alloc, true, false>::underlying;
+        using easy_var_impl<T, Alloc, true, false>::easy_var_impl;
 
     public:
-        using easy_var_impl<T, Alloc, true, false>::easy_var_impl;
-        using easy_var_impl<T, Alloc, true, false>::underlying;
-
         // clang-format off
         LSTM_ASSIGN_OP(%,  std::is_integral)
         LSTM_ASSIGN_OP(&,  std::is_integral)

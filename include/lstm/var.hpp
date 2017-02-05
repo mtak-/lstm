@@ -7,11 +7,19 @@ LSTM_BEGIN
     template<typename T, typename Alloc>
     struct var : private detail::var_alloc_policy<T, Alloc>
     {
-        using value_type     = T;
-        using allocator_type = Alloc;
-
     private:
-        using base = detail::var_alloc_policy<value_type, allocator_type>;
+        using base = detail::var_alloc_policy<T, Alloc>;
+
+        friend struct ::lstm::transaction;
+        friend test::transaction_tester;
+
+    public:
+        using value_type                 = T;
+        using allocator_type             = Alloc;
+        static constexpr bool     heap   = base::heap;
+        static constexpr bool     atomic = base::atomic;
+        static constexpr var_type type   = base::type;
+
         static_assert(std::is_same<allocator_type, detail::uncvref<allocator_type>>{},
                       "lstm::var<> allocators cannot be cv/ref qualified!");
         static_assert(!std::is_reference<value_type>{}, "lstm::var<>'s cannot contain a reference");
@@ -25,14 +33,6 @@ LSTM_BEGIN
                       "lstm::var<> does not support raw c arrays. try using a std::array");
         static_assert(std::is_pointer<typename std::allocator_traits<allocator_type>::pointer>{},
                       "sorry, lstm::var only supports allocators that return raw pointers");
-
-        friend struct ::lstm::transaction;
-        friend test::transaction_tester;
-
-    public:
-        using base::heap;
-        using base::atomic;
-        using base::type;
 
         ///////////////////////////////////////////
         // DEFAULT CONSTRUCTORS
