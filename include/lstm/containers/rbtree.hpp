@@ -258,7 +258,7 @@ LSTM_BEGIN
             const auto& key = new_node->key.unsafe_read();
 
             while ((parent = (node_t*)tx.read(*cur))) {
-                cur         = compare(key, tx.read(parent->key)) ? &parent->left_ : &parent->right_;
+                cur = compare(key, parent->key.unsafe_read()) ? &parent->left_ : &parent->right_;
                 prev_parent = parent;
             }
 
@@ -349,9 +349,9 @@ LSTM_BEGIN
         {
             node_t* cur = (node_t*)tx.read(root_);
             while (cur) {
-                if (compare(u, tx.read(cur->key_value.first)))
+                if (compare(u, cur->key.unsafe_read()))
                     cur = (node_t*)tx.read(cur->left_);
-                else if (compare(tx.read(cur->key_value.first), u))
+                else if (compare(cur->key.unsafe_read(), u))
                     cur = (node_t*)tx.read(cur->right_);
                 else
                     break;
