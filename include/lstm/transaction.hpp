@@ -126,7 +126,6 @@ LSTM_BEGIN
             return true;
         }
 
-        // TODO: emplace_back can throw exceptions...
         void commit_publish(const gp_t write_version) noexcept
         {
             for (detail::write_set_value_type write_set_value : tls_td->write_set) {
