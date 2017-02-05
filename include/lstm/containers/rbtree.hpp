@@ -54,8 +54,8 @@ LSTM_DETAIL_END
 LSTM_BEGIN
     template<typename Key,
              typename Value,
-             typename Alloc   = std::allocator<std::pair<Key, Value>>,
-             typename Compare = std::less<>>
+             typename Compare = std::less<>,
+             typename Alloc   = std::allocator<std::pair<Key, Value>>>
     struct rbtree : private Compare,
                     private detail::rebind_to<Alloc, detail::rb_node_<Key, Value, Alloc>>
     {
