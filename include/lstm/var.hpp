@@ -242,7 +242,14 @@ LSTM_BEGIN
 
         Alloc get_allocator() const noexcept { return base::alloc(); }
 
+        LSTM_REQUIRES(atomic)
         T unsafe_read() const noexcept
+        {
+            return base::load(detail::var_base::storage.load(LSTM_RELAXED));
+        }
+
+        LSTM_REQUIRES(!atomic)
+        const T& unsafe_read() const noexcept
         {
             return base::load(detail::var_base::storage.load(LSTM_RELAXED));
         }
