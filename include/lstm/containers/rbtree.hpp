@@ -4,7 +4,6 @@
 // lots of copy paste from wikipedia. probly lots of cycles to be saved
 
 #include <lstm/lstm.hpp>
-#include <iostream>
 
 LSTM_DETAIL_BEGIN
     enum class color : bool
@@ -105,17 +104,15 @@ LSTM_BEGIN
                 return left;
         }
 
-        node_t* sibling(transaction& tx, node_t* n)
+        node_t* sibling(transaction& tx, node_t* parent, node_t* n)
         {
-            if (n == nullptr)
+            if (parent == nullptr)
                 return nullptr;
-            if (auto parent = (node_t*)tx.read(n->parent_)) {
-                auto p_left = (node_t*)tx.read(parent->left_);
-                if (n == p_left)
-                    return tx.read(parent->right_);
-                return p_left;
-            }
-            return nullptr;
+
+            const auto p_left = (node_t*)tx.read(parent->left_);
+            if (n == p_left)
+                return (node_t*)tx.read(parent->right_);
+            return p_left;
         }
 
         void insert_case1(transaction& tx, node_t* n)
@@ -267,23 +264,154 @@ LSTM_BEGIN
             insert_case1(tx, new_node);
         }
 
+        void replace_node(transaction& tx, node_t* n, node_t* child)
+        {
+            auto parent = (node_t*)tx.read(n->parent_);
+            if (parent) {
+                if (tx.read(parent->left_) == n)
+                    tx.write(parent->left_, child);
+                else
+                    tx.write(parent->right_, child);
+            } else {
+                tx.write(root_, child);
+            }
+            if (child)
+                tx.write(child->parent_, parent);
+        }
+
+        static detail::color color(transaction& tx, node_t* n)
+        {
+            return n ? tx.read(n->color_) : detail::color::black;
+        }
+
+        void delete_case6(transaction& tx, node_t* parent, node_t* n)
+        {
+            auto s = sibling(tx, parent, n);
+
+            tx.write(s->color_, tx.read(parent->color_));
+            tx.write(parent->color_, detail::color::black);
+
+            if (n == tx.read(parent->left_)) {
+                tx.write(((node_t*)tx.read(s->right_))->color_, detail::color::black);
+                rotate_left(tx, parent);
+            } else {
+                tx.write(((node_t*)tx.read(s->left_))->color_, detail::color::black);
+                rotate_right(tx, parent);
+            }
+        }
+
+        void delete_case5(transaction& tx, node_t* parent, node_t* n)
+        {
+            auto s = sibling(tx, parent, n);
+
+            if (tx.read(s->color_) == detail::color::black) { /* this if statement is trivial,
+          due to case 2 (even though case 2 changed the sibling to a sibling's child,
+          the sibling's child can't be red, since no red parent can have a red child). */
+                /* the following statements just force the red to be on the left of the left of the
+                   parent,
+                   or right of the right, so case six will rotate correctly. */
+                auto s_left  = (node_t*)tx.read(s->left_);
+                auto s_right = (node_t*)tx.read(s->right_);
+                if (n == tx.read(parent->left_) && color(tx, s_right) == detail::color::black
+                    && (color(tx, s_left) == detail::color::red)) {
+                    // this last test is trivial too due to cases 2-4.
+                    tx.write(s->color_, detail::color::red);
+                    tx.write(s_left->color_, detail::color::black);
+                    rotate_right(tx, s);
+                } else if (n == tx.read(parent->right_) && color(tx, s_left) == detail::color::black
+                           && color(tx, s_right) == detail::color::red) {
+                    // this last test is trivial too due to cases 2-4.
+                    tx.write(s->color_, detail::color::red);
+                    tx.write(s_right->color_, detail::color::black);
+                    rotate_left(tx, s);
+                }
+            }
+            delete_case6(tx, parent, n);
+        }
+
+        void delete_case4(transaction& tx, node_t* parent, node_t* n)
+        {
+            node_t* s = sibling(tx, parent, n);
+
+            if (tx.read(parent->color_) == detail::color::red
+                && tx.read(s->color_) == detail::color::black
+                && color(tx, (node_t*)tx.read(s->left_)) == detail::color::black
+                && color(tx, (node_t*)tx.read(s->right_)) == detail::color::black) {
+                tx.write(s->color_, detail::color::red);
+                tx.write(parent->color_, detail::color::black);
+            } else {
+                delete_case5(tx, parent, n);
+            }
+        }
+
+        void delete_case3(transaction& tx, node_t* parent, node_t* n)
+        {
+            node_t* s = sibling(tx, parent, n);
+
+            if (tx.read(parent->color_) == detail::color::black
+                && color(tx, s) == detail::color::black
+                && (!s || color(tx, (node_t*)tx.read(s->left_)) == detail::color::black)
+                && (!s || color(tx, (node_t*)tx.read(s->right_)) == detail::color::black)) {
+                tx.write(s->color_, detail::color::red);
+                delete_case1(tx, (node_t*)tx.read(parent->parent_), parent);
+            } else {
+                delete_case4(tx, parent, n);
+            }
+        }
+
+        void delete_case2(transaction& tx, node_t* parent, node_t* n)
+        {
+            auto s = sibling(tx, parent, n);
+            if (color(tx, s) == detail::color::red) {
+                tx.write(parent->color_, detail::color::red);
+                tx.write(s->color_, detail::color::black);
+                if (n == tx.read(parent->left_))
+                    rotate_left(tx, parent);
+                else
+                    rotate_right(tx, parent);
+            }
+            delete_case3(tx, parent, n);
+        }
+
+        void delete_case1(transaction& tx, node_t* parent, node_t* n)
+        {
+            if (parent)
+                delete_case2(tx, parent, n);
+        }
+
+        void delete_one_child(transaction& tx, node_t* n)
+        {
+            node_t* right = (node_t*)tx.read(n->right_);
+            node_t* child = !right ? (node_t*)tx.read(n->left_) : right;
+
+            replace_node(tx, n, child);
+            if (tx.read(n->color_) == detail::color::black) {
+                if (color(tx, child) == detail::color::red)
+                    tx.write(child->color_, detail::color::black);
+                else
+                    delete_case1(tx, (node_t*)tx.read(n->parent_), child);
+            }
+            lstm::destroy_deallocate(alloc(), n);
+        }
+
         void erase_impl(transaction& tx, node_t* to_erase)
         {
-            // TODO: node with only one child or no child
+            if (tx.read(to_erase->left_) && tx.read(to_erase->right_)) {
+                node_t* temp = min_node(tx, (node_t*)tx.read(to_erase->right_));
 
-            node_t* temp = min_node(tx.read(to_erase->right_));
+                tx.write(to_erase->key, tx.read(temp->key));
+                tx.write(to_erase->value, tx.read(temp->value));
+                to_erase = temp;
+            }
 
-            tx.write(to_erase->key, tx.read(temp->key));
-            tx.write(to_erase->value, tx.read(temp->value));
-
-            erase_impl(tx, temp);
+            delete_one_child(tx, to_erase);
         }
 
         node_t* min_node(transaction& tx, node_t* current) const
         {
             node_t* next;
             /* loop down to find the leftmost leaf */
-            while ((next = tx.read(current->left_)))
+            while ((next = (node_t*)tx.read(current->left_)))
                 current = next;
 
             return current;
