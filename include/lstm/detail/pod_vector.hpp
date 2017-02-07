@@ -66,20 +66,10 @@ LSTM_DETAIL_BEGIN
         pod_vector(const pod_vector&) = delete;
         pod_vector& operator=(const pod_vector&) = delete;
 
-#ifndef NDEBUG
-        // ensure reset has been called on destruction
-        ~pod_vector() noexcept { assert(begin_ == nullptr && end_ == nullptr && capacity_ == 0); }
-#endif
-
-        // in release, leaves object in an invalid state
-        // aka this is the real destructor, but explicit. because... i want that
-        void reset() noexcept
+        ~pod_vector() noexcept
         {
+            assert(empty());
             alloc().deallocate(begin_, capacity_);
-#ifndef NDEBUG
-            end_ = begin_ = nullptr;
-            capacity_     = 0;
-#endif
         }
 
         bool  empty() const noexcept { return end_ == begin_; }

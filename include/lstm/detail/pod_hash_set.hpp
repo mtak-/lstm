@@ -89,11 +89,6 @@ LSTM_DETAIL_BEGIN
             filter_ = 0;
             data.clear();
         }
-        void reset() noexcept
-        {
-            filter_ = 0;
-            data.reset();
-        }
 
         bool  empty() const noexcept { return data.empty(); }
         uword size() const noexcept { return data.size(); }

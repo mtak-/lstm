@@ -141,16 +141,6 @@ LSTM_BEGIN
             }
             unlock_all(); // this->mut does not get unlocked here
             mut.unlock();
-
-            assert(succ_callbacks.empty());
-            assert(fail_callbacks.empty());
-            assert(read_set.empty());
-            assert(write_set.empty());
-
-            succ_callbacks.reset();
-            fail_callbacks.reset();
-            read_set.reset();
-            write_set.reset();
         }
 
         thread_data(const thread_data&) = delete;

@@ -5,7 +5,7 @@
 
 #include <random>
 
-static constexpr int iter_count   = LSTM_TEST_INIT(10000000, 1000);
+static constexpr int iter_count   = LSTM_TEST_INIT(1000000, 1000);
 static constexpr int loop_count   = LSTM_TEST_INIT(1, 1);
 static constexpr int thread_count = 8;
 static_assert(iter_count % thread_count == 0, "");
