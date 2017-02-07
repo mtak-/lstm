@@ -248,18 +248,19 @@ LSTM_BEGIN
 
         void push_impl(transaction& tx, node_t* new_node)
         {
-            node_t* prev_parent = nullptr;
-            node_t* parent;
+            node_t* parent = nullptr;
+            node_t* next_parent;
 
             auto*       cur = &root_;
-            const auto& key = tx.read(new_node->key);
+            const auto& key = new_node->key.unsafe_read();
 
-            while ((parent = (node_t*)tx.read(*cur))) {
-                cur         = compare(key, tx.read(parent->key)) ? &parent->left_ : &parent->right_;
-                prev_parent = parent;
+            while ((next_parent = (node_t*)tx.read(*cur))) {
+                cur = compare(key, tx.read(next_parent->key)) ? &next_parent->left_
+                                                              : &next_parent->right_;
+                parent = next_parent;
             }
 
-            new_node->parent_.unsafe_write(prev_parent);
+            new_node->parent_.unsafe_write(parent);
             tx.write(*cur, new_node);
             insert_case1(tx, new_node);
         }
