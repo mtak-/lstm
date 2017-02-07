@@ -26,32 +26,58 @@ LSTM_NOINLINE std::vector<int> get_data()
 
 int main()
 {
-    const auto data = get_data();
+    auto data = get_data();
     for (int loop = 0; loop < loop_count; ++loop) {
         lstm::rbtree<int, int> intmap;
-        thread_manager manager;
+        {
+            thread_manager manager;
 
-        for (int t = 0; t < thread_count; ++t) {
-            manager.queue_thread([&intmap, &data, t] {
-                lstm::thread_data& tls_td = lstm::tls_thread_data();
-                for (int i = 0; i < iter_count / thread_count; ++i) {
-                    lstm::read_write([&data, &intmap, &tls_td, i, t](lstm::transaction& tx) {
-                        intmap.emplace(tx,
-                                       data[i + t * iter_count / thread_count],
-                                       data[i + t * iter_count / thread_count + iter_count]);
-                    });
-                }
-            });
+            for (int t = 0; t < thread_count; ++t) {
+                manager.queue_thread([&intmap, &data, t] {
+                    lstm::thread_data& tls_td = lstm::tls_thread_data();
+                    for (int i = 0; i < iter_count / thread_count; ++i) {
+                        lstm::read_write([&data, &intmap, &tls_td, i, t](lstm::transaction& tx) {
+                            intmap.emplace(tx,
+                                           data[i + t * iter_count / thread_count],
+                                           data[i + t * iter_count / thread_count + iter_count]);
+                        });
+                    }
+                });
+            }
+
+            auto start = std::chrono::high_resolution_clock::now();
+            manager.run();
+            auto elapsed = std::chrono::high_resolution_clock::now() - start;
+            std::cout << "Insert Elapsed: "
+                      << std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count()
+                             / 1000000.f
+                      << "s" << std::endl;
         }
+#ifndef NDEBUG
+        lstm::read_write([&](lstm::transaction& tx) { return intmap.verify(tx); });
+#endif
+        {
+            thread_manager manager;
 
-        auto start = std::chrono::high_resolution_clock::now();
-        manager.run();
-        auto elapsed = std::chrono::high_resolution_clock::now() - start;
-        std::cout << "Elapsed: "
-                  << std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count()
-                         / 1000000.f
-                  << "s" << std::endl;
+            for (int t = 0; t < thread_count; ++t) {
+                manager.queue_thread([&intmap, &data, t] {
+                    lstm::thread_data& tls_td = lstm::tls_thread_data();
+                    for (int i = 0; i < iter_count / thread_count; ++i) {
+                        lstm::read_write([&data, &intmap, &tls_td, i, t](lstm::transaction& tx) {
+                            intmap.erase_one(tx, data[i + t * iter_count / thread_count]);
+                        });
+                    }
+                });
+            }
 
+            auto start = std::chrono::high_resolution_clock::now();
+            manager.run();
+            auto elapsed = std::chrono::high_resolution_clock::now() - start;
+            std::cout << "Delete Elapsed: "
+                      << std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count()
+                             / 1000000.f
+                      << "s" << std::endl;
+        }
 #ifndef NDEBUG
         lstm::read_write([&](lstm::transaction& tx) { return intmap.verify(tx); });
 #endif
