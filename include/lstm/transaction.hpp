@@ -94,17 +94,12 @@ LSTM_BEGIN
                 unlock(begin->dest_var());
         }
 
-        // // this is not needed in practice but it does guarantee progress
-        // void commit_sort_writes() noexcept
-        // { std::sort(std::begin(tls_td->write_set), std::end(tls_td->write_set)); }
-
         bool commit_lock_writes() noexcept
         {
             write_set_iter       write_begin = std::begin(tls_td->write_set);
             const write_set_iter write_end   = std::end(tls_td->write_set);
 
             for (write_set_iter write_iter = write_begin; write_iter != write_end; ++write_iter) {
-                // TODO: only care what version the var is, if it's also a read?
                 if (!lock(write_iter->dest_var())) {
                     unlock_write_set(std::move(write_begin), std::move(write_iter));
                     return false;
@@ -116,7 +111,6 @@ LSTM_BEGIN
 
         bool commit_validate_reads() noexcept
         {
-            // reads do not need to be locked to be validated
             for (detail::read_set_value_type read_set_vaue : tls_td->read_set) {
                 if (!rw_valid(read_set_vaue.src_var())) {
                     unlock_write_set(std::begin(tls_td->write_set), std::end(tls_td->write_set));
@@ -167,15 +161,11 @@ LSTM_BEGIN
 
         bool commit_slow_path(transaction_domain& domain) noexcept
         {
-            // commit_sort_writes(); // not needed in practice... but does guarantee progress
-
             if (!commit_lock_writes())
                 return false;
             return commit_slower_path(domain);
         }
 
-        // TODO: optimize for the following case?
-        // write_set.size() == 1
         bool commit(transaction_domain& domain) noexcept
         {
             if (!tls_td->write_set.empty() && !commit_slow_path(domain)) {
