@@ -29,17 +29,17 @@ LSTM_BEGIN
         static constexpr gp_t lock_bit = gp_t(1) << (sizeof(gp_t) * 8 - 1);
 
         thread_data* tls_td;
-        gp_t         read_version_;
+        gp_t         version_;
 
-        inline void reset_read_version(const gp_t new_read_version) noexcept
+        inline void reset_version(const gp_t new_version) noexcept
         {
-            assert(read_version_ <= new_read_version);
-            read_version_ = new_read_version;
+            assert(version_ <= new_version);
+            version_ = new_version;
         }
 
-        inline transaction(thread_data& in_tls_td, const gp_t in_read_version) noexcept
+        inline transaction(thread_data& in_tls_td, const gp_t in_version) noexcept
             : tls_td(&in_tls_td)
-            , read_version_(in_read_version)
+            , version_(in_version)
         {
             assert(&tls_thread_data() == tls_td);
             assert(tls_td->tx == nullptr);
@@ -49,7 +49,7 @@ LSTM_BEGIN
         static inline bool locked(const gp_t version) noexcept { return version & lock_bit; }
         static inline gp_t as_locked(const gp_t version) noexcept { return version | lock_bit; }
 
-        inline bool rw_valid(const gp_t version) const noexcept { return version <= read_version_; }
+        inline bool rw_valid(const gp_t version) const noexcept { return version <= version_; }
         inline bool rw_valid(const detail::var_base& v) const noexcept
         {
             return rw_valid(v.version_lock.load(LSTM_RELAXED));
@@ -127,7 +127,7 @@ LSTM_BEGIN
 
         void commit_reclaim_slow_path() noexcept
         {
-            tls_td->synchronize(read_version_);
+            tls_td->synchronize(version_);
             tls_td->do_succ_callbacks();
         }
 
@@ -142,14 +142,14 @@ LSTM_BEGIN
         {
             commit_publish(prev_write_version + 1);
 
-            read_version_ = prev_write_version;
+            version_ = prev_write_version;
         }
 
         bool commit_slower_path(transaction_domain& domain) noexcept
         {
             const gp_t prev_write_version = domain.fetch_and_bump_clock();
 
-            if (prev_write_version != read_version_ && !commit_validate_reads())
+            if (prev_write_version != version_ && !commit_validate_reads())
                 return false;
             commit_slowerer_path(prev_write_version);
             return true;
@@ -221,7 +221,9 @@ LSTM_BEGIN
         }
 
     public:
-        gp_t read_version() const noexcept { return read_version_; }
+        thread_data&       get_thread_data() noexcept { return *tls_td; }
+        const thread_data& get_thread_data() const noexcept { return *tls_td; }
+        gp_t               version() const noexcept { return version_; }
 
         template<typename T, typename Alloc, LSTM_REQUIRES_(!var<T, Alloc>::atomic)>
         LSTM_ALWAYS_INLINE const T& read(const var<T, Alloc>& src_var)
