@@ -40,8 +40,8 @@ LSTM_DETAIL_BEGIN
             tls_td.do_fail_callbacks();
             tls_td.fail_callbacks.clear();
             const gp_t new_version = domain.get_clock();
-            tx.reset_version(new_version);
             tls_td.access_relock(new_version);
+            tx.reset_version(new_version);
         }
 
         template<typename Func, LSTM_REQUIRES_(!is_void_transact_function<Func>())>
