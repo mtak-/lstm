@@ -32,15 +32,18 @@ LSTM_BEGIN
         {
             assert(tls_td->tx == nullptr);
             assert(version_ != detail::off_state);
+            assert(!detail::locked(version_));
             assert(valid());
         }
 
         inline void reset_version(const gp_t new_version) noexcept
         {
+            assert(tls_td->tx == this);
             assert(version_ <= new_version);
             version_ = new_version;
 
             assert(version_ != detail::off_state);
+            assert(!detail::locked(version_));
             assert(valid());
         }
 

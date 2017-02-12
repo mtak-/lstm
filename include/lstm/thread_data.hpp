@@ -12,8 +12,14 @@
 LSTM_DETAIL_BEGIN
     namespace
     {
+        static_assert(std::is_unsigned<gp_t>{}, "");
+
+        static constexpr gp_t lock_bit  = gp_t(1) << (sizeof(gp_t) * 8 - 1);
         static constexpr gp_t off_state = ~gp_t(0);
     }
+
+    inline bool locked(const gp_t version) noexcept { return version & lock_bit; }
+    inline gp_t as_locked(const gp_t version) noexcept { return version | lock_bit; }
 
     struct global_data
     {
