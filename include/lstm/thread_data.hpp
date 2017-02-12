@@ -32,7 +32,8 @@ LSTM_BEGIN
     struct LSTM_CACHE_ALIGNED thread_data
     {
     private:
-        friend struct detail::read_write_fn;
+        friend detail::read_write_fn;
+        friend detail::commit_algorithm;
         friend transaction;
         friend LSTM_NOINLINE inline thread_data& detail::tls_data_init() noexcept;
 

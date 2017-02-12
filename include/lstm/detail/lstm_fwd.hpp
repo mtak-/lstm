@@ -120,6 +120,7 @@ LSTM_DETAIL_BEGIN
     using var_storage = void*;
     using hash_t      = std::uint64_t;
 
+    struct commit_algorithm;
     struct read_write_fn;
     struct var_base;
 
