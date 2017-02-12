@@ -12,7 +12,7 @@ LSTM_DETAIL_BEGIN
         static_assert(std::is_unsigned<gp_t>{}, "");
 
         static constexpr gp_t lock_bit = gp_t(1) << (sizeof(gp_t) * 8 - 1);
-        using write_set_iter           = pod_hash_set<pod_vector<write_set_value_type>>::iterator;
+        using write_set_iter           = typename thread_data::write_set_iter;
 
         static inline bool locked(const gp_t version) noexcept { return version & lock_bit; }
         static inline gp_t as_locked(const gp_t version) noexcept { return version | lock_bit; }
