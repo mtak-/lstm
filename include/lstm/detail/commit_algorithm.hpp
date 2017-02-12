@@ -17,20 +17,10 @@ LSTM_DETAIL_BEGIN
         static inline bool locked(const gp_t version) noexcept { return version & lock_bit; }
         static inline gp_t as_locked(const gp_t version) noexcept { return version | lock_bit; }
 
-        static inline bool rw_valid(const gp_t version, const gp_t tx_version) noexcept
-        {
-            return version <= tx_version;
-        }
-
-        static inline bool rw_valid(const var_base& v, const gp_t tx_version) noexcept
-        {
-            return rw_valid(v.version_lock.load(LSTM_RELAXED), tx_version);
-        }
-
-        static inline bool lock(var_base& v, const gp_t tx_version) noexcept
+        static inline bool lock(var_base& v, const transaction tx) noexcept
         {
             gp_t version_buf = v.version_lock.load(LSTM_RELAXED);
-            return rw_valid(version_buf, tx_version)
+            return tx.rw_valid(version_buf)
                    && v.version_lock.compare_exchange_strong(version_buf,
                                                              as_locked(version_buf),
                                                              LSTM_ACQUIRE,
@@ -69,7 +59,7 @@ LSTM_DETAIL_BEGIN
             const write_set_iter write_end   = tls_td.write_set.end();
 
             for (write_set_iter write_iter = write_begin; write_iter != write_end; ++write_iter) {
-                if (!lock(write_iter->dest_var(), tx.version())) {
+                if (!lock(write_iter->dest_var(), tx)) {
                     unlock_write_set(write_begin, write_iter);
                     return false;
                 }
@@ -82,7 +72,7 @@ LSTM_DETAIL_BEGIN
         {
             thread_data& tls_td = tx.get_thread_data();
             for (read_set_value_type read_set_vaue : tls_td.read_set) {
-                if (!rw_valid(read_set_vaue.src_var(), tx.version())) {
+                if (!tx.rw_valid(read_set_vaue.src_var())) {
                     unlock_write_set(tls_td.write_set.begin(), tls_td.write_set.end());
                     return false;
                 }

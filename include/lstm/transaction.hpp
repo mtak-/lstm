@@ -30,21 +30,18 @@ LSTM_BEGIN
             : tls_td(&in_tls_td)
             , version_(in_version)
         {
-            assert(&tls_thread_data() == tls_td);
             assert(tls_td->tx == nullptr);
-            assert(tls_td->active.load(LSTM_RELAXED) != detail::off_state);
+            assert(version_ != detail::off_state);
+            assert(valid());
         }
 
         inline void reset_version(const gp_t new_version) noexcept
         {
             assert(version_ <= new_version);
             version_ = new_version;
-        }
 
-        inline bool rw_valid(const gp_t version) const noexcept { return version <= version_; }
-        inline bool rw_valid(const detail::var_base& v) const noexcept
-        {
-            return rw_valid(v.version_lock.load(LSTM_RELAXED));
+            assert(version_ != detail::off_state);
+            assert(valid());
         }
 
         // TODO: rename this or consider moving it out of this class
@@ -58,6 +55,8 @@ LSTM_BEGIN
 
         detail::var_storage read_impl(const detail::var_base& src_var) const
         {
+            assert(valid());
+
             const detail::write_set_lookup lookup = tls_td->write_set.lookup(src_var);
             if (LSTM_LIKELY(!lookup.success())) {
                 const gp_t                src_version = src_var.version_lock.load(LSTM_ACQUIRE);
@@ -76,6 +75,8 @@ LSTM_BEGIN
         // atomic var's perform no allocation (therefore, no callbacks)
         void atomic_write_impl(detail::var_base& dest_var, const detail::var_storage storage) const
         {
+            assert(valid());
+
             const detail::write_set_lookup lookup = tls_td->write_set.lookup(dest_var);
             if (LSTM_LIKELY(!lookup.success()))
                 tls_td->add_write_set(dest_var, storage, lookup.hash());
@@ -89,6 +90,17 @@ LSTM_BEGIN
     public:
         thread_data& get_thread_data() const noexcept { return *tls_td; }
         gp_t         version() const noexcept { return version_; }
+
+        bool valid(const thread_data& td = tls_thread_data()) const noexcept
+        {
+            return &td == tls_td && tls_td->active.load(LSTM_RELAXED) == version_;
+        }
+
+        bool rw_valid(const gp_t version) const noexcept { return version <= version_; }
+        bool rw_valid(const detail::var_base& v) const noexcept
+        {
+            return rw_valid(v.version_lock.load(LSTM_RELAXED));
+        }
 
         template<typename T, typename Alloc, LSTM_REQUIRES_(!var<T, Alloc>::atomic)>
         LSTM_ALWAYS_INLINE const T& read(const var<T, Alloc>& src_var) const
@@ -116,6 +128,8 @@ LSTM_BEGIN
                                 && std::is_constructible<T, U&&>())>
         void write(var<T, Alloc>& dest_var, U&& u) const
         {
+            assert(valid());
+
             const detail::write_set_lookup lookup = tls_td->write_set.lookup(dest_var);
             if (LSTM_LIKELY(!lookup.success())) {
                 const gp_t                dest_version = dest_var.version_lock.load(LSTM_ACQUIRE);
