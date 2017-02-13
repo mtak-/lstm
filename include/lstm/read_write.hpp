@@ -9,32 +9,38 @@ LSTM_DETAIL_BEGIN
     struct read_write_fn
     {
     private:
-        template<typename Func, typename Tx, LSTM_REQUIRES_(callable_with_tx<Func, Tx&>())>
-        static transact_result<Func> call(Func& func, Tx& tx)
+        template<typename Func, LSTM_REQUIRES_(callable_with_tx<Func, transaction&>())>
+        static transact_result<Func> call(Func& func, transaction tx)
         {
             return func(tx);
         }
 
-        template<typename Func, typename Tx, LSTM_REQUIRES_(!callable_with_tx<Func, Tx&>())>
-        static transact_result<Func> call(Func& func, Tx&)
+        template<typename Func, LSTM_REQUIRES_(!callable_with_tx<Func, transaction&>())>
+        static transact_result<Func> call(Func& func, const transaction)
         {
             return func();
         }
 
-        template<typename Tx>
-        [[noreturn]] static void unhandled_exception(Tx& tx, thread_data& tls_td)
+        static void thread_data_failed(thread_data& tls_td) noexcept
+        {
+            tls_td.write_set.clear();
+            tls_td.read_set.clear();
+            tls_td.succ_callbacks.clear();
+            tls_td.do_fail_callbacks();
+        }
+
+        [[noreturn]] static void unhandled_exception(thread_data& tls_td)
         {
             tls_td.access_unlock();
-            tx.cleanup();
+            thread_data_failed(tls_td);
             tls_td.tx = nullptr;
             throw;
         }
 
-        template<typename Tx>
         LSTM_ALWAYS_INLINE static void
-        tx_internal_failed(Tx& tx, transaction_domain& domain, thread_data& tls_td) noexcept
+        tx_failed(transaction& tx, transaction_domain& domain, thread_data& tls_td) noexcept
         {
-            tx.cleanup();
+            thread_data_failed(tls_td);
             const gp_t new_version = domain.get_clock();
             tls_td.access_relock(new_version);
             tx.reset_version(new_version);
@@ -87,9 +93,9 @@ LSTM_DETAIL_BEGIN
                 } catch (const tx_retry&) {
                     // nothing
                 } catch (...) {
-                    unhandled_exception(tx, tls_td);
+                    unhandled_exception(tls_td);
                 }
-                tx_internal_failed(tx, domain, tls_td);
+                tx_failed(tx, domain, tls_td);
 
                 // TODO: add backoff here?
             }
@@ -122,9 +128,9 @@ LSTM_DETAIL_BEGIN
                 } catch (const tx_retry&) {
                     // nothing
                 } catch (...) {
-                    unhandled_exception(tx, tls_td);
+                    unhandled_exception(tls_td);
                 }
-                tx_internal_failed(tx, domain, tls_td);
+                tx_failed(tx, domain, tls_td);
 
                 // TODO: add backoff here?
             }
@@ -146,7 +152,6 @@ LSTM_DETAIL_BEGIN
 
 #ifndef LSTM_MAKE_SFINAE_FRIENDLY
         template<typename Func,
-                 typename... Args,
                  LSTM_REQUIRES_(!is_transact_function<Func>()
                                 || is_nothrow_transact_function<Func>())>
         void operator()(Func&&,

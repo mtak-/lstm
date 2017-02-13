@@ -47,15 +47,6 @@ LSTM_BEGIN
             assert(valid());
         }
 
-        // TODO: rename this or consider moving it out of this class
-        void cleanup() const noexcept
-        {
-            tls_td->write_set.clear();
-            tls_td->read_set.clear();
-            tls_td->succ_callbacks.clear();
-            tls_td->do_fail_callbacks();
-        }
-
         detail::var_storage read_impl(const detail::var_base& src_var) const
         {
             assert(valid());
