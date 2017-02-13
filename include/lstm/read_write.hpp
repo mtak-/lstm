@@ -38,8 +38,9 @@ LSTM_DETAIL_BEGIN
         }
 
         LSTM_ALWAYS_INLINE static void
-        tx_failed(transaction& tx, transaction_domain& domain, thread_data& tls_td) noexcept
+        tx_failed(transaction& tx, transaction_domain& domain) noexcept
         {
+            thread_data& tls_td = tx.get_thread_data();
             thread_data_failed(tls_td);
             const gp_t new_version = domain.get_clock();
             tls_td.access_relock(new_version);
@@ -95,7 +96,7 @@ LSTM_DETAIL_BEGIN
                 } catch (...) {
                     unhandled_exception(tls_td);
                 }
-                tx_failed(tx, domain, tls_td);
+                tx_failed(tx, domain);
 
                 // TODO: add backoff here?
             }
@@ -130,7 +131,7 @@ LSTM_DETAIL_BEGIN
                 } catch (...) {
                     unhandled_exception(tls_td);
                 }
-                tx_failed(tx, domain, tls_td);
+                tx_failed(tx, domain);
 
                 // TODO: add backoff here?
             }
