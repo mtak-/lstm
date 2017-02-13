@@ -117,6 +117,12 @@ LSTM_BEGIN
             write_set.push_back(&dest_var, pending_write, hash);
         }
 
+        void reclaim_slow_path(const gp_t sync_version) noexcept
+        {
+            synchronize(sync_version);
+            do_succ_callbacks();
+        }
+
         LSTM_NOINLINE thread_data() noexcept
             : tx(nullptr)
         {
@@ -256,6 +262,13 @@ LSTM_BEGIN
             assert(succ_start_size == succ_callbacks.size());
 
             fail_callbacks.clear();
+        }
+
+        void reclaim(const gp_t sync_version) noexcept
+        {
+            // TODO: batching
+            if (!succ_callbacks.empty())
+                reclaim_slow_path(sync_version);
         }
     };
 LSTM_END

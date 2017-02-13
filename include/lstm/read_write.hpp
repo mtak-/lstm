@@ -34,11 +34,7 @@ LSTM_DETAIL_BEGIN
         LSTM_ALWAYS_INLINE static void
         tx_internal_failed(Tx& tx, transaction_domain& domain, thread_data& tls_td) noexcept
         {
-            tls_td.read_set.clear();
-            tls_td.write_set.clear();
-            tls_td.succ_callbacks.clear();
-            tls_td.do_fail_callbacks();
-            tls_td.fail_callbacks.clear();
+            tx.cleanup();
             const gp_t new_version = domain.get_clock();
             tls_td.access_relock(new_version);
             tx.reset_version(new_version);
@@ -48,6 +44,16 @@ LSTM_DETAIL_BEGIN
         {
             return tls_td.read_set.empty() && tls_td.write_set.empty()
                    && tls_td.fail_callbacks.empty() && tls_td.succ_callbacks.empty();
+        }
+
+        static void tx_success(thread_data& tls_td, const gp_t sync_version) noexcept
+        {
+            tls_td.access_unlock();
+            tls_td.tx = nullptr;
+            tls_td.write_set.clear();
+            tls_td.read_set.clear();
+            tls_td.fail_callbacks.clear();
+            tls_td.reclaim(sync_version);
         }
 
         template<typename Func, LSTM_REQUIRES_(!is_void_transact_function<Func>())>
@@ -66,9 +72,13 @@ LSTM_DETAIL_BEGIN
                     transact_result<Func> result = read_write_fn::call(func, tx);
 
                     // commit does not throw
-                    if (detail::commit_algorithm::try_commit(tx, domain)) {
-                        tls_td.tx = nullptr;
+                    gp_t sync_version;
+                    if ((sync_version = detail::commit_algorithm::try_commit(tx, domain))
+                        != detail::off_state) {
+                        tx_success(tls_td, sync_version);
                         assert(valid_start_state(tls_td));
+                        assert(!tls_td.in_critical_section());
+
                         if (std::is_reference<transact_result<Func>>{})
                             return static_cast<transact_result<Func>&&>(result);
                         else
@@ -100,11 +110,13 @@ LSTM_DETAIL_BEGIN
                     read_write_fn::call(func, tx);
 
                     // commit does not throw
-                    if (detail::commit_algorithm::try_commit(tx, domain)) {
-                        tls_td.tx = nullptr;
+                    gp_t sync_version;
+                    if ((sync_version = detail::commit_algorithm::try_commit(tx, domain))
+                        != detail::off_state) {
+                        tx_success(tls_td, sync_version);
                         assert(valid_start_state(tls_td));
-
                         assert(!tls_td.in_critical_section());
+
                         return;
                     }
                 } catch (const tx_retry&) {

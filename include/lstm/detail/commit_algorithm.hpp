@@ -83,67 +83,39 @@ LSTM_DETAIL_BEGIN
             }
         }
 
-        static void commit_reclaim_slow_path(thread_data& tls_td, const gp_t sync_version) noexcept
-        {
-            tls_td.synchronize(sync_version);
-            tls_td.do_succ_callbacks();
-        }
-
-        static void commit_reclaim(thread_data& tls_td, const gp_t sync_version) noexcept
-        {
-            // TODO: batching
-            if (!tls_td.succ_callbacks.empty())
-                commit_reclaim_slow_path(tls_td, sync_version);
-        }
-
-        static void
-        commit_slowerer_path(thread_data& tls_td, const gp_t prev_write_version) noexcept
-        {
-            commit_publish(tls_td, prev_write_version + 1);
-
-            tls_td.access_unlock();
-
-            tls_td.write_set.clear();
-
-            commit_reclaim(tls_td, prev_write_version);
-        }
-
-        static bool commit_slower_path(const transaction tx, transaction_domain& domain) noexcept
+        static gp_t commit_slower_path(const transaction tx, transaction_domain& domain) noexcept
         {
             const gp_t prev_write_version = domain.fetch_and_bump_clock();
 
             if (prev_write_version != tx.version() && !commit_validate_reads(tx))
-                return false;
+                return detail::off_state;
 
-            commit_slowerer_path(tx.get_thread_data(), prev_write_version);
+            commit_publish(tx.get_thread_data(), prev_write_version + 1);
 
-            return true;
+            return prev_write_version;
         }
 
-        static bool commit_slow_path(const transaction tx, transaction_domain& domain) noexcept
+        static gp_t commit_slow_path(const transaction tx, transaction_domain& domain) noexcept
         {
             if (!commit_lock_writes(tx))
-                return false;
+                return detail::off_state;
             return commit_slower_path(tx, domain);
         }
 
     public:
-        static bool try_commit(const transaction tx, transaction_domain& domain) noexcept
+        static gp_t try_commit(const transaction tx, transaction_domain& domain) noexcept
         {
-            thread_data& tls_td = tx.get_thread_data();
-            if (!tls_td.write_set.empty() && !commit_slow_path(tx, domain)) {
+            gp_t               sync_version = 0;
+            const thread_data& tls_td       = tx.get_thread_data();
+            if (!tls_td.write_set.empty()
+                && (sync_version = commit_slow_path(tx, domain)) == detail::off_state) {
                 LSTM_INTERNAL_FAIL_TX();
-                return false;
+                return detail::off_state;
             }
-
-            assert(tls_td.succ_callbacks.empty()); // TODO: probly should handle not empty case
-            tls_td.read_set.clear();
-            tls_td.fail_callbacks.clear();
-            tls_td.access_unlock();
 
             LSTM_SUCC_TX();
 
-            return true;
+            return sync_version;
         }
     };
 LSTM_DETAIL_END
