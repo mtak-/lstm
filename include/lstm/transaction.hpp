@@ -30,7 +30,7 @@ LSTM_BEGIN
             : tls_td(&in_tls_td)
             , version_(in_version)
         {
-            assert(tls_td->tx == nullptr);
+            assert(!tls_td->in_transaction());
             assert(version_ != detail::off_state);
             assert(!detail::locked(version_));
             assert(valid());

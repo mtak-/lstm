@@ -133,8 +133,8 @@ LSTM_BEGIN
 
         LSTM_NOINLINE ~thread_data() noexcept
         {
-            assert(tx == nullptr);
-            assert(active.load(LSTM_RELAXED) == detail::off_state);
+            assert(!in_transaction());
+            assert(!in_critical_section());
 
             lock_all(); // this->mut gets locked here
             {
@@ -162,8 +162,8 @@ LSTM_BEGIN
 
         inline void access_lock(const gp_t gp) noexcept
         {
-            assert(tx == nullptr);
-            assert(active.load(LSTM_RELAXED) == detail::off_state);
+            assert(!in_transaction());
+            assert(!in_critical_section());
             assert(gp != detail::off_state);
 
             active.store(gp, LSTM_RELEASE);
@@ -172,9 +172,9 @@ LSTM_BEGIN
 
         inline void access_relock(const gp_t gp) noexcept
         {
-            assert(active.load(LSTM_RELAXED) != detail::off_state);
-            assert(active.load(LSTM_RELAXED) <= gp);
+            assert(in_critical_section());
             assert(gp != detail::off_state);
+            assert(active.load(LSTM_RELAXED) <= gp);
 
             active.store(gp, LSTM_RELEASE);
             std::atomic_thread_fence(LSTM_ACQUIRE);
@@ -182,7 +182,7 @@ LSTM_BEGIN
 
         inline void access_unlock() noexcept
         {
-            assert(active.load(LSTM_RELAXED) != detail::off_state);
+            assert(in_critical_section());
             active.store(detail::off_state, LSTM_RELEASE);
         }
 
@@ -195,8 +195,7 @@ LSTM_BEGIN
         // TODO: allow specifying a backoff strategy
         inline void synchronize(const gp_t gp) noexcept
         {
-            assert(tls_thread_data().active.load(LSTM_RELAXED) == detail::off_state);
-            assert(&tls_thread_data().mut == &mut);
+            assert(!in_critical_section());
             assert(gp != detail::off_state);
 
             mut.lock();

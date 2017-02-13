@@ -44,6 +44,12 @@ LSTM_DETAIL_BEGIN
             tx.reset_version(new_version);
         }
 
+        static bool valid_start_state(thread_data& tls_td) noexcept
+        {
+            return tls_td.read_set.empty() && tls_td.write_set.empty()
+                   && tls_td.fail_callbacks.empty() && tls_td.succ_callbacks.empty();
+        }
+
         template<typename Func, LSTM_REQUIRES_(!is_void_transact_function<Func>())>
         static transact_result<Func>
         slow_path(Func& func, transaction_domain& domain, thread_data& tls_td)
@@ -55,16 +61,14 @@ LSTM_DETAIL_BEGIN
 
             while (true) {
                 try {
-                    assert(tls_td.read_set.size() == 0);
-                    assert(tls_td.write_set.size() == 0);
-                    assert(tls_td.fail_callbacks.size() == 0);
-                    assert(tls_td.succ_callbacks.size() == 0);
+                    assert(valid_start_state(tls_td));
 
                     transact_result<Func> result = read_write_fn::call(func, tx);
 
                     // commit does not throw
                     if (detail::commit_algorithm::try_commit(tx, domain)) {
                         tls_td.tx = nullptr;
+                        assert(valid_start_state(tls_td));
                         if (std::is_reference<transact_result<Func>>{})
                             return static_cast<transact_result<Func>&&>(result);
                         else
@@ -91,22 +95,16 @@ LSTM_DETAIL_BEGIN
 
             while (true) {
                 try {
-                    assert(tls_td.read_set.size() == 0);
-                    assert(tls_td.write_set.size() == 0);
-                    assert(tls_td.fail_callbacks.size() == 0);
-                    assert(tls_td.succ_callbacks.size() == 0);
+                    assert(valid_start_state(tls_td));
 
                     read_write_fn::call(func, tx);
 
                     // commit does not throw
                     if (detail::commit_algorithm::try_commit(tx, domain)) {
                         tls_td.tx = nullptr;
-                        assert(tls_td.read_set.size() == 0);
-                        assert(tls_td.write_set.size() == 0);
-                        assert(tls_td.fail_callbacks.size() == 0);
-                        assert(tls_td.succ_callbacks.size() == 0);
+                        assert(valid_start_state(tls_td));
 
-                        assert(tls_td.active.load(LSTM_RELAXED) == detail::off_state);
+                        assert(!tls_td.in_critical_section());
                         return;
                     }
                 } catch (const tx_retry&) {

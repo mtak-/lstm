@@ -15,8 +15,8 @@ LSTM_BEGIN
         LSTM_CACHE_ALIGNED std::atomic<gp_t> clock{0};
 
     public:
-        inline transaction_domain() noexcept          = default;
-        transaction_domain(const transaction_domain&) = delete;
+        inline constexpr transaction_domain() noexcept = default;
+        transaction_domain(const transaction_domain&)  = delete;
         transaction_domain& operator=(const transaction_domain&) = delete;
 
         inline gp_t get_clock() noexcept { return clock.load(LSTM_RELAXED); }
@@ -36,7 +36,7 @@ LSTM_DETAIL_BEGIN
 LSTM_DETAIL_END
 
 LSTM_BEGIN
-    inline transaction_domain& default_domain() noexcept
+    inline constexpr transaction_domain& default_domain() noexcept
     {
         return LSTM_ACCESS_INLINE_VAR(detail::_default_domain);
     }
