@@ -5,9 +5,6 @@
 
 #include <lstm/thread_data.hpp>
 
-#include <atomic>
-#include <cassert>
-
 LSTM_DETAIL_BEGIN
     [[noreturn]] LSTM_ALWAYS_INLINE void internal_retry()
     {

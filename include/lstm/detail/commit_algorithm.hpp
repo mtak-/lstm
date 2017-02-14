@@ -1,11 +1,15 @@
 #ifndef LSTM_DETAIL_COMMIT_ALGORITHM_HPP
 #define LSTM_DETAIL_COMMIT_ALGORITHM_HPP
 
-#include <lstm/thread_data.hpp>
 #include <lstm/transaction.hpp>
 #include <lstm/transaction_domain.hpp>
 
 LSTM_DETAIL_BEGIN
+    namespace
+    {
+        static constexpr gp_t commit_failed = off_state;
+    }
+
     struct commit_algorithm
     {
     private:
@@ -22,7 +26,7 @@ LSTM_DETAIL_BEGIN
         }
 
         // x86_64: likely compiles to mov
-        static inline void unlock(var_base& v, const gp_t version_to_set) noexcept
+        static inline void unlock_as_version(var_base& v, const gp_t version_to_set) noexcept
         {
             assert(locked(v.version_lock.load(LSTM_RELAXED)));
             assert(!locked(version_to_set));
@@ -79,38 +83,39 @@ LSTM_DETAIL_BEGIN
             for (write_set_value_type write_set_value : tls_td.write_set) {
                 write_set_value.dest_var().storage.store(write_set_value.pending_write(),
                                                          LSTM_RELAXED);
-                unlock(write_set_value.dest_var(), write_version);
+                unlock_as_version(write_set_value.dest_var(), write_version);
             }
         }
 
         static gp_t commit_slower_path(const transaction tx, transaction_domain& domain) noexcept
         {
-            const gp_t prev_write_version = domain.fetch_and_bump_clock();
+            const gp_t sync_version = domain.fetch_and_bump_clock();
 
-            if (prev_write_version != tx.version() && !commit_validate_reads(tx))
-                return detail::off_state;
+            if (sync_version != tx.version() && !commit_validate_reads(tx))
+                return commit_failed;
 
-            commit_publish(tx.get_thread_data(), prev_write_version + 1);
+            commit_publish(tx.get_thread_data(), sync_version + 1);
 
-            return prev_write_version;
+            return sync_version;
         }
 
         static gp_t commit_slow_path(const transaction tx, transaction_domain& domain) noexcept
         {
             if (!commit_lock_writes(tx))
-                return detail::off_state;
+                return commit_failed;
             return commit_slower_path(tx, domain);
         }
 
     public:
         static gp_t try_commit(const transaction tx, transaction_domain& domain) noexcept
         {
+            // if the write set is empty, synchronize always succeeds
             gp_t               sync_version = 0;
             const thread_data& tls_td       = tx.get_thread_data();
             if (!tls_td.write_set.empty()
-                && (sync_version = commit_slow_path(tx, domain)) == detail::off_state) {
+                && (sync_version = commit_slow_path(tx, domain)) == commit_failed) {
                 LSTM_INTERNAL_FAIL_TX();
-                return detail::off_state;
+                return commit_failed;
             }
 
             LSTM_SUCC_TX();

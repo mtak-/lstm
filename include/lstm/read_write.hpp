@@ -81,7 +81,7 @@ LSTM_DETAIL_BEGIN
                     // commit does not throw
                     gp_t sync_version;
                     if ((sync_version = detail::commit_algorithm::try_commit(tx, domain))
-                        != detail::off_state) {
+                        != commit_failed) {
                         tx_success(tls_td, sync_version);
                         assert(valid_start_state(tls_td));
                         assert(!tls_td.in_critical_section());
@@ -119,7 +119,7 @@ LSTM_DETAIL_BEGIN
                     // commit does not throw
                     gp_t sync_version;
                     if ((sync_version = detail::commit_algorithm::try_commit(tx, domain))
-                        != detail::off_state) {
+                        != commit_failed) {
                         tx_success(tls_td, sync_version);
                         assert(valid_start_state(tls_td));
                         assert(!tls_td.in_critical_section());
