@@ -91,6 +91,8 @@ LSTM_DETAIL_BEGIN
         {
             const gp_t sync_version = domain.fetch_and_bump_clock();
 
+            assert(tx.version() <= sync_version);
+
             if (sync_version != tx.version() && !commit_validate_reads(tx))
                 return commit_failed;
 
@@ -109,6 +111,8 @@ LSTM_DETAIL_BEGIN
     public:
         static gp_t try_commit(const transaction tx, transaction_domain& domain) noexcept
         {
+            assert(tx.version() <= domain.get_clock());
+
             // if the write set is empty, synchronize always succeeds
             gp_t               sync_version = 0;
             const thread_data& tls_td       = tx.get_thread_data();

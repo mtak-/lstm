@@ -7,7 +7,7 @@
 #include <cassert>
 
 LSTM_BEGIN
-    struct LSTM_CACHE_ALIGNED transaction_domain
+    struct transaction_domain
     {
     private:
         static constexpr gp_t max_version = ~(gp_t(1) << (sizeof(gp_t) * 8 - 1));
@@ -29,16 +29,11 @@ LSTM_BEGIN
             return result;
         }
     };
-LSTM_END
 
-LSTM_DETAIL_BEGIN
-    LSTM_INLINE_VAR transaction_domain _default_domain{};
-LSTM_DETAIL_END
-
-LSTM_BEGIN
-    inline constexpr transaction_domain& default_domain() noexcept
+    inline transaction_domain& default_domain() noexcept
     {
-        return LSTM_ACCESS_INLINE_VAR(detail::_default_domain);
+        static transaction_domain _default_domain{};
+        return _default_domain;
     }
 LSTM_END
 
