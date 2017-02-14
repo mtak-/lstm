@@ -25,7 +25,6 @@ LSTM_BEGIN
             : tls_td(&in_tls_td)
             , version_(in_version)
         {
-            assert(!tls_td->in_transaction());
             assert(version_ != detail::off_state);
             assert(!detail::locked(version_));
             assert(valid());
@@ -33,8 +32,8 @@ LSTM_BEGIN
 
         inline void reset_version(const gp_t new_version) noexcept
         {
-            assert(tls_td->tx == this);
             assert(version_ <= new_version);
+            assert(new_version == tls_td->active.load(LSTM_RELAXED));
             version_ = new_version;
 
             assert(version_ != detail::off_state);

@@ -70,7 +70,7 @@ LSTM_DETAIL_BEGIN
             const gp_t version = domain.get_clock();
             tls_td.access_lock(version);
             transaction tx{tls_td, version};
-            tls_td.tx = &tx;
+            tls_td.tx = (transaction*)1;
 
             while (true) {
                 try {
@@ -108,7 +108,7 @@ LSTM_DETAIL_BEGIN
             const gp_t version = domain.get_clock();
             tls_td.access_lock(version);
             transaction tx{tls_td, version};
-            tls_td.tx = &tx;
+            tls_td.tx = (transaction*)1;
 
             while (true) {
                 try {
@@ -146,7 +146,7 @@ LSTM_DETAIL_BEGIN
                                          thread_data&        tls_td = tls_thread_data()) const
         {
             if (tls_td.tx)
-                return read_write_fn::call(func, *tls_td.tx);
+                return read_write_fn::call(func, {tls_td, tls_td.active.load(LSTM_RELAXED)});
 
             return read_write_fn::slow_path(func, domain, tls_td);
         }
