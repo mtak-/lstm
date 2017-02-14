@@ -1,8 +1,6 @@
 #ifndef LSTM_TRANSACTION_HPP
 #define LSTM_TRANSACTION_HPP
 
-#include <lstm/detail/var_detail.hpp>
-
 #include <lstm/thread_data.hpp>
 
 LSTM_DETAIL_BEGIN
