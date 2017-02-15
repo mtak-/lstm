@@ -79,7 +79,7 @@ LSTM_BEGIN
             return bool(comparer()((T &&) t, (U &&) u));
         }
 
-        node_t* grandparent(transaction& tx, node_t* n)
+        node_t* grandparent(const transaction tx, node_t* n)
         {
             if (n == nullptr)
                 return nullptr;
@@ -91,7 +91,7 @@ LSTM_BEGIN
             return (node_t*)tx.read(parent->parent_);
         }
 
-        node_t* uncle(transaction& tx, node_t* n)
+        node_t* uncle(const transaction tx, node_t* n)
         {
             node_t* g = grandparent(tx, n);
             if (g == nullptr)
@@ -104,7 +104,7 @@ LSTM_BEGIN
                 return left;
         }
 
-        node_t* sibling(transaction& tx, node_t* parent, node_t* n)
+        node_t* sibling(const transaction tx, node_t* parent, node_t* n)
         {
             if (parent == nullptr)
                 return nullptr;
@@ -115,7 +115,7 @@ LSTM_BEGIN
             return p_left;
         }
 
-        void insert_case1(transaction& tx, node_t* n)
+        void insert_case1(const transaction tx, node_t* n)
         {
             if (tx.read(n->parent_) == nullptr)
                 tx.write(n->color_, detail::color::black);
@@ -123,13 +123,13 @@ LSTM_BEGIN
                 insert_case2(tx, n);
         }
 
-        void insert_case2(transaction& tx, node_t* n)
+        void insert_case2(const transaction tx, node_t* n)
         {
             if (tx.read(((node_t*)tx.read(n->parent_))->color_) == detail::color::red)
                 insert_case3(tx, n);
         }
 
-        void insert_case3(transaction& tx, node_t* n)
+        void insert_case3(const transaction tx, node_t* n)
         {
             node_t* u = uncle(tx, n);
 
@@ -144,7 +144,7 @@ LSTM_BEGIN
             }
         }
 
-        void insert_case4(transaction& tx, node_t* n)
+        void insert_case4(const transaction tx, node_t* n)
         {
             node_t* g = grandparent(tx, n);
 
@@ -188,7 +188,7 @@ LSTM_BEGIN
             insert_case5(tx, n);
         }
 
-        void insert_case5(transaction& tx, node_t* n)
+        void insert_case5(const transaction tx, node_t* n)
         {
             node_t* g = grandparent(tx, n);
 
@@ -200,7 +200,7 @@ LSTM_BEGIN
                 rotate_left(tx, g);
         }
 
-        void rotate_left(transaction& tx, node_t* n)
+        void rotate_left(const transaction tx, node_t* n)
         {
             node_t* p        = (node_t*)tx.read(n->right_);
             node_t* p_left   = (node_t*)tx.read(p->left_);
@@ -223,7 +223,7 @@ LSTM_BEGIN
                 tx.write(n_parent->right_, p);
         }
 
-        void rotate_right(transaction& tx, node_t* n)
+        void rotate_right(const transaction tx, node_t* n)
         {
             node_t* p        = (node_t*)tx.read(n->left_);
             node_t* p_right  = (node_t*)tx.read(p->right_);
@@ -246,7 +246,7 @@ LSTM_BEGIN
                 tx.write(n_parent->right_, p);
         }
 
-        void push_impl(transaction& tx, node_t* new_node)
+        void push_impl(const transaction tx, node_t* new_node)
         {
             node_t* parent = nullptr;
             node_t* next_parent;
@@ -265,7 +265,7 @@ LSTM_BEGIN
             insert_case1(tx, new_node);
         }
 
-        void replace_node(transaction& tx, node_t* n, node_t* child)
+        void replace_node(const transaction tx, node_t* n, node_t* child)
         {
             auto parent = (node_t*)tx.read(n->parent_);
             if (parent) {
@@ -280,12 +280,12 @@ LSTM_BEGIN
                 tx.write(child->parent_, parent);
         }
 
-        static detail::color color(transaction& tx, node_t* n)
+        static detail::color color(const transaction tx, node_t* n)
         {
             return n ? tx.read(n->color_) : detail::color::black;
         }
 
-        void delete_case6(transaction& tx, node_t* parent, node_t* n)
+        void delete_case6(const transaction tx, node_t* parent, node_t* n)
         {
             auto s = sibling(tx, parent, n);
 
@@ -301,7 +301,7 @@ LSTM_BEGIN
             }
         }
 
-        void delete_case5(transaction& tx, node_t* parent, node_t* n)
+        void delete_case5(const transaction tx, node_t* parent, node_t* n)
         {
             auto s = sibling(tx, parent, n);
 
@@ -330,7 +330,7 @@ LSTM_BEGIN
             delete_case6(tx, parent, n);
         }
 
-        void delete_case4(transaction& tx, node_t* parent, node_t* n)
+        void delete_case4(const transaction tx, node_t* parent, node_t* n)
         {
             node_t* s = sibling(tx, parent, n);
 
@@ -345,7 +345,7 @@ LSTM_BEGIN
             }
         }
 
-        void delete_case3(transaction& tx, node_t* parent, node_t* n)
+        void delete_case3(const transaction tx, node_t* parent, node_t* n)
         {
             node_t* s = sibling(tx, parent, n);
 
@@ -360,7 +360,7 @@ LSTM_BEGIN
             }
         }
 
-        void delete_case2(transaction& tx, node_t* parent, node_t* n)
+        void delete_case2(const transaction tx, node_t* parent, node_t* n)
         {
             auto s = sibling(tx, parent, n);
             if (color(tx, s) == detail::color::red) {
@@ -374,13 +374,13 @@ LSTM_BEGIN
             delete_case3(tx, parent, n);
         }
 
-        void delete_case1(transaction& tx, node_t* parent, node_t* n)
+        void delete_case1(const transaction tx, node_t* parent, node_t* n)
         {
             if (parent)
                 delete_case2(tx, parent, n);
         }
 
-        void delete_one_child(transaction& tx, node_t* n)
+        void delete_one_child(const transaction tx, node_t* n)
         {
             node_t* right = (node_t*)tx.read(n->right_);
             node_t* child = !right ? (node_t*)tx.read(n->left_) : right;
@@ -395,7 +395,7 @@ LSTM_BEGIN
             lstm::destroy_deallocate(alloc(), n);
         }
 
-        void erase_impl(transaction& tx, node_t* to_erase)
+        void erase_impl(const transaction tx, node_t* to_erase)
         {
             if (tx.read(to_erase->left_) && tx.read(to_erase->right_)) {
                 node_t* temp = min_node(tx, (node_t*)tx.read(to_erase->right_));
@@ -408,7 +408,7 @@ LSTM_BEGIN
             delete_one_child(tx, to_erase);
         }
 
-        node_t* min_node(transaction& tx, node_t* current) const
+        node_t* min_node(const transaction tx, node_t* current) const
         {
             node_t* next;
             /* loop down to find the leftmost leaf */
@@ -419,7 +419,7 @@ LSTM_BEGIN
         }
 
 #ifndef NDEBUG
-        detail::height_info minmax_height(transaction& tx, node_t* node) const
+        detail::height_info minmax_height(const transaction tx, node_t* node) const
         {
             if (!node)
                 return {0, 0, 0};
@@ -483,7 +483,7 @@ LSTM_BEGIN
                 destroy_deallocate_subtree(alloc(), root);
         }
 
-        void clear(transaction& tx)
+        void clear(const transaction tx)
         {
             if (auto root = (node_t*)tx.read(root_)) {
                 tx.write(root_, nullptr);
@@ -494,7 +494,7 @@ LSTM_BEGIN
             }
         }
 
-        node_t* find(transaction& tx, const Key& u) const
+        node_t* find(const transaction tx, const Key& u) const
         {
             node_t* cur = (node_t*)tx.read(root_);
             while (cur) {
@@ -510,12 +510,12 @@ LSTM_BEGIN
         }
 
         template<typename... Us, LSTM_REQUIRES_(std::is_constructible<node_t, alloc_t&, Us&&...>{})>
-        void emplace(transaction& tx, Us&&... us)
+        void emplace(const transaction tx, Us&&... us)
         {
             push_impl(tx, lstm::allocate_construct(alloc(), alloc(), (Us &&) us...));
         }
 
-        bool erase_one(transaction& tx, const Key& key)
+        bool erase_one(const transaction tx, const Key& key)
         {
             if (auto to_erase = find(tx, key)) {
                 erase_impl(tx, to_erase);
@@ -525,7 +525,7 @@ LSTM_BEGIN
         }
 
 #ifndef NDEBUG
-        void verify(transaction& tx) const
+        void verify(const transaction tx) const
         {
             auto root = (node_t*)tx.read(root_);
             if (root)
