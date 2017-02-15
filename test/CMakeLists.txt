@@ -32,3 +32,6 @@ add_test(test.delete_var_and_modify delete_var_and_modify)
 
 add_executable(rbtree rbtree.cpp)
 add_test(test.rbtree rbtree)
+
+add_executable(throwing_constructor throwing_constructor.cpp)
+add_test(test.throwing_constructor throwing_constructor)

@@ -55,4 +55,6 @@ int main()
         tm.run();
     }
     CHECK(debug_live_allocations<> == 1);
+
+    return test_result();
 }
