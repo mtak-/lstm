@@ -102,14 +102,26 @@ LSTM_DETAIL_BEGIN
             noexcept(alloc_traits::allocate(alloc(), 1))
             && noexcept(alloc_traits::construct(alloc(), (T*)nullptr, (Us &&) us...)))
         {
-            T* ptr = alloc_traits::allocate(alloc(), 1);
-            alloc_traits::construct(alloc(), ptr, (Us &&) us...);
-            return ptr;
+            if (noexcept(alloc_traits::construct(alloc(), (T*)nullptr, (Us &&) us...))) {
+                auto deleter = [alloc = alloc()](T * t) mutable noexcept
+                {
+                    alloc_traits::deallocate(alloc, t, 1);
+                };
+
+                std::unique_ptr<T, decltype(deleter)> ptr{alloc_traits::allocate(alloc(), 1),
+                                                          std::move(deleter)};
+                alloc_traits::construct(alloc(), std::addressof(*ptr), (Us &&) us...);
+                return ptr.release();
+            } else {
+                T* ptr = alloc_traits::allocate(alloc(), 1);
+                alloc_traits::construct(alloc(), ptr, (Us &&) us...);
+                return ptr;
+            }
         }
 
         static void destroy_deallocate(Alloc& alloc, var_storage s) noexcept
         {
-            T* ptr = &load(s);
+            T* ptr = std::addressof(load(s));
             alloc_traits::destroy(alloc, ptr);
             alloc_traits::deallocate(alloc, ptr, 1);
         }
