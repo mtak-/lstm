@@ -48,19 +48,33 @@ LSTM_DETAIL_BEGIN
         hash_t filter_;
         data_t data;
 
-        iterator find(const var_base& value) noexcept
+        iterator find_impl(const var_base& value) noexcept
         {
-            iterator result = begin();
-            for (; result != end(); ++result)
-                if (&result->dest_var() == &value)
-                    break;
+            iterator              result = begin();
+            const var_base* const ptr    = &value;
+            while (result != end() && ptr != &result->dest_var())
+                ++result;
             return result;
         }
 
-        LSTM_NOINLINE write_set_lookup slow_lookup(const var_base& dest_var,
-                                                   const hash_t    hash) noexcept
+        LSTM_NOINLINE const_iterator find_slow_path(const var_base& dest_var) const noexcept
         {
-            iterator iter = find(dest_var);
+            const const_iterator iter = const_cast<pod_hash_set&>(*this).find_impl(dest_var);
+            if (iter != end()) {
+                LSTM_LOG_BLOOM_SUCCESS();
+
+                return iter;
+            } else {
+                LSTM_LOG_BLOOM_COLLISION();
+
+                return iter;
+            }
+        }
+
+        LSTM_NOINLINE write_set_lookup lookup_slow_path(const var_base& dest_var,
+                                                        const hash_t    hash) noexcept
+        {
+            const iterator iter = find_impl(dest_var);
             if (iter != end()) {
                 LSTM_LOG_BLOOM_SUCCESS();
 
@@ -94,14 +108,22 @@ LSTM_DETAIL_BEGIN
         uword size() const noexcept { return data.size(); }
         uword capacity() const noexcept { return data.capacity(); }
 
-        // TODO: this is the reason it only works with write_set_value_type
-        // if more instantiations of this class are needed, probly just put hash
-        // first and make it a template
         void push_back(var_base* const value, const var_storage pending_write, const hash_t hash)
         {
             assert(hash != 0);
             filter_ |= hash;
             data.emplace_back(value, pending_write);
+        }
+
+        // biased against finding the var
+        const_iterator find(const var_base& dest_var) const noexcept
+        {
+            if (LSTM_LIKELY(!(filter_ & dumb_pointer_hash(dest_var)))) {
+                LSTM_LOG_BLOOM_SUCCESS();
+
+                return end();
+            }
+            return find_slow_path(dest_var);
         }
 
         // biased against finding the var
@@ -113,7 +135,7 @@ LSTM_DETAIL_BEGIN
 
                 return write_set_lookup{hash};
             }
-            return slow_lookup(dest_var, hash);
+            return lookup_slow_path(dest_var, hash);
         }
 
         iterator       begin() noexcept { return data.begin(); }

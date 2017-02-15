@@ -46,8 +46,8 @@ LSTM_BEGIN
         {
             assert(valid());
 
-            const detail::write_set_lookup lookup = tls_td->write_set.lookup(src_var);
-            if (LSTM_LIKELY(!lookup.success())) {
+            const thread_data::write_set_t::const_iterator iter = tls_td->write_set.find(src_var);
+            if (LSTM_LIKELY(iter == tls_td->write_set.end())) {
                 const gp_t                src_version = src_var.version_lock.load(LSTM_ACQUIRE);
                 const detail::var_storage result      = src_var.storage.load(LSTM_ACQUIRE);
                 if (rw_valid(src_version)
@@ -56,7 +56,7 @@ LSTM_BEGIN
                     return result;
                 }
             } else if (rw_valid(src_var)) {
-                return lookup.pending_write();
+                return iter->pending_write();
             }
             detail::internal_retry();
         }
