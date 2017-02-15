@@ -34,6 +34,7 @@ LSTM_BEGIN
         {
             assert(version_ <= new_version);
             assert(new_version == tls_td->active.load(LSTM_RELAXED));
+
             version_ = new_version;
 
             assert(version_ != detail::off_state);
@@ -81,7 +82,8 @@ LSTM_BEGIN
 
         bool valid(const thread_data& td = tls_thread_data()) const noexcept
         {
-            return &td == tls_td && tls_td->active.load(LSTM_RELAXED) == version_;
+            return &td == tls_td && tls_td->active.load(LSTM_RELAXED) == version_
+                   && tls_td->in_transaction();
         }
 
         bool rw_valid(const gp_t version) const noexcept { return version <= version_; }

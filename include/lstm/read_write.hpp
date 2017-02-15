@@ -69,8 +69,8 @@ LSTM_DETAIL_BEGIN
         {
             const gp_t version = domain.get_clock();
             tls_td.access_lock(version);
-            transaction tx{tls_td, version};
             tls_td.in_transaction_ = true;
+            transaction tx{tls_td, version};
 
             while (true) {
                 try {
@@ -107,8 +107,8 @@ LSTM_DETAIL_BEGIN
         {
             const gp_t version = domain.get_clock();
             tls_td.access_lock(version);
-            transaction tx{tls_td, version};
             tls_td.in_transaction_ = true;
+            transaction tx{tls_td, version};
 
             while (true) {
                 try {
