@@ -33,7 +33,7 @@ LSTM_DETAIL_BEGIN
         {
             tls_td.access_unlock();
             thread_data_failed(tls_td);
-            tls_td.tx = nullptr;
+            tls_td.in_transaction_ = false;
             throw;
         }
 
@@ -56,7 +56,7 @@ LSTM_DETAIL_BEGIN
         static void tx_success(thread_data& tls_td, const gp_t sync_version) noexcept
         {
             tls_td.access_unlock();
-            tls_td.tx = nullptr;
+            tls_td.in_transaction_ = false;
             tls_td.write_set.clear();
             tls_td.read_set.clear();
             tls_td.fail_callbacks.clear();
@@ -70,7 +70,7 @@ LSTM_DETAIL_BEGIN
             const gp_t version = domain.get_clock();
             tls_td.access_lock(version);
             transaction tx{tls_td, version};
-            tls_td.tx = (transaction*)1;
+            tls_td.in_transaction_ = true;
 
             while (true) {
                 try {
@@ -108,7 +108,7 @@ LSTM_DETAIL_BEGIN
             const gp_t version = domain.get_clock();
             tls_td.access_lock(version);
             transaction tx{tls_td, version};
-            tls_td.tx = (transaction*)1;
+            tls_td.in_transaction_ = true;
 
             while (true) {
                 try {
@@ -145,7 +145,7 @@ LSTM_DETAIL_BEGIN
                                          transaction_domain& domain = default_domain(),
                                          thread_data&        tls_td = tls_thread_data()) const
         {
-            if (tls_td.tx)
+            if (tls_td.in_transaction())
                 return read_write_fn::call(func, {tls_td, tls_td.active.load(LSTM_RELAXED)});
 
             return read_write_fn::slow_path(func, domain, tls_td);

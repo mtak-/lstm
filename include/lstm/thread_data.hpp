@@ -35,7 +35,7 @@ LSTM_DETAIL_END
 LSTM_BEGIN
     LSTM_ALWAYS_INLINE thread_data& tls_thread_data() noexcept;
 
-    struct LSTM_CACHE_ALIGNED thread_data
+    struct thread_data
     {
     private:
         friend detail::read_write_fn;
@@ -50,18 +50,15 @@ LSTM_BEGIN
         using write_set_iter      = typename write_set_t::iterator;
         using callbacks_iter      = typename callbacks_t::iterator;
 
+        // TODO: optimize this layout once batching is implemented
         LSTM_CACHE_ALIGNED mutex_type mut;
-        LSTM_CACHE_ALIGNED thread_data* next;
-        transaction*                    tx;
-
-        // TODO: this is not the best type for these callbacks as it doesn't support sharing
-        // how could sharing be made fast for small tx's?
-        callbacks_t        succ_callbacks;
-        callbacks_t        fail_callbacks;
-        LSTM_CACHE_ALIGNED std::atomic<gp_t> active;
-
-        read_set_t  read_set;
-        write_set_t write_set;
+        thread_data*                  next;
+        std::atomic<gp_t>             active;
+        bool                          in_transaction_;
+        read_set_t                    read_set;
+        write_set_t                   write_set;
+        callbacks_t                   succ_callbacks;
+        callbacks_t                   fail_callbacks;
 
         static void lock_all() noexcept
         {
@@ -124,7 +121,7 @@ LSTM_BEGIN
         }
 
         LSTM_NOINLINE thread_data() noexcept
-            : tx(nullptr)
+            : in_transaction_(false)
         {
             active.store(detail::off_state, LSTM_RELEASE);
 
@@ -160,7 +157,7 @@ LSTM_BEGIN
         thread_data& operator=(const thread_data&) = delete;
 
     public:
-        inline bool in_transaction() const noexcept { return tx != nullptr; }
+        inline bool in_transaction() const noexcept { return in_transaction_; }
         inline bool in_critical_section() const noexcept
         {
             return active.load(LSTM_RELAXED) != detail::off_state;
