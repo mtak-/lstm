@@ -11,10 +11,17 @@
 #include "simple_test.hpp"
 #include "thread_manager.hpp"
 
-static constexpr auto loop_count = 250000;
+static constexpr auto loop_count = LSTM_TEST_INIT(25000, 250);
 
 using lstm::read_write;
 using lstm::var;
+
+struct modify_on_delete
+{
+    int x{0};
+    modify_on_delete() { throw 0; }
+    ~modify_on_delete() { x = -1; }
+};
 
 struct big
 {
@@ -25,6 +32,12 @@ struct big
 
 int main()
 {
+    {
+        try {
+            var<modify_on_delete, debug_alloc<modify_on_delete>> x;
+        } catch (int) {
+        }
+    }
     {
         var<big, debug_alloc<big>> x;
         thread_manager tm;

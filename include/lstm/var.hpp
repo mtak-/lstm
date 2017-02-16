@@ -40,35 +40,34 @@ LSTM_BEGIN
         LSTM_REQUIRES(std::is_default_constructible<value_type>{}
                       && std::is_default_constructible<allocator_type>{}
                       && detail::is_convertible<value_type>{})
-        constexpr var() noexcept(noexcept(base::allocate_construct()))
+        constexpr var() noexcept(noexcept(base::allocate_construct())
+                                 && std::is_nothrow_default_constructible<allocator_type>{})
         {
-            detail::var_base::storage.store(base::allocate_construct(), LSTM_RELAXED);
         }
 
         LSTM_REQUIRES(std::is_default_constructible<value_type>{}
                       && std::is_default_constructible<allocator_type>{}
                       && !detail::is_convertible<value_type>{})
-        explicit constexpr var() noexcept(noexcept(base::allocate_construct()))
+        explicit constexpr var() noexcept(
+            noexcept(base::allocate_construct())
+            && std::is_nothrow_default_constructible<allocator_type>{})
         {
-            detail::var_base::storage.store(base::allocate_construct(), LSTM_RELAXED);
         }
 
         LSTM_REQUIRES(std::is_default_constructible<value_type>{}
                       && detail::is_convertible<value_type>{})
         constexpr var(std::allocator_arg_t,
                       const allocator_type& in_alloc) noexcept(noexcept(base::allocate_construct()))
-            : base{in_alloc}
+            : base(std::allocator_arg, in_alloc)
         {
-            detail::var_base::storage.store(base::allocate_construct(), LSTM_RELAXED);
         }
 
         LSTM_REQUIRES(std::is_default_constructible<value_type>{}
                       && !detail::is_convertible<value_type>{})
         explicit constexpr var(std::allocator_arg_t, const allocator_type& in_alloc) noexcept(
             noexcept(base::allocate_construct()))
-            : base{in_alloc}
+            : base(std::allocator_arg, in_alloc)
         {
-            detail::var_base::storage.store(base::allocate_construct(), LSTM_RELAXED);
         }
 
         ///////////////////////////////////////////
@@ -81,11 +80,11 @@ LSTM_BEGIN
                      && detail::is_convertible<value_type, std::initializer_list<Ilist>&, Us&&...>{}
                      && std::is_default_constructible<allocator_type>{}
                      && sizeof...(Us) > 0)>
-        constexpr var(std::initializer_list<Ilist> is,
-                      Us&&... us) noexcept(noexcept(base::allocate_construct(is, (Us &&) us...)))
+        constexpr var(std::initializer_list<Ilist> is, Us&&... us) noexcept(
+            noexcept(base::allocate_construct(is, (Us &&) us...))
+            && std::is_nothrow_default_constructible<allocator_type>{})
+            : base(is, (Us &&) us...)
         {
-            detail::var_base::storage.store(base::allocate_construct(is, (Us &&) us...),
-                                            LSTM_RELAXED);
         }
 
         template<
@@ -97,10 +96,10 @@ LSTM_BEGIN
                 && std::is_default_constructible<allocator_type>{}
                 && sizeof...(Us) > 0)>
         explicit constexpr var(std::initializer_list<Ilist> is, Us&&... us) noexcept(
-            noexcept(base::allocate_construct(is, (Us &&) us...)))
+            noexcept(base::allocate_construct(is, (Us &&) us...))
+            && std::is_nothrow_default_constructible<allocator_type>{})
+            : base(is, (Us &&) us...)
         {
-            detail::var_base::storage.store(base::allocate_construct(is, (Us &&) us...),
-                                            LSTM_RELAXED);
         }
 
         // support for var<std::vector<int>> = {1,2,3};
@@ -110,9 +109,10 @@ LSTM_BEGIN
                            && detail::is_convertible<value_type, std::initializer_list<Ilist>&>{}
                            && std::is_default_constructible<allocator_type>{})>
         constexpr var(std::initializer_list<Ilist> is) noexcept(
-            noexcept(base::allocate_construct(is)))
+            noexcept(base::allocate_construct(is))
+            && std::is_nothrow_default_constructible<allocator_type>{})
+            : base(is)
         {
-            detail::var_base::storage.store(base::allocate_construct(is), LSTM_RELAXED);
         }
 
         template<
@@ -121,9 +121,10 @@ LSTM_BEGIN
                            && !detail::is_convertible<value_type, std::initializer_list<Ilist>&>{}
                            && std::is_default_constructible<allocator_type>{})>
         explicit constexpr var(std::initializer_list<Ilist> is) noexcept(
-            noexcept(base::allocate_construct(is)))
+            noexcept(base::allocate_construct(is))
+            && std::is_nothrow_default_constructible<allocator_type>{})
+            : base(is)
         {
-            detail::var_base::storage.store(base::allocate_construct(is), LSTM_RELAXED);
         }
 
         template<
@@ -136,10 +137,8 @@ LSTM_BEGIN
                       const allocator_type&        in_alloc,
                       std::initializer_list<Ilist> is,
                       Us&&... us) noexcept(noexcept(base::allocate_construct(is, (Us &&) us...)))
-            : base{in_alloc}
+            : base(std::allocator_arg, in_alloc, is, (Us &&) us...)
         {
-            detail::var_base::storage.store(base::allocate_construct(is, (Us &&) us...),
-                                            LSTM_RELAXED);
         }
 
         template<
@@ -153,10 +152,8 @@ LSTM_BEGIN
             const allocator_type&        in_alloc,
             std::initializer_list<Ilist> is,
             Us&&... us) noexcept(noexcept(base::allocate_construct(is, (Us &&) us...)))
-            : base{in_alloc}
+            : base(std::allocator_arg, in_alloc, is, (Us &&) us...)
         {
-            detail::var_base::storage.store(base::allocate_construct(is, (Us &&) us...),
-                                            LSTM_RELAXED);
         }
 
         ///////////////////////////////////////////
@@ -168,11 +165,11 @@ LSTM_BEGIN
                                 && detail::is_convertible<value_type, U&&, Us&&...>{}
                                 && !std::is_same<detail::uncvref<U>, std::allocator_arg_t>{}
                                 && std::is_default_constructible<allocator_type>{})>
-        constexpr var(U&& u, Us&&... us) noexcept(noexcept(base::allocate_construct((U &&) u,
-                                                                                    (Us &&) us...)))
+        constexpr var(U&& u, Us&&... us) noexcept(
+            noexcept(base::allocate_construct((U &&) u, (Us &&) us...))
+            && std::is_nothrow_default_constructible<allocator_type>{})
+            : base((U &&) u, (Us &&) us...)
         {
-            detail::var_base::storage.store(base::allocate_construct((U &&) u, (Us &&) us...),
-                                            LSTM_RELAXED);
         }
 
         template<typename U,
@@ -182,10 +179,10 @@ LSTM_BEGIN
                                 && !std::is_same<detail::uncvref<U>, std::allocator_arg_t>{}
                                 && std::is_default_constructible<allocator_type>{})>
         explicit constexpr var(U&& u, Us&&... us) noexcept(
-            noexcept(base::allocate_construct((U &&) u, (Us &&) us...)))
+            noexcept(base::allocate_construct((U &&) u, (Us &&) us...))
+            && std::is_nothrow_default_constructible<allocator_type>{})
+            : base((U &&) u, (Us &&) us...)
         {
-            detail::var_base::storage.store(base::allocate_construct((U &&) u, (Us &&) us...),
-                                            LSTM_RELAXED);
         }
 
         template<typename U,
@@ -197,10 +194,8 @@ LSTM_BEGIN
                       U&&                   u,
                       Us&&... us) noexcept(noexcept(base::allocate_construct((U &&) u,
                                                                              (Us &&) us...)))
-            : base{in_alloc}
+            : base(std::allocator_arg, in_alloc, (U &&) u, (Us &&) us...)
         {
-            detail::var_base::storage.store(base::allocate_construct((U &&) u, (Us &&) us...),
-                                            LSTM_RELAXED);
         }
 
         template<typename U,
@@ -212,10 +207,8 @@ LSTM_BEGIN
             const allocator_type& in_alloc,
             U&&                   u,
             Us&&... us) noexcept(noexcept(base::allocate_construct((U &&) u, (Us &&) us...)))
-            : base{in_alloc}
+            : base(std::allocator_arg, in_alloc, (U &&) u, (Us &&) us...)
         {
-            detail::var_base::storage.store(base::allocate_construct((U &&) u, (Us &&) us...),
-                                            LSTM_RELAXED);
         }
 
         ///////////////////////////////////////////
@@ -224,18 +217,21 @@ LSTM_BEGIN
         LSTM_REQUIRES(std::is_move_constructible<value_type>{}
                       && detail::is_convertible<value_type, value_type&&>{}
                       && std::is_default_constructible<allocator_type>{})
-        constexpr var(value_type&& t) noexcept(noexcept(base::allocate_construct(std::move(t))))
+        constexpr var(value_type&& t) noexcept(
+            noexcept(base::allocate_construct(std::move(t)))
+            && std::is_nothrow_default_constructible<allocator_type>{})
+            : base(std::move(t))
         {
-            detail::var_base::storage.store(base::allocate_construct(std::move(t)), LSTM_RELAXED);
         }
 
         LSTM_REQUIRES(std::is_move_constructible<value_type>{}
                       && !detail::is_convertible<value_type, value_type&&>{}
                       && std::is_default_constructible<allocator_type>{})
         explicit constexpr var(value_type&& t) noexcept(
-            noexcept(base::allocate_construct(std::move(t))))
+            noexcept(base::allocate_construct(std::move(t)))
+            && std::is_nothrow_default_constructible<allocator_type>{})
+            : base(std::move(t))
         {
-            detail::var_base::storage.store(base::allocate_construct(std::move(t)), LSTM_RELAXED);
         }
 
         LSTM_REQUIRES(std::is_move_constructible<value_type>{}
@@ -243,9 +239,8 @@ LSTM_BEGIN
         constexpr var(std::allocator_arg_t,
                       const allocator_type& in_alloc,
                       value_type&& t) noexcept(noexcept(base::allocate_construct(std::move(t))))
-            : base{in_alloc}
+            : base(std::allocator_arg, in_alloc, std::move(t))
         {
-            detail::var_base::storage.store(base::allocate_construct(std::move(t)), LSTM_RELAXED);
         }
 
         LSTM_REQUIRES(std::is_move_constructible<value_type>{}
@@ -254,9 +249,8 @@ LSTM_BEGIN
             std::allocator_arg_t,
             const allocator_type& in_alloc,
             value_type&&          t) noexcept(noexcept(base::allocate_construct(std::move(t))))
-            : base{in_alloc}
+            : base(std::allocator_arg, in_alloc, std::move(t))
         {
-            detail::var_base::storage.store(base::allocate_construct(std::move(t)), LSTM_RELAXED);
         }
 
         allocator_type get_allocator() const noexcept { return base::alloc(); }
