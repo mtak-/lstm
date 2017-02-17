@@ -35,17 +35,6 @@ LSTM_DETAIL_BEGIN
             cb = [](cb_payload_t& payload) { (*reinterpret_cast<uncvref<F>*>(&payload))(); };
         }
 
-        template<typename F, LSTM_REQUIRES_(!sbo_concept<F>{})>
-        gp_callback(F&& f)
-        {
-            static_assert(noexcept(f()), "gp_callbacks must be noexcept");
-            ::new (&payload) uncvref<F>*(::new uncvref<F>((F &&) f));
-            cb = [](cb_payload_t& payload) {
-                (**reinterpret_cast<uncvref<F>**>(&payload))();
-                ::delete *reinterpret_cast<uncvref<F>**>(&payload);
-            };
-        }
-
         void operator()() noexcept { cb(payload); }
     };
 LSTM_DETAIL_END
