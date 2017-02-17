@@ -28,8 +28,8 @@ int main()
 
         ints.clear();
         CHECK(ints.size() == 0);
-        CHECK(debug_live_allocations<> == 0);
     }
+    CHECK(debug_live_allocations<> == 0);
 
     return test_result();
 }
