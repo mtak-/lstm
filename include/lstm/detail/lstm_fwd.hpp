@@ -117,8 +117,13 @@ LSTM_BEGIN
 LSTM_END
 
 LSTM_DETAIL_BEGIN
-    using var_storage = void*;
-    using hash_t      = std::uint64_t;
+    union var_storage
+    {
+        void* ptr;
+        char  raw[sizeof(void*)];
+    };
+
+    using hash_t = std::uint64_t;
 
     struct commit_algorithm;
     struct read_write_fn;

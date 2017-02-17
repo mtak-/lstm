@@ -21,7 +21,7 @@ LSTM_DETAIL_BEGIN
         std::atomic<gp_t>        version_lock;
         std::atomic<var_storage> storage;
 
-        inline var_base(const var_storage in_storage) noexcept
+        explicit var_base(const var_storage in_storage) noexcept
             : version_lock{0}
             , storage{in_storage}
         {
@@ -35,7 +35,7 @@ LSTM_DETAIL_BEGIN
     template<typename T>
     constexpr var_type var_type_switch() noexcept
     {
-        if (sizeof(T) <= sizeof(word) && alignof(T) <= alignof(word)
+        if (sizeof(T) <= sizeof(var_storage) && alignof(T) <= alignof(var_storage)
             && std::is_trivially_copy_constructible<T>{}()
             && std::is_trivially_move_constructible<T>{}()
             && std::is_trivially_copy_assignable<T>{}()
@@ -52,27 +52,27 @@ LSTM_DETAIL_BEGIN
         Alloc alloc_;
 
     public:
-        constexpr alloc_wrapper() = default;
-        constexpr alloc_wrapper(const Alloc& in_alloc) noexcept
+        alloc_wrapper() = default;
+        alloc_wrapper(const Alloc& in_alloc) noexcept
             : alloc_(in_alloc)
         {
         }
 
-        constexpr Alloc&       alloc() noexcept { return alloc_; }
-        constexpr const Alloc& alloc() const noexcept { return alloc_; }
+        Alloc&       alloc() noexcept { return alloc_; }
+        const Alloc& alloc() const noexcept { return alloc_; }
     };
 
     template<typename Alloc>
     struct alloc_wrapper<Alloc, false> : private Alloc
     {
-        constexpr alloc_wrapper() = default;
-        constexpr alloc_wrapper(const Alloc& in_alloc) noexcept
+        alloc_wrapper() = default;
+        alloc_wrapper(const Alloc& in_alloc) noexcept
             : Alloc(in_alloc)
         {
         }
 
-        constexpr Alloc&       alloc() noexcept { return *this; }
-        constexpr const Alloc& alloc() const noexcept { return *this; }
+        Alloc&       alloc() noexcept { return *this; }
+        const Alloc& alloc() const noexcept { return *this; }
     };
 
     template<typename T, typename Alloc, var_type Var_type = var_type_switch<T>()>
@@ -87,8 +87,8 @@ LSTM_DETAIL_BEGIN
         using alloc_traits = std::allocator_traits<Alloc>;
         using alloc_wrapper<Alloc>::alloc;
 
-        explicit constexpr var_alloc_policy() noexcept(
-            noexcept(allocate_construct()) && std::is_nothrow_default_constructible<Alloc>{})
+        explicit var_alloc_policy() noexcept(noexcept(allocate_construct())
+                                             && std::is_nothrow_default_constructible<Alloc>{})
             : var_base(allocate_construct())
         {
         }
@@ -97,7 +97,7 @@ LSTM_DETAIL_BEGIN
                  typename... Us,
                  LSTM_REQUIRES_(!std::is_same<uncvref<U>, std::allocator_arg_t>{}
                                 && !std::is_same<uncvref<U>, var_alloc_policy>{})>
-        explicit constexpr var_alloc_policy(U&& u, Us&&... us) noexcept(
+        explicit var_alloc_policy(U&& u, Us&&... us) noexcept(
             noexcept(allocate_construct((U &&) u, (Us &&) us...))
             && std::is_nothrow_default_constructible<Alloc>{})
             : var_base(allocate_construct((U &&) u, (Us &&) us...))
@@ -105,10 +105,9 @@ LSTM_DETAIL_BEGIN
         }
 
         template<typename... Us>
-        explicit constexpr var_alloc_policy(
-            std::allocator_arg_t,
-            const Alloc& in_alloc,
-            Us&&... us) noexcept(noexcept(allocate_construct((Us &&) us...)))
+        explicit var_alloc_policy(std::allocator_arg_t,
+                                  const Alloc& in_alloc,
+                                  Us&&... us) noexcept(noexcept(allocate_construct((Us &&) us...)))
             : alloc_wrapper<Alloc>(in_alloc)
             , var_base(allocate_construct((Us &&) us...))
         {
@@ -131,11 +130,11 @@ LSTM_DETAIL_BEGIN
                 try {
                     alloc_traits::construct(alloc(), ptr, (Us &&) us...);
                 } catch (...) {
-                    var_alloc_policy::destroy_deallocate(alloc(), ptr);
+                    var_alloc_policy::destroy_deallocate(alloc(), {ptr});
                     throw;
                 }
             }
-            return ptr;
+            return {ptr};
         }
 
         static void destroy_deallocate(Alloc& alloc, var_storage s) noexcept
@@ -145,7 +144,7 @@ LSTM_DETAIL_BEGIN
             alloc_traits::deallocate(alloc, ptr, 1);
         }
 
-        static T& load(var_storage storage) noexcept { return *static_cast<T*>(storage); }
+        static T& load(var_storage storage) noexcept { return *static_cast<T*>(storage.ptr); }
 
         template<typename U>
         static void
@@ -167,7 +166,6 @@ LSTM_DETAIL_BEGIN
         static void store(const std::atomic<var_storage>&& storage, U&&) noexcept = delete;
     };
 
-    // TODO: extremely likely there's strict aliasing issues...
     template<typename T, typename Alloc>
     struct var_alloc_policy<T, Alloc, var_type::atomic> : private alloc_wrapper<Alloc>, var_base
     {
@@ -180,8 +178,8 @@ LSTM_DETAIL_BEGIN
         using alloc_traits = std::allocator_traits<Alloc>;
         using alloc_wrapper<Alloc>::alloc;
 
-        explicit constexpr var_alloc_policy() noexcept(
-            noexcept(allocate_construct()) && std::is_nothrow_default_constructible<Alloc>{})
+        explicit var_alloc_policy() noexcept(noexcept(allocate_construct())
+                                             && std::is_nothrow_default_constructible<Alloc>{})
             : var_base(allocate_construct())
         {
         }
@@ -190,7 +188,7 @@ LSTM_DETAIL_BEGIN
                  typename... Us,
                  LSTM_REQUIRES_(!std::is_same<uncvref<U>, std::allocator_arg_t>{}
                                 && !std::is_same<uncvref<U>, var_alloc_policy>{})>
-        explicit constexpr var_alloc_policy(U&& u, Us&&... us) noexcept(
+        explicit var_alloc_policy(U&& u, Us&&... us) noexcept(
             noexcept(allocate_construct((U &&) u, (Us &&) us...))
             && std::is_nothrow_default_constructible<Alloc>{})
             : var_base(allocate_construct((U &&) u, (Us &&) us...))
@@ -198,10 +196,9 @@ LSTM_DETAIL_BEGIN
         }
 
         template<typename... Us>
-        explicit constexpr var_alloc_policy(
-            std::allocator_arg_t,
-            const Alloc& in_alloc,
-            Us&&... us) noexcept(noexcept(allocate_construct((Us &&) us...)))
+        explicit var_alloc_policy(std::allocator_arg_t,
+                                  const Alloc& in_alloc,
+                                  Us&&... us) noexcept(noexcept(allocate_construct((Us &&) us...)))
             : alloc_wrapper<Alloc>(in_alloc)
             , var_base(allocate_construct((Us &&) us...))
         {
@@ -212,22 +209,24 @@ LSTM_DETAIL_BEGIN
         allocate_construct(Us&&... us) noexcept(std::is_nothrow_constructible<T, Us&&...>{})
         {
             var_storage result;
-            alloc_traits::construct(alloc(), reinterpret_cast<T*>(&result), (Us &&) us...);
+            alloc_traits::construct(alloc(), reinterpret_cast<T*>(result.raw), (Us &&) us...);
             return result;
         }
 
-        static T load(var_storage storage) noexcept { return *reinterpret_cast<T*>(&storage); }
+        static T load(var_storage storage) noexcept { return *reinterpret_cast<T*>(storage.raw); }
 
         template<typename U>
         static void store(var_storage& storage, U&& u) noexcept
         {
-            reinterpret_cast<T&>(storage) = (U &&) u;
+            *reinterpret_cast<T*>(storage.raw) = (U &&) u;
         }
 
         template<typename U>
         static void store(std::atomic<var_storage>& storage, U&& u) noexcept
         {
-            storage.store(reinterpret_cast<var_storage>(static_cast<T>((U &&) u)), LSTM_RELAXED);
+            var_storage new_storage;
+            ::new (new_storage.raw) T((U &&) u);
+            storage.store(new_storage, LSTM_RELAXED);
         }
 
         template<typename U>
