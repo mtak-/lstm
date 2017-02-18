@@ -25,9 +25,6 @@ int main()
         manager.queue_loop_n([&] { lstm::read_write([&] { ints.clear(); }); }, iter_count);
 
         manager.run();
-
-        ints.clear();
-        CHECK(ints.size() == 0);
     }
     CHECK(debug_live_allocations<> == 0);
 

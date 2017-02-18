@@ -4,8 +4,8 @@
 #include <lstm/detail/backoff.hpp>
 #include <lstm/detail/gp_callback.hpp>
 #include <lstm/detail/pod_hash_set.hpp>
-#include <lstm/detail/pod_vector.hpp>
 #include <lstm/detail/read_set_value_type.hpp>
+#include <lstm/detail/reclaim_buffer.hpp>
 #include <lstm/detail/var_detail.hpp>
 #include <lstm/detail/write_set_value_type.hpp>
 
@@ -57,8 +57,8 @@ LSTM_BEGIN
         bool                          in_transaction_;
         read_set_t                    read_set;
         write_set_t                   write_set;
-        callbacks_t                   succ_callbacks;
         callbacks_t                   fail_callbacks;
+        detail::succ_callbacks_t<4>   succ_callbacks;
 
         static void lock_all() noexcept
         {
@@ -94,6 +94,18 @@ LSTM_BEGIN
             }
         }
 
+        // TODO: allow specifying a backoff strategy
+        static bool try_wait(const gp_t gp) noexcept
+        {
+            for (thread_data* q = LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
+                 q != nullptr;
+                 q = q->next) {
+                if (q->not_in_grace_period(gp))
+                    return false;
+            }
+            return true;
+        }
+
         void add_read_set(const detail::var_base& src_var) { read_set.emplace_back(&src_var); }
 
         void remove_read_set(const detail::var_base& src_var) noexcept
@@ -114,10 +126,26 @@ LSTM_BEGIN
             write_set.push_back(&dest_var, pending_write, hash);
         }
 
-        void reclaim_slow_path(const gp_t sync_version) noexcept
+        void reclaim_all_possible(const gp_t sync_version) noexcept
         {
+            do_succ_callbacks(succ_callbacks.front().callbacks);
+            succ_callbacks.pop_front();
+            if (!succ_callbacks.empty()) {
+                const gp_t front_sync_version = succ_callbacks.front().version;
+                if (sync_version < front_sync_version) {
+                    if (try_synchronize(front_sync_version))
+                        reclaim_all_possible(front_sync_version);
+                } else {
+                    reclaim_all_possible(sync_version);
+                }
+            }
+        }
+
+        LSTM_NOINLINE void reclaim_slow_path() noexcept
+        {
+            const gp_t sync_version = succ_callbacks.front().version;
             synchronize(sync_version);
-            do_succ_callbacks();
+            reclaim_all_possible(sync_version);
         }
 
         LSTM_NOINLINE thread_data() noexcept
@@ -151,6 +179,13 @@ LSTM_BEGIN
             }
             unlock_all(); // this->mut does not get unlocked here
             mut.unlock();
+
+            assert(succ_callbacks.active().callbacks.empty());
+            if (!succ_callbacks.empty()) {
+                const gp_t last_version = succ_callbacks.back().version;
+                synchronize(last_version);
+                reclaim_all_possible(last_version);
+            }
         }
 
         thread_data(const thread_data&) = delete;
@@ -196,6 +231,23 @@ LSTM_BEGIN
         }
 
         // TODO: allow specifying a backoff strategy
+        inline bool try_synchronize(const gp_t gp) noexcept
+        {
+            assert(!in_critical_section());
+            assert(gp != detail::off_state);
+
+            bool result;
+
+            mut.lock();
+            {
+                result = try_wait(gp);
+            }
+            mut.unlock();
+
+            return result;
+        }
+
+        // TODO: allow specifying a backoff strategy
         inline void synchronize(const gp_t gp) noexcept
         {
             assert(!in_critical_section());
@@ -210,11 +262,10 @@ LSTM_BEGIN
 
         template<typename Func,
                  LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
-        void
-        queue_succ_callback(Func&& func) noexcept(noexcept(succ_callbacks.emplace_back((Func &&)
-                                                                                           func)))
+        void queue_succ_callback(Func&& func) noexcept(
+            noexcept(succ_callbacks.active().callbacks.emplace_back((Func &&) func)))
         {
-            succ_callbacks.emplace_back((Func &&) func);
+            succ_callbacks.active().callbacks.emplace_back((Func &&) func);
         }
 
         template<typename Func,
@@ -226,46 +277,35 @@ LSTM_BEGIN
             fail_callbacks.emplace_back((Func &&) func);
         }
 
-        // TODO: when atomic swap on succ_callbacks is possible, this needs to do just that
-        void do_succ_callbacks() noexcept
+        static void do_succ_callbacks(callbacks_t& succ_callbacks) noexcept
         {
-#ifndef NDEBUG
-            const std::size_t fail_start_size = fail_callbacks.size();
-            const std::size_t succ_start_size = succ_callbacks.size();
-#endif
-            // TODO: if a callback adds a callback, this fails, again need a different type
             for (auto& succ_callback : succ_callbacks)
                 succ_callback();
-
-            assert(fail_start_size == fail_callbacks.size());
-            assert(succ_start_size == succ_callbacks.size());
-
             succ_callbacks.clear();
         }
 
-        // TODO: when atomic swap on succ_callbacks is possible, this needs to do just that
         void do_fail_callbacks() noexcept
         {
 #ifndef NDEBUG
             const std::size_t fail_start_size = fail_callbacks.size();
-            const std::size_t succ_start_size = succ_callbacks.size();
 #endif
-            // TODO: if a callback adds a callback, this fails, again need a different type
             const callbacks_iter begin = fail_callbacks.begin();
             for (callbacks_iter riter = fail_callbacks.end(); riter != begin;)
                 (*--riter)();
 
             assert(fail_start_size == fail_callbacks.size());
-            assert(succ_start_size == succ_callbacks.size());
 
             fail_callbacks.clear();
         }
 
         void reclaim(const gp_t sync_version) noexcept
         {
-            // TODO: batching
-            if (!succ_callbacks.empty())
-                reclaim_slow_path(sync_version);
+            detail::succ_callback_t& active_buf = succ_callbacks.active();
+            if (active_buf.callbacks.empty())
+                return;
+
+            if (succ_callbacks.push_is_full(sync_version))
+                reclaim_slow_path();
         }
     };
 LSTM_END

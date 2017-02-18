@@ -25,7 +25,7 @@ LSTM_DETAIL_BEGIN
         {
             tls_td.write_set.clear();
             tls_td.read_set.clear();
-            tls_td.succ_callbacks.clear();
+            tls_td.succ_callbacks.active().callbacks.clear();
             tls_td.do_fail_callbacks();
         }
 
@@ -50,7 +50,8 @@ LSTM_DETAIL_BEGIN
         static bool valid_start_state(thread_data& tls_td) noexcept
         {
             return tls_td.read_set.empty() && tls_td.write_set.empty()
-                   && tls_td.fail_callbacks.empty() && tls_td.succ_callbacks.empty();
+                   && tls_td.fail_callbacks.empty()
+                   && tls_td.succ_callbacks.active().callbacks.empty();
         }
 
         static void tx_success(thread_data& tls_td, const gp_t sync_version) noexcept
