@@ -62,7 +62,7 @@ int main()
             for (int t = 0; t < thread_count; ++t) {
                 manager.queue_thread([&intmap, &data, t] {
                     lstm::thread_data& tls_td = lstm::tls_thread_data();
-                    for (int i = 0; i < iter_count / thread_count; ++i) {
+                    for (int i = iter_count / thread_count; i >= 0; --i) {
                         lstm::read_write([&data, &intmap, &tls_td, i, t](lstm::transaction& tx) {
                             intmap.erase_one(tx, data[i + t * iter_count / thread_count]);
                         });
