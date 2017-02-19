@@ -182,9 +182,8 @@ LSTM_BEGIN
             mut.unlock();
 
             assert(succ_callbacks.active().callbacks.empty());
-            if (!succ_callbacks.empty()) {
+            if (!succ_callbacks.empty())
                 reclaim_all();
-            }
         }
 
         thread_data(const thread_data&) = delete;
