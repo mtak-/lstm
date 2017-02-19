@@ -242,11 +242,11 @@ LSTM_DETAIL_BEGIN
     {
     };
 
-    template<typename Func, typename Tx>
-    using callable_with_tx_ = decltype(std::declval<Func>()(std::declval<Tx>()));
+    template<typename Func>
+    using callable_with_tx_ = decltype(std::declval<Func>()(std::declval<const transaction&>()));
 
-    template<typename Func, typename Tx>
-    using callable_with_tx = supports<callable_with_tx_, Func, Tx>;
+    template<typename Func>
+    using callable_with_tx = supports<callable_with_tx_, Func>;
 
     template<typename Func>
     using callable_ = decltype(std::declval<Func>()());
@@ -254,24 +254,22 @@ LSTM_DETAIL_BEGIN
     template<typename Func>
     using callable = supports<callable_, Func>;
 
-    template<typename Func,
-             bool = callable_with_tx<Func&, transaction&>{}(),
-             bool = callable<Func&>{}()>
+    template<typename Func, bool = callable_with_tx<Func>{}(), bool = callable<Func>{}()>
     struct transact_result_impl;
 
     template<typename Func, bool b>
     struct transact_result_impl<Func, true, b>
     {
-        using type = decltype(std::declval<Func&>()(std::declval<transaction&>()));
+        using type = decltype(std::declval<Func>()(std::declval<const transaction&>()));
         static constexpr bool nothrow
-            = noexcept(std::declval<Func&>()(std::declval<transaction&>()));
+            = noexcept(std::declval<Func>()(std::declval<const transaction&>()));
     };
 
     template<typename Func>
     struct transact_result_impl<Func, false, true>
     {
-        using type                    = decltype(std::declval<Func&>()());
-        static constexpr bool nothrow = noexcept(std::declval<Func&>()());
+        using type                    = decltype(std::declval<Func>()());
+        static constexpr bool nothrow = noexcept(std::declval<Func>()());
     };
 
     template<typename Func>
@@ -323,9 +321,5 @@ LSTM_DETAIL_BEGIN
     }
 // clang-format on
 LSTM_DETAIL_END
-
-LSTM_TEST_BEGIN
-    struct transaction_tester;
-LSTM_TEST_END
 
 #endif /* LSTM_DETAIL_LSTM_FWD_HPP */

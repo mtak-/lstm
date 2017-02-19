@@ -277,7 +277,7 @@ LSTM_BEGIN
 
         static void do_succ_callbacks(callbacks_t& succ_callbacks) noexcept
         {
-            for (auto& succ_callback : succ_callbacks)
+            for (detail::gp_callback& succ_callback : succ_callbacks)
                 succ_callback();
             succ_callbacks.clear();
         }

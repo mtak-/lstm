@@ -9,13 +9,13 @@ LSTM_DETAIL_BEGIN
     struct read_write_fn
     {
     private:
-        template<typename Func, LSTM_REQUIRES_(callable_with_tx<Func, transaction&>())>
-        static transact_result<Func> call(Func&& func, transaction tx)
+        template<typename Func, LSTM_REQUIRES_(callable_with_tx<Func&&>())>
+        static transact_result<Func> call(Func&& func, const transaction tx)
         {
             return ((Func &&) func)(tx);
         }
 
-        template<typename Func, LSTM_REQUIRES_(!callable_with_tx<Func, transaction&>())>
+        template<typename Func, LSTM_REQUIRES_(!callable_with_tx<Func&&>())>
         static transact_result<Func> call(Func&& func, const transaction)
         {
             return ((Func &&) func)();
@@ -64,7 +64,7 @@ LSTM_DETAIL_BEGIN
             tls_td.reclaim(sync_version);
         }
 
-        template<typename Func, LSTM_REQUIRES_(!is_void_transact_function<Func>())>
+        template<typename Func, LSTM_REQUIRES_(!is_void_transact_function<Func&>())>
         static transact_result<Func>
         slow_path(Func func, transaction_domain& domain, thread_data& tls_td)
         {
@@ -103,7 +103,7 @@ LSTM_DETAIL_BEGIN
             }
         }
 
-        template<typename Func, LSTM_REQUIRES_(is_void_transact_function<Func>())>
+        template<typename Func, LSTM_REQUIRES_(is_void_transact_function<Func&>())>
         static void slow_path(Func func, transaction_domain& domain, thread_data& tls_td)
         {
             const gp_t version = domain.get_clock();
@@ -140,8 +140,10 @@ LSTM_DETAIL_BEGIN
 
     public:
         template<typename Func,
-                 LSTM_REQUIRES_(is_transact_function<Func>()
-                                && !is_nothrow_transact_function<Func>())>
+                 LSTM_REQUIRES_(is_transact_function<Func&&>()
+                                && is_transact_function<uncvref<Func>&>()),
+                 LSTM_REQUIRES_(!is_nothrow_transact_function<Func&&>()
+                                && !is_nothrow_transact_function<uncvref<Func>&>())>
         transact_result<Func> operator()(Func&&              func,
                                          transaction_domain& domain = default_domain(),
                                          thread_data&        tls_td = tls_thread_data()) const
@@ -155,16 +157,28 @@ LSTM_DETAIL_BEGIN
 
 #ifndef LSTM_MAKE_SFINAE_FRIENDLY
         template<typename Func,
-                 LSTM_REQUIRES_(!is_transact_function<Func>()
-                                || is_nothrow_transact_function<Func>())>
+                 LSTM_REQUIRES_(!is_transact_function<Func&&>()
+                                || !is_transact_function<uncvref<Func>&>())>
         void operator()(Func&&,
                         transaction_domain& = default_domain(),
                         thread_data&        = tls_thread_data()) const
         {
-            static_assert(is_transact_function<Func>(),
+            static_assert(is_transact_function<Func&&>() && !is_transact_function<uncvref<Func>&>(),
                           "functions passed to lstm::read_write must either take no parameters, "
-                          "lstm::transaction&, or auto&/T&");
-            static_assert(!is_nothrow_transact_function<Func>(),
+                          "or take a `lstm::transaction` either by value or `const&`");
+        }
+
+        template<typename Func,
+                 LSTM_REQUIRES_(is_transact_function<Func&&>()
+                                && is_transact_function<uncvref<Func>&>()),
+                 LSTM_REQUIRES_(is_nothrow_transact_function<Func&&>()
+                                || is_nothrow_transact_function<uncvref<Func>&>())>
+        void operator()(Func&&,
+                        transaction_domain& = default_domain(),
+                        thread_data&        = tls_thread_data()) const
+        {
+            static_assert(!is_nothrow_transact_function<Func&&>()
+                              && !is_nothrow_transact_function<uncvref<Func>&>(),
                           "functions passed to lstm::read_write must not be marked noexcept");
         }
 #endif

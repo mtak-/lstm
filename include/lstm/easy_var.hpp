@@ -28,7 +28,8 @@ LSTM_BEGIN
 
         easy_var& operator=(const easy_var& rhs)
         {
-            lstm::read_write([&](auto& tx) { tx.write(underlying(), tx.read(rhs.underlying())); });
+            lstm::read_write(
+                [&](const transaction tx) { tx.write(underlying(), tx.read(rhs.underlying())); });
             return *this;
         }
 
@@ -36,13 +37,13 @@ LSTM_BEGIN
                  LSTM_REQUIRES_(std::is_assignable<value_type&, const U&>())>
         easy_var& operator=(const U& rhs)
         {
-            lstm::read_write([&](auto& tx) { tx.write(underlying(), rhs); });
+            lstm::read_write([&](const transaction tx) { tx.write(underlying(), rhs); });
             return *this;
         }
 
         value_type get() const
         {
-            return lstm::read_write([this](auto& tx) { return tx.read(underlying()); });
+            return lstm::read_write([this](const transaction tx) { return tx.read(underlying()); });
         }
 
         inline operator value_type() const { return get(); }

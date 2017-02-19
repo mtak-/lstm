@@ -111,7 +111,7 @@ LSTM_BEGIN
         {
             thread_data& tls_td = tls_thread_data();
             lstm::read_write(
-                [&](auto& tx) {
+                [&](const transaction tx) {
                     tx.write(size_, 0);
                     auto root = tx.read(head);
                     tx.write(head, nullptr);
@@ -131,7 +131,7 @@ LSTM_BEGIN
             thread_data& tls_td   = tls_thread_data();
             node_t*      new_head = lstm::allocate_construct(tls_td, alloc(), (Us &&) us...);
             lstm::read_write(
-                [&](auto& tx) {
+                [&](const transaction tx) {
                     auto head_ = tx.read(head);
                     new_head->next_.unsafe_write(head_);
 
@@ -146,7 +146,7 @@ LSTM_BEGIN
 
         word size() const
         {
-            return lstm::read_write([&](auto& tx) { return tx.read(size_); });
+            return lstm::read_write([&](const transaction tx) { return tx.read(size_); });
         }
     };
 LSTM_END

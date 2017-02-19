@@ -28,7 +28,6 @@ LSTM_DETAIL_BEGIN
         }
 
         friend struct ::lstm::transaction;
-        friend test::transaction_tester;
         friend commit_algorithm;
     };
 

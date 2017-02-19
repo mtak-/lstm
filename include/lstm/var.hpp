@@ -11,7 +11,6 @@ LSTM_BEGIN
         using base = detail::var_alloc_policy<T, Alloc>;
 
         friend struct ::lstm::transaction;
-        friend test::transaction_tester;
 
     public:
         using value_type                 = T;

@@ -44,7 +44,7 @@ int main()
         for (int i = 0; i < 5; ++i) {
             tm.queue_loop_n(
                 [&] {
-                    read_write([&](auto& tx) {
+                    read_write([&](const transaction tx) {
                         try {
                             tx.write(x, 0);
                         } catch (...) {
