@@ -15,32 +15,8 @@ LSTM_BEGIN
     struct transaction
     {
     private:
-        friend detail::read_write_fn;
-        friend test::transaction_tester;
-
         thread_data* tls_td;
         gp_t         version_;
-
-        inline transaction(thread_data& in_tls_td, const gp_t in_version) noexcept
-            : tls_td(&in_tls_td)
-            , version_(in_version)
-        {
-            assert(version_ != detail::off_state);
-            assert(!detail::locked(version_));
-            assert(valid());
-        }
-
-        inline void reset_version(const gp_t new_version) noexcept
-        {
-            assert(version_ <= new_version);
-            assert(new_version == tls_td->active.load(LSTM_RELAXED));
-
-            version_ = new_version;
-
-            assert(version_ != detail::off_state);
-            assert(!detail::locked(version_));
-            assert(valid());
-        }
 
         detail::var_storage read_impl(const detail::var_base& src_var) const
         {
@@ -77,8 +53,28 @@ LSTM_BEGIN
         }
 
     public:
+        inline transaction(thread_data& in_tls_td, const gp_t in_version) noexcept
+            : tls_td(&in_tls_td)
+            , version_(in_version)
+        {
+            assert(version_ != detail::off_state);
+            assert(!detail::locked(version_));
+            assert(valid());
+        }
+
         thread_data& get_thread_data() const noexcept { return *tls_td; }
         gp_t         version() const noexcept { return version_; }
+
+        inline void reset_version(const gp_t new_version) noexcept
+        {
+            assert(version_ <= new_version);
+
+            version_ = new_version;
+
+            assert(version_ != detail::off_state);
+            assert(!detail::locked(version_));
+            assert(valid());
+        }
 
         bool valid(const thread_data& td = tls_thread_data()) const noexcept
         {

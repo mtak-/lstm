@@ -8,6 +8,7 @@
 LSTM_DETAIL_BEGIN
     struct gp_callback
     {
+    private:
         static constexpr auto max_payload_size = sizeof(void*) * 3;
 
         using cb_payload_t = std::aligned_storage_t<max_payload_size, alignof(std::max_align_t)>;
@@ -24,6 +25,14 @@ LSTM_DETAIL_BEGIN
         cb_payload_t payload;
         void (*cb)(cb_payload_t&) noexcept;
 
+        template<typename F>
+        static void callback(cb_payload_t& payload) noexcept
+        {
+            static_assert(std::is_same<uncvref<F>, F>{}, "");
+            (*reinterpret_cast<F*>(&payload))();
+        }
+
+    public:
         gp_callback() noexcept = default;
 
         template<typename F, LSTM_REQUIRES_(sbo_concept<F>{})>
@@ -31,10 +40,7 @@ LSTM_DETAIL_BEGIN
         {
             static_assert(noexcept(f()), "gp_callbacks must be noexcept");
             ::new (&payload) uncvref<F>((F &&) f);
-            cb = [](cb_payload_t & payload) noexcept
-            {
-                (*reinterpret_cast<uncvref<F>*>(&payload))();
-            };
+            cb = &callback<uncvref<F>>;
         }
 
         void operator()() noexcept { cb(payload); }

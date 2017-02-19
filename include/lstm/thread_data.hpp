@@ -302,7 +302,7 @@ LSTM_BEGIN
             if (active_buf.callbacks.empty())
                 return;
 
-            if (succ_callbacks.push_is_full(sync_version))
+            if (LSTM_UNLIKELY(succ_callbacks.push_is_full(sync_version)))
                 reclaim_slow_path();
         }
     };

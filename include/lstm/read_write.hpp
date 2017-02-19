@@ -10,15 +10,15 @@ LSTM_DETAIL_BEGIN
     {
     private:
         template<typename Func, LSTM_REQUIRES_(callable_with_tx<Func, transaction&>())>
-        static transact_result<Func> call(Func& func, transaction tx)
+        static transact_result<Func> call(Func&& func, transaction tx)
         {
-            return func(tx);
+            return ((Func &&) func)(tx);
         }
 
         template<typename Func, LSTM_REQUIRES_(!callable_with_tx<Func, transaction&>())>
-        static transact_result<Func> call(Func& func, const transaction)
+        static transact_result<Func> call(Func&& func, const transaction)
         {
-            return func();
+            return ((Func &&) func)();
         }
 
         static void thread_data_failed(thread_data& tls_td) noexcept
@@ -66,7 +66,7 @@ LSTM_DETAIL_BEGIN
 
         template<typename Func, LSTM_REQUIRES_(!is_void_transact_function<Func>())>
         static transact_result<Func>
-        slow_path(Func& func, transaction_domain& domain, thread_data& tls_td)
+        slow_path(Func func, transaction_domain& domain, thread_data& tls_td)
         {
             const gp_t version = domain.get_clock();
             tls_td.access_lock(version);
@@ -104,7 +104,7 @@ LSTM_DETAIL_BEGIN
         }
 
         template<typename Func, LSTM_REQUIRES_(is_void_transact_function<Func>())>
-        static void slow_path(Func& func, transaction_domain& domain, thread_data& tls_td)
+        static void slow_path(Func func, transaction_domain& domain, thread_data& tls_td)
         {
             const gp_t version = domain.get_clock();
             tls_td.access_lock(version);
@@ -147,9 +147,10 @@ LSTM_DETAIL_BEGIN
                                          thread_data&        tls_td = tls_thread_data()) const
         {
             if (tls_td.in_transaction())
-                return read_write_fn::call(func, {tls_td, tls_td.active.load(LSTM_RELAXED)});
+                return read_write_fn::call((Func &&) func,
+                                           {tls_td, tls_td.active.load(LSTM_RELAXED)});
 
-            return read_write_fn::slow_path(func, domain, tls_td);
+            return read_write_fn::slow_path((Func &&) func, domain, tls_td);
         }
 
 #ifndef LSTM_MAKE_SFINAE_FRIENDLY
