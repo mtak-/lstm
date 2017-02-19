@@ -36,7 +36,8 @@ int main()
                 manager.queue_thread([&intmap, &data, t] {
                     lstm::thread_data& tls_td = lstm::tls_thread_data();
                     for (int i = 0; i < iter_count / thread_count; ++i) {
-                        lstm::read_write([&data, &intmap, &tls_td, i, t](lstm::transaction& tx) {
+                        lstm::read_write([&data, &intmap, &tls_td, i, t](
+                            const lstm::transaction tx) {
                             intmap.emplace(tx,
                                            data[i + t * iter_count / thread_count],
                                            data[i + t * iter_count / thread_count + iter_count]);
@@ -54,7 +55,7 @@ int main()
                       << "s" << std::endl;
         }
 #ifndef NDEBUG
-        lstm::read_write([&](lstm::transaction& tx) { return intmap.verify(tx); });
+        lstm::read_write([&](const lstm::transaction tx) { return intmap.verify(tx); });
 #endif
         {
             thread_manager manager;
@@ -63,9 +64,10 @@ int main()
                 manager.queue_thread([&intmap, &data, t] {
                     lstm::thread_data& tls_td = lstm::tls_thread_data();
                     for (int i = iter_count / thread_count; i >= 0; --i) {
-                        lstm::read_write([&data, &intmap, &tls_td, i, t](lstm::transaction& tx) {
-                            intmap.erase_one(tx, data[i + t * iter_count / thread_count]);
-                        });
+                        lstm::read_write(
+                            [&data, &intmap, &tls_td, i, t](const lstm::transaction tx) {
+                                intmap.erase_one(tx, data[i + t * iter_count / thread_count]);
+                            });
                     }
                 });
             }
@@ -79,7 +81,7 @@ int main()
                       << "s" << std::endl;
         }
 #ifndef NDEBUG
-        lstm::read_write([&](lstm::transaction& tx) { return intmap.verify(tx); });
+        lstm::read_write([&](const lstm::transaction tx) { return intmap.verify(tx); });
 #endif
     }
 

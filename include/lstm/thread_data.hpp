@@ -126,26 +126,27 @@ LSTM_BEGIN
             write_set.push_back(&dest_var, pending_write, hash);
         }
 
-        void reclaim_all_possible(const gp_t sync_version) noexcept
+        void reclaim_all() noexcept
         {
-            do_succ_callbacks(succ_callbacks.front().callbacks);
-            succ_callbacks.pop_front();
-            if (!succ_callbacks.empty()) {
-                const gp_t front_sync_version = succ_callbacks.front().version;
-                if (sync_version < front_sync_version) {
-                    if (try_synchronize(front_sync_version))
-                        reclaim_all_possible(front_sync_version);
-                } else {
-                    reclaim_all_possible(sync_version);
-                }
-            }
+            synchronize(succ_callbacks.back().version);
+            do {
+                do_succ_callbacks(succ_callbacks.front().callbacks);
+                succ_callbacks.pop_front();
+            } while (!succ_callbacks.empty());
+        }
+
+        LSTM_ALWAYS_INLINE void reclaim_all_possible() noexcept
+        {
+            do {
+                do_succ_callbacks(succ_callbacks.front().callbacks);
+                succ_callbacks.pop_front();
+            } while (!succ_callbacks.empty() && try_synchronize(succ_callbacks.front().version));
         }
 
         LSTM_NOINLINE void reclaim_slow_path() noexcept
         {
-            const gp_t sync_version = succ_callbacks.front().version;
-            synchronize(sync_version);
-            reclaim_all_possible(sync_version);
+            synchronize(succ_callbacks.front().version);
+            reclaim_all_possible();
         }
 
         LSTM_NOINLINE thread_data() noexcept
@@ -182,9 +183,7 @@ LSTM_BEGIN
 
             assert(succ_callbacks.active().callbacks.empty());
             if (!succ_callbacks.empty()) {
-                const gp_t last_version = succ_callbacks.back().version;
-                synchronize(last_version);
-                reclaim_all_possible(last_version);
+                reclaim_all();
             }
         }
 
