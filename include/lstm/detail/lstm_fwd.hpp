@@ -14,7 +14,6 @@
 
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <type_traits>
 #include <utility>
 
@@ -102,8 +101,7 @@ LSTM_BEGIN
     using word  = LSTM_SIGNED_LOCKFREE_WORD;
     using uword = std::make_unsigned_t<word>;
 
-    using gp_t       = uword;
-    using mutex_type = std::mutex;
+    using gp_t = uword;
 
     static_assert(std::is_integral<word>{}, "type chosen for word must be an integral type");
     static_assert(std::is_signed<word>{}, "type chosen for word must be signed");

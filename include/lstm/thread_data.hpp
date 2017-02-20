@@ -1,7 +1,7 @@
 #ifndef LSTM_THREAD_DATA_HPP
 #define LSTM_THREAD_DATA_HPP
 
-#include <lstm/detail/backoff.hpp>
+#include <lstm/detail/fast_rw_mutex.hpp>
 #include <lstm/detail/gp_callback.hpp>
 #include <lstm/detail/pod_hash_set.hpp>
 #include <lstm/detail/read_set_value_type.hpp>
@@ -10,6 +10,8 @@
 #include <lstm/detail/write_set_value_type.hpp>
 
 LSTM_DETAIL_BEGIN
+    using mutex_type = fast_rw_mutex;
+
     namespace
     {
         static_assert(std::is_unsigned<gp_t>{}, "");
@@ -51,14 +53,14 @@ LSTM_BEGIN
         using callbacks_iter      = typename callbacks_t::iterator;
 
         // TODO: optimize this layout once batching is implemented
-        LSTM_CACHE_ALIGNED mutex_type mut;
-        thread_data*                  next;
-        std::atomic<gp_t>             active;
-        bool                          in_transaction_;
-        read_set_t                    read_set;
-        write_set_t                   write_set;
-        callbacks_t                   fail_callbacks;
-        detail::succ_callbacks_t<4>   succ_callbacks;
+        LSTM_CACHE_ALIGNED detail::mutex_type mut;
+        thread_data*                          next;
+        std::atomic<gp_t>                     active;
+        bool                                  in_transaction_;
+        read_set_t                            read_set;
+        write_set_t                           write_set;
+        callbacks_t                           fail_callbacks;
+        detail::succ_callbacks_t<4>           succ_callbacks;
 
         static void lock_all() noexcept
         {
@@ -140,13 +142,17 @@ LSTM_BEGIN
             do {
                 do_succ_callbacks(succ_callbacks.front().callbacks);
                 succ_callbacks.pop_front();
-            } while (!succ_callbacks.empty() && try_synchronize(succ_callbacks.front().version));
+            } while (!succ_callbacks.empty() && try_wait(succ_callbacks.front().version));
         }
 
         LSTM_NOINLINE void reclaim_slow_path() noexcept
         {
-            synchronize(succ_callbacks.front().version);
-            reclaim_all_possible();
+            mut.lock_shared();
+            {
+                wait(succ_callbacks.front().version);
+                reclaim_all_possible();
+            }
+            mut.unlock_shared();
         }
 
         LSTM_NOINLINE thread_data() noexcept
@@ -167,6 +173,13 @@ LSTM_BEGIN
         {
             assert(!in_transaction());
             assert(!in_critical_section());
+            assert(read_set.empty());
+            assert(write_set.empty());
+            assert(fail_callbacks.empty());
+            assert(succ_callbacks.active().callbacks.empty());
+
+            if (!succ_callbacks.empty())
+                reclaim_all();
 
             lock_all(); // this->mut gets locked here
             {
@@ -180,10 +193,6 @@ LSTM_BEGIN
             }
             unlock_all(); // this->mut does not get unlocked here
             mut.unlock();
-
-            assert(succ_callbacks.active().callbacks.empty());
-            if (!succ_callbacks.empty())
-                reclaim_all();
         }
 
         thread_data(const thread_data&) = delete;
@@ -229,33 +238,16 @@ LSTM_BEGIN
         }
 
         // TODO: allow specifying a backoff strategy
-        inline bool try_synchronize(const gp_t gp) noexcept
-        {
-            assert(!in_critical_section());
-            assert(gp != detail::off_state);
-
-            bool result;
-
-            mut.lock();
-            {
-                result = try_wait(gp);
-            }
-            mut.unlock();
-
-            return result;
-        }
-
-        // TODO: allow specifying a backoff strategy
         inline void synchronize(const gp_t gp) noexcept
         {
             assert(!in_critical_section());
             assert(gp != detail::off_state);
 
-            mut.lock();
+            mut.lock_shared();
             {
                 wait(gp);
             }
-            mut.unlock();
+            mut.unlock_shared();
         }
 
         template<typename Func,
@@ -298,6 +290,10 @@ LSTM_BEGIN
 
         void reclaim(const gp_t sync_version) noexcept
         {
+            assert(!in_critical_section());
+            assert(sync_version != detail::off_state);
+            assert(!detail::locked(sync_version));
+
             detail::succ_callback_t& active_buf = succ_callbacks.active();
             if (active_buf.callbacks.empty())
                 return;

@@ -34,7 +34,7 @@ LSTM_DETAIL_BEGIN
             assert(!active().callbacks.empty());
             active().version = version;
 
-            const bool result = ++size == 4;
+            const bool result = ++size == StackCount;
             assert(active().callbacks.empty() || result);
             return result;
         }
