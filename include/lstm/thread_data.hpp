@@ -301,6 +301,20 @@ LSTM_BEGIN
             if (LSTM_UNLIKELY(succ_callbacks.push_is_full(sync_version)))
                 reclaim_slow_path();
         }
+
+        // clears up all buffers that greedily hold on to extra storage
+        void shrink_to_fit() noexcept(noexcept(read_set.shrink_to_fit(),
+                                               write_set.shrink_to_fit(),
+                                               fail_callbacks.shrink_to_fit(),
+                                               succ_callbacks.shrink_to_fit()))
+        {
+            if (!in_critical_section() && !succ_callbacks.empty())
+                reclaim_all();
+            read_set.shrink_to_fit();
+            write_set.shrink_to_fit();
+            fail_callbacks.shrink_to_fit();
+            succ_callbacks.shrink_to_fit();
+        }
     };
 LSTM_END
 

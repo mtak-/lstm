@@ -24,6 +24,8 @@ LSTM_DETAIL_BEGIN
     private:
         static_assert(std::is_pod<value_type>{}, "only works with POD types");
         static_assert(std::is_same<value_type, typename allocator_type::value_type>{}, "");
+        static constexpr bool has_noexcept_alloc
+            = noexcept(std::declval<Alloc&>().allocate(std::declval<std::size_t>()));
 
         iterator begin_;
         iterator end_;
@@ -44,7 +46,7 @@ LSTM_DETAIL_BEGIN
             begin_ = new_begin;
         }
 
-        LSTM_NOINLINE void reserve_more() noexcept(noexcept(alloc().allocate(capacity_)))
+        LSTM_NOINLINE void reserve_more() noexcept(has_noexcept_alloc)
         {
             capacity_ <<= 1;
             assert(capacity_ > size()); // zomg big transaction
@@ -55,9 +57,9 @@ LSTM_DETAIL_BEGIN
         }
 
     public:
-        pod_vector(const allocator_type& alloc = {}) noexcept
+        pod_vector(const allocator_type& alloc = {}) noexcept(has_noexcept_alloc)
             : allocator_type(alloc)
-            , begin_(alloc_traits::allocate(this->alloc(), 1))
+            , begin_(this->alloc().allocate(1))
             , end_(begin_)
             , capacity_(1)
         {
@@ -77,7 +79,7 @@ LSTM_DETAIL_BEGIN
         uword capacity() const noexcept { return capacity_; }
 
         template<typename... Us>
-        void emplace_back(Us&&... us) noexcept(noexcept(reserve_more()))
+        void emplace_back(Us&&... us) noexcept(has_noexcept_alloc)
         {
             if (LSTM_UNLIKELY(size() == capacity_))
                 reserve_more();
@@ -97,6 +99,20 @@ LSTM_DETAIL_BEGIN
         }
 
         void clear() noexcept { end_ = begin_; }
+
+        void shrink_to_fit() noexcept(has_noexcept_alloc)
+        {
+            const uword   new_capacity = size() ? size() : 1;
+            const pointer new_begin    = alloc().allocate(new_capacity);
+            assert(new_begin);
+            if (std::is_same<pod_mallocator<T>, Alloc>{} || LSTM_LIKELY(new_begin != begin_)) {
+                std::memcpy(new_begin, begin_, sizeof(value_type) * size());
+                alloc().deallocate(begin_, capacity_);
+                end_   = new_begin + size();
+                begin_ = new_begin;
+            }
+            capacity_ = new_capacity;
+        }
 
         iterator       begin() noexcept { return begin_; }
         iterator       end() noexcept { return end_; }

@@ -108,7 +108,10 @@ LSTM_DETAIL_BEGIN
         uword size() const noexcept { return data.size(); }
         uword capacity() const noexcept { return data.capacity(); }
 
-        void push_back(var_base* const value, const var_storage pending_write, const hash_t hash)
+        void
+        push_back(var_base* const   value,
+                  const var_storage pending_write,
+                  const hash_t hash) noexcept(noexcept(data.emplace_back(value, pending_write)))
         {
             assert(hash != 0);
             filter_ |= hash;
@@ -137,6 +140,8 @@ LSTM_DETAIL_BEGIN
             }
             return lookup_slow_path(dest_var, hash);
         }
+
+        void shrink_to_fit() noexcept(noexcept(data.shrink_to_fit())) { data.shrink_to_fit(); }
 
         iterator       begin() noexcept { return data.begin(); }
         iterator       end() noexcept { return data.end(); }

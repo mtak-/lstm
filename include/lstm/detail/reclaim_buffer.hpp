@@ -48,6 +48,12 @@ LSTM_DETAIL_BEGIN
             start = (start + 1) % StackCount;
             --size;
         }
+
+        void shrink_to_fit() noexcept(noexcept(active().callbacks.shrink_to_fit()))
+        {
+            for (succ_callback_t& succ_callback : callbacks)
+                succ_callback.callbacks.shrink_to_fit();
+        }
     };
 LSTM_DETAIL_END
 
