@@ -1,6 +1,8 @@
 #ifndef LSTM_TEST_THREAD_MANAGER_HPP
 #define LSTM_TEST_THREAD_MANAGER_HPP
 
+#include <lstm/thread_data.hpp>
+
 #include <thread>
 #include <vector>
 
@@ -17,9 +19,10 @@ public:
     {
         using namespace std::chrono_literals;
         threads.emplace_back([ this, f = (F &&) f ] {
-            while (!_run.load(LSTM_RELAXED)) {
+            lstm::tls_thread_data();
+            while (!_run.load(LSTM_RELAXED))
                 std::this_thread::sleep_for(1ns);
-            }
+
             f();
         });
         LSTM_LOG_REGISTER_THREAD_ID(threads.back().get_id());
@@ -30,9 +33,10 @@ public:
     {
         using namespace std::chrono_literals;
         threads.emplace_back([ this, f = (F &&) f, n ] {
-            while (!_run.load(LSTM_RELAXED)) {
+            lstm::tls_thread_data();
+            while (!_run.load(LSTM_RELAXED))
                 std::this_thread::sleep_for(1ns);
-            }
+
             for (int i = 0; i < n; ++i)
                 f();
         });
