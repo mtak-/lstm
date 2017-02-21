@@ -29,7 +29,7 @@ LSTM_DETAIL_BEGIN
 
         iterator begin_;
         iterator end_;
-        uword    capacity_;
+        iterator buffer_end_;
 
         using alloc_traits = std::allocator_traits<allocator_type>;
         static_assert(std::is_pointer<typename alloc_traits::pointer>{},
@@ -38,22 +38,19 @@ LSTM_DETAIL_BEGIN
 
         inline allocator_type& alloc() noexcept { return *this; }
 
-        void reserve_more_slow_path(const pointer new_begin) noexcept
-        {
-            std::memcpy(new_begin, begin_, sizeof(value_type) * size());
-            alloc().deallocate(begin_, capacity_ >> 1);
-            end_   = new_begin + size();
-            begin_ = new_begin;
-        }
-
         LSTM_NOINLINE void reserve_more() noexcept(has_noexcept_alloc)
         {
-            capacity_ <<= 1;
-            assert(capacity_ > size()); // zomg big transaction
-            const pointer new_begin = alloc().allocate(capacity_);
+            assert((capacity() << 1) > size()); // zomg big transaction
+            const pointer new_begin = alloc().allocate(capacity() << 1);
             assert(new_begin);
-            if (std::is_same<pod_mallocator<T>, Alloc>{} || LSTM_LIKELY(new_begin != begin_))
-                reserve_more_slow_path(new_begin);
+
+            std::memcpy(new_begin, begin_, sizeof(value_type) * size());
+
+            alloc().deallocate(begin_, capacity());
+
+            buffer_end_ = new_begin + (capacity() << 1);
+            end_        = new_begin + size();
+            begin_      = new_begin;
         }
 
     public:
@@ -61,7 +58,7 @@ LSTM_DETAIL_BEGIN
             : allocator_type(alloc)
             , begin_(this->alloc().allocate(1))
             , end_(begin_)
-            , capacity_(1)
+            , buffer_end_(begin_ + 1)
         {
         }
 
@@ -71,18 +68,18 @@ LSTM_DETAIL_BEGIN
         ~pod_vector() noexcept
         {
             assert(empty());
-            alloc().deallocate(begin_, capacity_);
+            alloc().deallocate(begin_, capacity());
         }
 
         bool  empty() const noexcept { return end_ == begin_; }
         uword size() const noexcept { return end_ - begin_; }
-        uword capacity() const noexcept { return capacity_; }
+        uword capacity() const noexcept { return buffer_end_ - begin_; }
 
         template<typename... Us>
         void emplace_back(Us&&... us) noexcept(has_noexcept_alloc)
         {
             ::new (end_++) value_type((Us &&) us...);
-            if (LSTM_UNLIKELY(size() == capacity_))
+            if (LSTM_UNLIKELY(end_ == buffer_end_))
                 reserve_more();
         }
 
@@ -102,16 +99,19 @@ LSTM_DETAIL_BEGIN
 
         void shrink_to_fit() noexcept(has_noexcept_alloc)
         {
-            const uword   new_capacity = size() ? size() : 1;
-            const pointer new_begin    = alloc().allocate(new_capacity);
-            assert(new_begin);
-            if (std::is_same<pod_mallocator<T>, Alloc>{} || LSTM_LIKELY(new_begin != begin_)) {
+            const uword new_capacity = size() + 1;
+            if (new_capacity != capacity()) {
+                const pointer new_begin = alloc().allocate(new_capacity);
+                assert(new_begin);
+
                 std::memcpy(new_begin, begin_, sizeof(value_type) * size());
-                alloc().deallocate(begin_, capacity_);
-                end_   = new_begin + size();
-                begin_ = new_begin;
+
+                alloc().deallocate(begin_, capacity());
+
+                buffer_end_ = new_begin + new_capacity;
+                end_        = new_begin + size();
+                begin_      = new_begin;
             }
-            capacity_ = new_capacity;
         }
 
         iterator       begin() noexcept { return begin_; }
