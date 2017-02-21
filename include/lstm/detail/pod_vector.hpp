@@ -81,9 +81,9 @@ LSTM_DETAIL_BEGIN
         template<typename... Us>
         void emplace_back(Us&&... us) noexcept(has_noexcept_alloc)
         {
+            ::new (end_++) value_type((Us &&) us...);
             if (LSTM_UNLIKELY(size() == capacity_))
                 reserve_more();
-            ::new (end_++) value_type((Us &&) us...);
         }
 
         void unordered_erase(const pointer ptr) noexcept
