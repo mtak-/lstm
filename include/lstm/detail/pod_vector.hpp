@@ -29,7 +29,7 @@ LSTM_DETAIL_BEGIN
 
         iterator begin_;
         iterator end_;
-        iterator buffer_end_;
+        iterator last_valid_address_;
 
         using alloc_traits = std::allocator_traits<allocator_type>;
         static_assert(std::is_pointer<typename alloc_traits::pointer>{},
@@ -48,9 +48,9 @@ LSTM_DETAIL_BEGIN
 
             alloc().deallocate(begin_, capacity());
 
-            buffer_end_ = new_begin + (capacity() << 1);
-            end_        = new_begin + size();
-            begin_      = new_begin;
+            last_valid_address_ = new_begin + (capacity() << 1) - 1;
+            end_                = new_begin + size();
+            begin_              = new_begin;
         }
 
     public:
@@ -58,7 +58,7 @@ LSTM_DETAIL_BEGIN
             : allocator_type(alloc)
             , begin_(this->alloc().allocate(1))
             , end_(begin_)
-            , buffer_end_(begin_ + 1)
+            , last_valid_address_(begin_)
         {
         }
 
@@ -73,14 +73,23 @@ LSTM_DETAIL_BEGIN
 
         bool  empty() const noexcept { return end_ == begin_; }
         uword size() const noexcept { return end_ - begin_; }
-        uword capacity() const noexcept { return buffer_end_ - begin_; }
+        uword capacity() const noexcept { return last_valid_address_ + 1 - begin_; }
+        bool  allocates_on_next_push() const noexcept { return end_ == last_valid_address_; }
 
         template<typename... Us>
         void emplace_back(Us&&... us) noexcept(has_noexcept_alloc)
         {
             ::new (end_++) value_type((Us &&) us...);
-            if (LSTM_UNLIKELY(end_ == buffer_end_))
+            if (LSTM_UNLIKELY(end_ > last_valid_address_))
                 reserve_more();
+        }
+
+        template<typename... Us>
+        void unchecked_emplace_back(Us&&... us) noexcept
+        {
+            // if you hit this you probly forgot to check allocates_on_next_push
+            assert(!allocates_on_next_push());
+            ::new (end_++) value_type((Us &&) us...);
         }
 
         void unordered_erase(const pointer ptr) noexcept
@@ -108,9 +117,9 @@ LSTM_DETAIL_BEGIN
 
                 alloc().deallocate(begin_, capacity());
 
-                buffer_end_ = new_begin + new_capacity;
-                end_        = new_begin + size();
-                begin_      = new_begin;
+                last_valid_address_ = new_begin + new_capacity - 1;
+                end_                = new_begin + size();
+                begin_              = new_begin;
             }
         }
 
