@@ -4,7 +4,7 @@
 #include <lstm/thread_data.hpp>
 
 LSTM_DETAIL_BEGIN
-    [[noreturn]] LSTM_ALWAYS_INLINE void internal_retry()
+    [[noreturn]] void internal_retry()
     {
         LSTM_INTERNAL_FAIL_TX();
         throw tx_retry{};
@@ -18,23 +18,41 @@ LSTM_BEGIN
         thread_data* tls_td;
         gp_t         version_;
 
-        detail::var_storage read_impl(const detail::var_base& src_var) const
+        LSTM_NOINLINE detail::var_storage read_impl_slow_path(const detail::var_base& src_var) const
+        {
+            const thread_data::write_set_t::const_iterator iter = tls_td->write_set.find(src_var);
+            if (iter == tls_td->write_set.end()) {
+                const gp_t                src_version = src_var.version_lock.load(LSTM_ACQUIRE);
+                const detail::var_storage result      = src_var.storage.load(LSTM_ACQUIRE);
+                if (src_var.version_lock.load(LSTM_RELAXED) == src_version
+                    && rw_valid(src_version)) {
+                    tls_td->read_set.emplace_back(&src_var);
+                    return result;
+                }
+            } else if (rw_valid(src_var))
+                return iter->pending_write();
+
+            detail::internal_retry();
+        }
+
+        LSTM_NOINLINE detail::var_storage read_impl(const detail::var_base& src_var) const
         {
             assert(valid());
 
-            const thread_data::write_set_t::const_iterator iter = tls_td->write_set.find(src_var);
-            if (LSTM_LIKELY(iter == tls_td->write_set.end())) {
-                const gp_t                src_version = src_var.version_lock.load(LSTM_ACQUIRE);
-                const detail::var_storage result      = src_var.storage.load(LSTM_ACQUIRE);
-                if (rw_valid(src_version)
-                    && src_var.version_lock.load(LSTM_RELAXED) == src_version) {
-                    tls_td->add_read_set(src_var);
-                    return result;
-                }
-            } else if (rw_valid(src_var)) {
-                return iter->pending_write();
+            if (LSTM_UNLIKELY(tls_td->read_set.allocates_on_next_push()
+                              || tls_td->write_set.filter() & dumb_pointer_hash(src_var)))
+                return read_impl_slow_path(src_var);
+
+            // TODO: would be nice to force this critical section to be small, but it doesn't seem
+            // to be an issue on the tested compiler
+            const gp_t                src_version = src_var.version_lock.load(LSTM_ACQUIRE);
+            const detail::var_storage result      = src_var.storage.load(LSTM_ACQUIRE);
+            if (LSTM_LIKELY(src_var.version_lock.load(LSTM_RELAXED) == src_version
+                            && rw_valid(src_version))) {
+                tls_td->read_set.unchecked_emplace_back(&src_var);
+                return result;
             }
-            detail::internal_retry();
+            return read_impl_slow_path(src_var);
         }
 
         // atomic var's perform no allocation (therefore, no callbacks)
@@ -89,7 +107,7 @@ LSTM_BEGIN
         }
 
         template<typename T, typename Alloc, LSTM_REQUIRES_(!var<T, Alloc>::atomic)>
-        LSTM_ALWAYS_INLINE const T& read(const var<T, Alloc>& src_var) const
+        LSTM_NOINLINE const T& read(const var<T, Alloc>& src_var) const
         {
             static_assert(std::is_reference<decltype(
                               var<T, Alloc>::load(src_var.storage.load()))>{},
