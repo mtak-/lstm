@@ -107,6 +107,7 @@ LSTM_DETAIL_BEGIN
         bool  empty() const noexcept { return data.empty(); }
         uword size() const noexcept { return data.size(); }
         uword capacity() const noexcept { return data.capacity(); }
+        bool  allocates_on_next_push() const noexcept { return data.allocates_on_next_push(); }
 
         void
         push_back(var_base* const   value,
@@ -116,6 +117,16 @@ LSTM_DETAIL_BEGIN
             assert(hash != 0);
             filter_ |= hash;
             data.emplace_back(value, pending_write);
+        }
+
+        void unchecked_push_back(
+            var_base* const   value,
+            const var_storage pending_write,
+            const hash_t hash) noexcept(noexcept(data.unchecked_emplace_back(value, pending_write)))
+        {
+            assert(hash != 0);
+            filter_ |= hash;
+            data.unchecked_emplace_back(value, pending_write);
         }
 
         // biased against finding the var

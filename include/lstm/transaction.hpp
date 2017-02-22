@@ -35,12 +35,12 @@ LSTM_BEGIN
             detail::internal_retry();
         }
 
-        LSTM_NOINLINE detail::var_storage read_impl(const detail::var_base& src_var) const
+        LSTM_NOINLINE_LUKEWARM detail::var_storage read_impl(const detail::var_base& src_var) const
         {
             assert(valid());
 
             if (LSTM_UNLIKELY(tls_td->read_set.allocates_on_next_push()
-                              || tls_td->write_set.filter() & dumb_pointer_hash(src_var)))
+                              || (tls_td->write_set.filter() & dumb_pointer_hash(src_var))))
                 return read_impl_slow_path(src_var);
 
             // TODO: would be nice to force this critical section to be small, but it doesn't seem
@@ -55,11 +55,9 @@ LSTM_BEGIN
             return read_impl_slow_path(src_var);
         }
 
-        // atomic var's perform no allocation (therefore, no callbacks)
-        void atomic_write_impl(detail::var_base& dest_var, const detail::var_storage storage) const
+        LSTM_NOINLINE_LUKEWARM void
+        atomic_write_slow_path(detail::var_base& dest_var, const detail::var_storage storage) const
         {
-            assert(valid());
-
             const detail::write_set_lookup lookup = tls_td->write_set.lookup(dest_var);
             if (LSTM_LIKELY(!lookup.success()))
                 tls_td->add_write_set(dest_var, storage, lookup.hash());
@@ -68,6 +66,22 @@ LSTM_BEGIN
 
             if (!rw_valid(dest_var))
                 detail::internal_retry();
+        }
+
+        // atomic var's perform no allocation (therefore, no callbacks)
+        LSTM_NOINLINE void
+        atomic_write_impl(detail::var_base& dest_var, const detail::var_storage storage) const
+        {
+            assert(valid());
+
+            const detail::hash_t hash = dumb_pointer_hash(dest_var);
+
+            if (LSTM_UNLIKELY(tls_td->write_set.allocates_on_next_push()
+                              || (tls_td->write_set.filter() & hash)
+                              || !rw_valid(dest_var)))
+                return atomic_write_slow_path(dest_var, storage);
+
+            tls_td->add_write_set_unchecked(dest_var, storage, hash);
         }
 
     public:

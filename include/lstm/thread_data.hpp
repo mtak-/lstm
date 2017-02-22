@@ -118,6 +118,16 @@ LSTM_BEGIN
             }
         }
 
+        void add_write_set_unchecked(detail::var_base&         dest_var,
+                                     const detail::var_storage pending_write,
+                                     const detail::hash_t      hash)
+        {
+            // up to caller to ensure dest_var is not already in the write_set
+            assert(!write_set.lookup(dest_var).success());
+            remove_read_set(dest_var);
+            write_set.unchecked_push_back(&dest_var, pending_write, hash);
+        }
+
         void add_write_set(detail::var_base&         dest_var,
                            const detail::var_storage pending_write,
                            const detail::hash_t      hash)
