@@ -49,7 +49,7 @@ LSTM_BEGIN
             return read_impl_slow_path(src_var);
         }
 
-        LSTM_NOINLINE_LUKEWARM void
+        LSTM_NOINLINE void
         atomic_write_slow_path(detail::var_base& dest_var, const detail::var_storage storage) const
         {
             const detail::write_set_lookup lookup = tls_td->write_set.lookup(dest_var);
@@ -63,7 +63,7 @@ LSTM_BEGIN
         }
 
         // atomic var's perform no allocation (therefore, no callbacks)
-        LSTM_NOINLINE void
+        LSTM_NOINLINE_LUKEWARM void
         atomic_write_impl(detail::var_base& dest_var, const detail::var_storage storage) const
         {
             assert(valid());

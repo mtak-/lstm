@@ -4,7 +4,7 @@
 #include <lstm/detail/lstm_fwd.hpp>
 
 LSTM_BEGIN
-    [[noreturn]] LSTM_ALWAYS_INLINE void retry()
+    [[noreturn]] LSTM_NOINLINE void retry()
     {
         LSTM_USER_FAIL_TX();
         throw detail::tx_retry{};
