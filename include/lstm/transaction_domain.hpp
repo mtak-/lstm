@@ -23,12 +23,12 @@ LSTM_BEGIN
         transaction_domain(const transaction_domain&) = delete;
         transaction_domain& operator=(const transaction_domain&) = delete;
 
-        inline gp_t get_clock() const noexcept { return clock.load(LSTM_RELAXED); }
+        inline gp_t get_clock() const noexcept { return clock.load(LSTM_ACQUIRE); }
 
         // returns the previous version
         inline gp_t fetch_and_bump_clock() noexcept
         {
-            const gp_t result = clock.fetch_add(1, LSTM_RELAXED);
+            const gp_t result = clock.fetch_add(1, LSTM_RELEASE);
             assert(result < max_version - 1);
             return result;
         }

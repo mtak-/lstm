@@ -78,25 +78,34 @@ LSTM_DETAIL_BEGIN
             return true;
         }
 
-        static void commit_publish(thread_data& tls_td, const gp_t write_version) noexcept
+        static void commit_write(const thread_data::write_set_t& write_set) noexcept
         {
-            for (write_set_value_type write_set_value : tls_td.write_set) {
+            for (write_set_value_type write_set_value : write_set)
                 write_set_value.dest_var().storage.store(write_set_value.pending_write(),
-                                                         LSTM_RELAXED);
+                                                         LSTM_RELEASE);
+        }
+
+        static void
+        commit_publish(const thread_data::write_set_t& write_set, const gp_t write_version) noexcept
+        {
+            for (write_set_value_type write_set_value : write_set)
                 unlock_as_version(write_set_value.dest_var(), write_version);
-            }
         }
 
         static gp_t commit_slower_path(const transaction tx, transaction_domain& domain) noexcept
         {
+            // last check
+            if (!commit_validate_reads(tx))
+                return commit_failed;
+
+            const thread_data::write_set_t& write_set = tx.get_thread_data().write_set;
+            commit_write(write_set);
+
             const gp_t sync_version = domain.fetch_and_bump_clock();
 
             assert(tx.version() <= sync_version);
 
-            if (sync_version != tx.version() && !commit_validate_reads(tx))
-                return commit_failed;
-
-            commit_publish(tx.get_thread_data(), sync_version + 1);
+            commit_publish(write_set, sync_version + 1);
 
             return sync_version;
         }
@@ -113,13 +122,15 @@ LSTM_DETAIL_BEGIN
         {
             assert(tx.version() <= domain.get_clock());
 
+            const thread_data& tls_td = tx.get_thread_data();
+            if (tls_td.write_set.empty())
+                return 0;
+
             // if the write set is empty, synchronize always succeeds
-            gp_t               sync_version = 0;
-            const thread_data& tls_td       = tx.get_thread_data();
-            if (!tls_td.write_set.empty()
-                && (sync_version = commit_slow_path(tx, domain)) == commit_failed) {
+            const gp_t sync_version = commit_slow_path(tx, domain);
+            if (sync_version == commit_failed) {
                 LSTM_INTERNAL_FAIL_TX();
-                return commit_failed;
+                return sync_version;
             }
 
             LSTM_SUCC_TX();

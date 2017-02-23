@@ -22,10 +22,8 @@ LSTM_BEGIN
         {
             const thread_data::write_set_t::const_iterator iter = tls_td->write_set.find(src_var);
             if (iter == tls_td->write_set.end()) {
-                const gp_t                src_version = src_var.version_lock.load(LSTM_ACQUIRE);
-                const detail::var_storage result      = src_var.storage.load(LSTM_ACQUIRE);
-                if (src_var.version_lock.load(LSTM_RELAXED) == src_version
-                    && rw_valid(src_version)) {
+                const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
+                if (rw_valid(src_var.version_lock.load(LSTM_ACQUIRE))) {
                     tls_td->read_set.emplace_back(&src_var);
                     return result;
                 }
@@ -43,12 +41,8 @@ LSTM_BEGIN
                               || (tls_td->write_set.filter() & dumb_pointer_hash(src_var))))
                 return read_impl_slow_path(src_var);
 
-            // TODO: would be nice to force this critical section to be small, but it doesn't seem
-            // to be an issue on the tested compiler
-            const gp_t                src_version = src_var.version_lock.load(LSTM_ACQUIRE);
-            const detail::var_storage result      = src_var.storage.load(LSTM_ACQUIRE);
-            if (LSTM_LIKELY(src_var.version_lock.load(LSTM_RELAXED) == src_version
-                            && rw_valid(src_version))) {
+            const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
+            if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE)))) {
                 tls_td->read_set.unchecked_emplace_back(&src_var);
                 return result;
             }
@@ -139,6 +133,7 @@ LSTM_BEGIN
         }
 
         // TODO: tease out the parts of this function that don't depend on template params
+        // TODO: optimize it
         template<typename T,
                  typename Alloc,
                  typename U = T,
@@ -150,10 +145,8 @@ LSTM_BEGIN
 
             const detail::write_set_lookup lookup = tls_td->write_set.lookup(dest_var);
             if (LSTM_LIKELY(!lookup.success())) {
-                const gp_t                dest_version = dest_var.version_lock.load(LSTM_ACQUIRE);
-                const detail::var_storage cur_storage  = dest_var.storage.load(LSTM_ACQUIRE);
-                if (rw_valid(dest_version)
-                    && dest_var.version_lock.load(LSTM_RELAXED) == dest_version) {
+                const detail::var_storage cur_storage = dest_var.storage.load(LSTM_ACQUIRE);
+                if (LSTM_LIKELY(rw_valid(dest_var.version_lock.load(LSTM_ACQUIRE)))) {
                     const detail::var_storage new_storage = dest_var.allocate_construct((U &&) u);
                     tls_td->add_write_set(dest_var, new_storage, lookup.hash());
                     tls_td->queue_succ_callback(
