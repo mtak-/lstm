@@ -15,12 +15,14 @@ LSTM_BEGIN
     struct transaction
     {
     private:
+        using write_set_const_iter = thread_data::write_set_t::const_iterator;
+
         thread_data* tls_td;
         gp_t         version_;
 
         LSTM_NOINLINE detail::var_storage read_impl_slow_path(const detail::var_base& src_var) const
         {
-            const thread_data::write_set_t::const_iterator iter = tls_td->write_set.find(src_var);
+            const write_set_const_iter iter = tls_td->write_set.find(src_var);
             if (iter == tls_td->write_set.end()) {
                 const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
                 if (rw_valid(src_var.version_lock.load(LSTM_ACQUIRE))) {
@@ -82,7 +84,7 @@ LSTM_BEGIN
         LSTM_NOINLINE detail::var_storage
         untracked_read_impl_slow_path(const detail::var_base& src_var) const
         {
-            const thread_data::write_set_t::const_iterator iter = tls_td->write_set.find(src_var);
+            const write_set_const_iter iter = tls_td->write_set.find(src_var);
             if (iter == tls_td->write_set.end()) {
                 const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
                 if (rw_valid(src_var.version_lock.load(LSTM_ACQUIRE)))

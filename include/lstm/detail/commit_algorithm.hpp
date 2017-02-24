@@ -13,6 +13,7 @@ LSTM_DETAIL_BEGIN
     struct commit_algorithm
     {
     private:
+        using write_set_t    = typename thread_data::write_set_t;
         using write_set_iter = typename thread_data::write_set_iter;
 
         static inline bool lock(var_base& v, const transaction tx) noexcept
@@ -44,7 +45,8 @@ LSTM_DETAIL_BEGIN
             v.version_lock.store(locked_version ^ lock_bit, LSTM_RELEASE);
         }
 
-        static void unlock_write_set(write_set_iter begin, const write_set_iter end) noexcept
+        LSTM_NOINLINE static void
+        unlock_write_set(write_set_iter begin, const write_set_iter end) noexcept
         {
             for (; begin != end; ++begin)
                 unlock(begin->dest_var());
@@ -78,15 +80,14 @@ LSTM_DETAIL_BEGIN
             return true;
         }
 
-        static void commit_write(const thread_data::write_set_t& write_set) noexcept
+        static void commit_write(const write_set_t& write_set) noexcept
         {
             for (write_set_value_type write_set_value : write_set)
                 write_set_value.dest_var().storage.store(write_set_value.pending_write(),
                                                          LSTM_RELEASE);
         }
 
-        static void
-        commit_publish(const thread_data::write_set_t& write_set, const gp_t write_version) noexcept
+        static void commit_publish(const write_set_t& write_set, const gp_t write_version) noexcept
         {
             for (write_set_value_type write_set_value : write_set)
                 unlock_as_version(write_set_value.dest_var(), write_version);
@@ -98,7 +99,7 @@ LSTM_DETAIL_BEGIN
             if (!commit_validate_reads(tx))
                 return commit_failed;
 
-            const thread_data::write_set_t& write_set = tx.get_thread_data().write_set;
+            const write_set_t& write_set = tx.get_thread_data().write_set;
             commit_write(write_set);
 
             const gp_t sync_version = domain.fetch_and_bump_clock();
