@@ -125,16 +125,15 @@ LSTM_DETAIL_BEGIN
 
             const thread_data& tls_td = tx.get_thread_data();
             if (tls_td.write_set.empty())
-                return 0;
+                return 0; // synchronize on the earliest grace period
 
             // if the write set is empty, synchronize always succeeds
             const gp_t sync_version = commit_slow_path(tx, domain);
-            if (sync_version == commit_failed) {
-                LSTM_INTERNAL_FAIL_TX();
-                return sync_version;
-            }
 
-            LSTM_SUCC_TX();
+            if (sync_version == commit_failed)
+                LSTM_INTERNAL_FAIL_TX();
+            else
+                LSTM_SUCC_TX();
 
             return sync_version;
         }
