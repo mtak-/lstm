@@ -100,10 +100,10 @@ LSTM_DETAIL_BEGIN
                 return commit_failed;
 
             const write_set_t& write_set = tx.get_thread_data().write_set;
+
             commit_write(write_set);
 
             const gp_t sync_version = domain.fetch_and_bump_clock();
-
             assert(tx.version() <= sync_version);
 
             commit_publish(write_set, sync_version + 1);
