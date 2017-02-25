@@ -20,7 +20,7 @@ LSTM_DETAIL_BEGIN
     }
 
     template<typename T>
-    inline hash_t dumb_pointer_hash(const T& value) noexcept
+    inline hash_t dumb_reference_hash(const T& value) noexcept
     {
         constexpr hash_t shift = calcShift<T>();
         static_assert(sizeof(hash_t) >= sizeof(std::uintptr_t) - shift,
@@ -149,7 +149,7 @@ LSTM_DETAIL_BEGIN
         // biased against finding the var
         const_iterator find(const var_base& dest_var) const noexcept
         {
-            if (LSTM_LIKELY(!(filter_ & dumb_pointer_hash(dest_var)))) {
+            if (LSTM_LIKELY(!(filter_ & dumb_reference_hash(dest_var)))) {
                 LSTM_LOG_BLOOM_SUCCESS();
 
                 return end();
@@ -160,7 +160,7 @@ LSTM_DETAIL_BEGIN
         // biased against finding the var
         write_set_lookup lookup(const var_base& dest_var) noexcept
         {
-            const hash_t hash = dumb_pointer_hash(dest_var);
+            const hash_t hash = dumb_reference_hash(dest_var);
             if (LSTM_LIKELY(!(filter_ & hash))) {
                 LSTM_LOG_BLOOM_SUCCESS();
 

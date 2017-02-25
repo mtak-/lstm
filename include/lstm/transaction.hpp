@@ -41,7 +41,7 @@ LSTM_BEGIN
             assert(valid());
 
             if (LSTM_UNLIKELY(tls_td->read_set.allocates_on_next_push()
-                              || (tls_td->write_set.filter() & dumb_pointer_hash(src_var))))
+                              || (tls_td->write_set.filter() & dumb_reference_hash(src_var))))
                 return read_impl_slow_path(src_var);
 
             const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
@@ -71,7 +71,7 @@ LSTM_BEGIN
         {
             assert(valid());
 
-            const detail::hash_t hash = dumb_pointer_hash(dest_var);
+            const detail::hash_t hash = dumb_reference_hash(dest_var);
 
             if (LSTM_UNLIKELY(tls_td->write_set.allocates_on_next_push()
                               || (tls_td->write_set.filter() & hash)
@@ -101,7 +101,7 @@ LSTM_BEGIN
         {
             assert(valid());
 
-            if (LSTM_UNLIKELY(tls_td->write_set.filter() & dumb_pointer_hash(src_var)))
+            if (LSTM_UNLIKELY(tls_td->write_set.filter() & dumb_reference_hash(src_var)))
                 return untracked_read_impl_slow_path(src_var);
 
             const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
