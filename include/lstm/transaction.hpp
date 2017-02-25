@@ -76,9 +76,9 @@ LSTM_BEGIN
             if (LSTM_UNLIKELY(tls_td->write_set.allocates_on_next_push()
                               || (tls_td->write_set.filter() & hash)
                               || !rw_valid(dest_var)))
-                return atomic_write_slow_path(dest_var, storage);
-
-            tls_td->add_write_set_unchecked(dest_var, storage, hash);
+                atomic_write_slow_path(dest_var, storage);
+            else
+                tls_td->add_write_set_unchecked(dest_var, storage, hash);
         }
 
         LSTM_NOINLINE detail::var_storage

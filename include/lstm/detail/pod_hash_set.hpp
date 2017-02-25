@@ -30,7 +30,7 @@ LSTM_DETAIL_BEGIN
         return (one << (raw_hash & 63));
     }
 
-    // TODO: this class is only designed to work with write_set_value_type
+    // this class is only designed to work with write_set_value_type and read_set_value_type
     template<typename Underlying>
     struct pod_hash_set
     {
@@ -97,6 +97,7 @@ LSTM_DETAIL_BEGIN
         pod_hash_set& operator=(const pod_hash_set&) = delete;
 
         hash_t filter() const noexcept { return filter_; }
+        void reset_filter(const hash_t new_filter) noexcept { filter_ = new_filter; }
 
         void clear() noexcept
         {
@@ -129,6 +130,22 @@ LSTM_DETAIL_BEGIN
             data.unchecked_emplace_back(value, pending_write);
         }
 
+        void push_back(const var_base* const value,
+                       const hash_t          hash) noexcept(noexcept(data.emplace_back(value)))
+        {
+            assert(hash != 0);
+            filter_ |= hash;
+            data.emplace_back(value);
+        }
+
+        void unchecked_push_back(const var_base* const value, const hash_t hash) noexcept(
+            noexcept(data.unchecked_emplace_back(value)))
+        {
+            assert(hash != 0);
+            filter_ |= hash;
+            data.unchecked_emplace_back(value);
+        }
+
         // biased against finding the var
         const_iterator find(const var_base& dest_var) const noexcept
         {
@@ -151,6 +168,9 @@ LSTM_DETAIL_BEGIN
             }
             return lookup_slow_path(dest_var, hash);
         }
+
+        void unordered_erase(const pointer ptr) noexcept { data.unordered_erase(ptr); }
+        void unordered_erase(const const_pointer ptr) noexcept { data.unordered_erase(ptr); }
 
         void shrink_to_fit() noexcept(noexcept(data.shrink_to_fit())) { data.shrink_to_fit(); }
 
