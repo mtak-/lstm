@@ -96,7 +96,7 @@ LSTM_BEGIN
             detail::internal_retry();
         }
 
-        LSTM_ALWAYS_INLINE detail::var_storage
+        LSTM_NOINLINE_LUKEWARM detail::var_storage
         untracked_read_impl(const detail::var_base& src_var) const
         {
             assert(valid());
