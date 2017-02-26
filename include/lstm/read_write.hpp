@@ -149,8 +149,7 @@ LSTM_DETAIL_BEGIN
                                          thread_data&        tls_td = tls_thread_data()) const
         {
             if (tls_td.in_transaction())
-                return read_write_fn::call((Func &&) func,
-                                           {tls_td, tls_td.active.load(LSTM_RELAXED)});
+                return read_write_fn::call((Func &&) func, {tls_td, tls_td.gp()});
 
             return read_write_fn::slow_path((Func &&) func, domain, tls_td);
         }

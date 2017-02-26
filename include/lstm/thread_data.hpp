@@ -1,38 +1,13 @@
 #ifndef LSTM_THREAD_DATA_HPP
 #define LSTM_THREAD_DATA_HPP
 
-#include <lstm/detail/fast_rw_mutex.hpp>
 #include <lstm/detail/gp_callback.hpp>
 #include <lstm/detail/pod_hash_set.hpp>
 #include <lstm/detail/read_set_value_type.hpp>
 #include <lstm/detail/reclaim_buffer.hpp>
+#include <lstm/detail/thread_gp.hpp>
 #include <lstm/detail/var_detail.hpp>
 #include <lstm/detail/write_set_value_type.hpp>
-
-LSTM_DETAIL_BEGIN
-    using mutex_type = fast_rw_mutex;
-
-    namespace
-    {
-        static_assert(std::is_unsigned<gp_t>{}, "");
-
-        static constexpr gp_t lock_bit  = gp_t(1) << (sizeof(gp_t) * 8 - 1);
-        static constexpr gp_t off_state = ~gp_t(0);
-    }
-
-    inline bool locked(const gp_t version) noexcept { return version & lock_bit; }
-    inline gp_t as_locked(const gp_t version) noexcept { return version | lock_bit; }
-
-    struct global_data
-    {
-        mutex_type   thread_data_mut{};
-        thread_data* thread_data_root{nullptr};
-    };
-
-    LSTM_INLINE_VAR LSTM_CACHE_ALIGNED global_data globals{};
-
-    LSTM_NOINLINE inline thread_data& tls_data_init() noexcept;
-LSTM_DETAIL_END
 
 LSTM_BEGIN
     struct thread_data
@@ -41,7 +16,6 @@ LSTM_BEGIN
         friend detail::read_write_fn;
         friend detail::commit_algorithm;
         friend transaction;
-        friend LSTM_NOINLINE inline thread_data& detail::tls_data_init() noexcept;
 
         using read_set_t  = detail::pod_vector<detail::read_set_value_type>;
         using write_set_t = detail::pod_hash_set<detail::pod_vector<detail::write_set_value_type>>;
@@ -51,94 +25,12 @@ LSTM_BEGIN
         using callbacks_iter      = typename callbacks_t::iterator;
 
         // TODO: optimize this layout once batching is implemented
-        LSTM_CACHE_ALIGNED detail::mutex_type mut;
-        thread_data*                          next;
-        std::atomic<gp_t>                     active;
-        bool                                  in_transaction_;
-        read_set_t                            read_set;
-        write_set_t                           write_set;
-        callbacks_t                           fail_callbacks;
-        detail::succ_callbacks_t<8>           succ_callbacks;
-
-        static void lock_all() noexcept
-        {
-            LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_mut.lock();
-
-            thread_data* current = LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
-            while (current) {
-                current->mut.lock();
-                current = current->next;
-            }
-        }
-
-        static void unlock_all() noexcept
-        {
-            thread_data* current = LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
-            while (current) {
-                current->mut.unlock();
-                current = current->next;
-            }
-
-            LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_mut.unlock();
-        }
-
-        // TODO: allow specifying a backoff strategy
-        static void wait(const gp_t gp) noexcept
-        {
-            for (thread_data* q = LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
-                 q != nullptr;
-                 q = q->next) {
-                detail::default_backoff backoff;
-                while (q->not_in_grace_period(gp))
-                    backoff();
-            }
-        }
-
-        static void
-        wait_make_list(const gp_t gp, detail::pod_vector<detail::wait_elem_t>& active) noexcept
-        {
-            for (thread_data* q = LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
-                 q != nullptr;
-                 q = q->next) {
-                detail::default_backoff backoff;
-                const gp_t              td_gp = q->active.load(LSTM_ACQUIRE);
-                if (td_gp <= gp) {
-                    do {
-                        backoff();
-                    } while (q->not_in_grace_period(gp));
-                } else {
-                    active.emplace_back(td_gp, q);
-                }
-            }
-        }
-
-        static bool try_wait(const gp_t gp) noexcept
-        {
-            for (thread_data* q = LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
-                 q != nullptr;
-                 q = q->next) {
-                if (q->not_in_grace_period(gp))
-                    return false;
-            }
-            return true;
-        }
-
-        static bool
-        wait_list(const gp_t gp, detail::pod_vector<detail::wait_elem_t>& active) noexcept
-        {
-            for (auto iter = active.begin(); iter < active.end();) {
-                if (iter->version <= gp) {
-                    const gp_t new_v = iter->td->active.load(LSTM_ACQUIRE);
-                    if (iter->version == new_v)
-                        return false;
-                    else
-                        active.unordered_erase(iter);
-                } else {
-                    ++iter;
-                }
-            }
-            return true;
-        }
+        LSTM_CACHE_ALIGNED detail::thread_gp_node tgp_node;
+        read_set_t                                read_set;
+        write_set_t                               write_set;
+        callbacks_t                               fail_callbacks;
+        detail::succ_callbacks_t<8>               succ_callbacks;
+        bool                                      in_transaction_;
 
         void remove_read_set(const detail::var_base& src_var) noexcept
         {
@@ -172,51 +64,39 @@ LSTM_BEGIN
 
         void reclaim_all() noexcept
         {
-            synchronize(succ_callbacks.back().version);
+            synchronize_min_gp(succ_callbacks.back().version);
             do {
                 do_succ_callbacks(succ_callbacks.front().callbacks);
                 succ_callbacks.pop_front();
             } while (!succ_callbacks.empty());
         }
 
-        LSTM_ALWAYS_INLINE void reclaim_all_possible() noexcept
+        LSTM_ALWAYS_INLINE void reclaim_all_possible(const gp_t min_gp) noexcept
         {
             do {
                 do_succ_callbacks(succ_callbacks.front().callbacks);
                 succ_callbacks.pop_front();
-            } while (!succ_callbacks.empty()
-                     && wait_list(succ_callbacks.front().version, succ_callbacks.wait_list()));
+            } while (!succ_callbacks.empty() && succ_callbacks.front().version < min_gp);
         }
 
         LSTM_NOINLINE void reclaim_slow_path() noexcept
         {
-            mut.lock_shared();
-            {
-                wait_make_list(succ_callbacks.front().version, succ_callbacks.wait_list());
-                reclaim_all_possible();
-                succ_callbacks.wait_list().clear();
-            }
-            mut.unlock_shared();
+            const gp_t min_gp = tgp_node.synchronize_min_gp(succ_callbacks.front().version);
+            reclaim_all_possible(min_gp);
         }
 
+    public:
         LSTM_NOINLINE thread_data() noexcept
             : in_transaction_(false)
         {
-            active.store(detail::off_state, LSTM_RELEASE);
-
-            mut.lock();
-            lock_all(); // this->mut does not get locked here
-            {
-                next = LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
-                LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root = this;
-            }
-            unlock_all(); // this->mut gets unlocked here
         }
+
+        thread_data(const thread_data&) = delete;
+        thread_data& operator=(const thread_data&) = delete;
 
         LSTM_NOINLINE ~thread_data() noexcept
         {
             assert(!in_transaction());
-            assert(!in_critical_section());
             assert(read_set.empty());
             assert(write_set.empty());
             assert(fail_callbacks.empty());
@@ -224,74 +104,37 @@ LSTM_BEGIN
 
             if (!succ_callbacks.empty())
                 reclaim_all();
-
-            lock_all(); // this->mut gets locked here
-            {
-                thread_data** indirect = &LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
-                assert(*indirect);
-                while (*indirect != this) {
-                    indirect = &(*indirect)->next;
-                    assert(*indirect);
-                }
-                *indirect = next;
-            }
-            unlock_all(); // this->mut does not get unlocked here
-            mut.unlock();
         }
 
-        thread_data(const thread_data&) = delete;
-        thread_data& operator=(const thread_data&) = delete;
-
-    public:
-        inline bool in_transaction() const noexcept { return in_transaction_; }
-        inline bool in_critical_section() const noexcept
+        LSTM_ALWAYS_INLINE bool in_transaction() const noexcept { return in_transaction_; }
+        LSTM_ALWAYS_INLINE bool in_critical_section() const noexcept
         {
-            return active.load(LSTM_RELAXED) != detail::off_state;
+            return tgp_node.in_critical_section();
         }
+        LSTM_ALWAYS_INLINE gp_t gp() const noexcept { return tgp_node.gp(); }
 
-        inline void access_lock(const gp_t gp) noexcept
+        LSTM_ALWAYS_INLINE void access_lock(const gp_t gp) noexcept
         {
             assert(!in_transaction());
-            assert(!in_critical_section());
-            assert(gp != detail::off_state);
-
-            active.store(gp, LSTM_RELEASE);
-            std::atomic_thread_fence(LSTM_ACQUIRE);
+            tgp_node.access_lock(gp);
         }
 
-        inline void access_relock(const gp_t gp) noexcept
+        LSTM_ALWAYS_INLINE void access_relock(const gp_t gp) noexcept
         {
-            assert(in_critical_section());
-            assert(gp != detail::off_state);
-            assert(active.load(LSTM_RELAXED) <= gp);
-
-            active.store(gp, LSTM_RELEASE);
-            std::atomic_thread_fence(LSTM_ACQUIRE);
+            tgp_node.access_relock(gp);
         }
 
-        inline void access_unlock() noexcept
+        LSTM_ALWAYS_INLINE void access_unlock() noexcept { tgp_node.access_unlock(); }
+
+        LSTM_ALWAYS_INLINE bool not_in_grace_period(const gp_t gp) const noexcept
         {
-            assert(in_critical_section());
-            active.store(detail::off_state, LSTM_RELEASE);
+            return tgp_node.not_in_grace_period(gp);
         }
 
-        inline bool not_in_grace_period(const gp_t gp) const noexcept
+        LSTM_ALWAYS_INLINE gp_t synchronize_min_gp(const gp_t sync_version) const noexcept
         {
-            // TODO: acquire seems unneeded
-            return active.load(LSTM_ACQUIRE) <= gp;
-        }
-
-        // TODO: allow specifying a backoff strategy
-        inline void synchronize(const gp_t gp) noexcept
-        {
-            assert(!in_critical_section());
-            assert(gp != detail::off_state);
-
-            mut.lock_shared();
-            {
-                wait(gp);
-            }
-            mut.unlock_shared();
+            assert(!in_transaction());
+            return tgp_node.synchronize_min_gp(sync_version);
         }
 
         template<typename Func,
@@ -335,6 +178,7 @@ LSTM_BEGIN
         void reclaim(const gp_t sync_version) noexcept
         {
             assert(!in_critical_section());
+            assert(!in_transaction());
             assert(sync_version != detail::off_state);
             assert(!detail::locked(sync_version));
 

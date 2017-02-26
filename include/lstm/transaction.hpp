@@ -136,8 +136,7 @@ LSTM_BEGIN
 
         bool valid(const thread_data& td = tls_thread_data()) const noexcept
         {
-            return &td == tls_td && tls_td->active.load(LSTM_RELAXED) == version_
-                   && tls_td->in_transaction();
+            return &td == tls_td && tls_td->gp() == version_ && tls_td->in_transaction();
         }
 
         bool rw_valid(const gp_t version) const noexcept { return version <= version_; }
