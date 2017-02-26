@@ -14,13 +14,27 @@ LSTM_DETAIL_BEGIN
         pod_vector<gp_callback> callbacks;
     };
 
+    struct wait_elem_t
+    {
+        gp_t               version;
+        const thread_data* td;
+
+        wait_elem_t() noexcept = default;
+        wait_elem_t(const gp_t in_version, const thread_data* in_td) noexcept
+            : version(in_version)
+            , td(in_td)
+        {
+        }
+    };
+
     template<std::size_t StackCount = 4>
     struct succ_callbacks_t
     {
     private:
-        succ_callback_t callbacks[StackCount];
-        std::int8_t     start{0};
-        std::int8_t     size{0};
+        succ_callback_t         callbacks[StackCount];
+        std::int8_t             start{0};
+        std::int8_t             size{0};
+        pod_vector<wait_elem_t> active_td;
 
         std::int8_t active_index() const noexcept { return (start + size) % StackCount; }
 
@@ -28,6 +42,7 @@ LSTM_DETAIL_BEGIN
         succ_callback_t& active() noexcept { return callbacks[active_index()]; }
         succ_callback_t& front() noexcept { return callbacks[start]; }
         succ_callback_t& back() noexcept { return callbacks[(start + size - 1) % StackCount]; }
+        pod_vector<wait_elem_t>& wait_list() noexcept { return active_td; }
 
         bool push_is_full(const gp_t version) noexcept
         {
@@ -53,6 +68,7 @@ LSTM_DETAIL_BEGIN
         {
             for (succ_callback_t& succ_callback : callbacks)
                 succ_callback.callbacks.shrink_to_fit();
+            active_td.shrink_to_fit();
         }
     };
 LSTM_DETAIL_END

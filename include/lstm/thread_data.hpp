@@ -60,7 +60,7 @@ LSTM_BEGIN
         read_set_t                            read_set;
         write_set_t                           write_set;
         callbacks_t                           fail_callbacks;
-        detail::succ_callbacks_t<4>           succ_callbacks;
+        detail::succ_callbacks_t<8>           succ_callbacks;
 
         static void lock_all() noexcept
         {
@@ -96,7 +96,24 @@ LSTM_BEGIN
             }
         }
 
-        // TODO: allow specifying a backoff strategy
+        static void
+        wait_make_list(const gp_t gp, detail::pod_vector<detail::wait_elem_t>& active) noexcept
+        {
+            for (thread_data* q = LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
+                 q != nullptr;
+                 q = q->next) {
+                detail::default_backoff backoff;
+                const gp_t              td_gp = q->active.load(LSTM_ACQUIRE);
+                if (td_gp <= gp) {
+                    do {
+                        backoff();
+                    } while (q->not_in_grace_period(gp));
+                } else {
+                    active.emplace_back(td_gp, q);
+                }
+            }
+        }
+
         static bool try_wait(const gp_t gp) noexcept
         {
             for (thread_data* q = LSTM_ACCESS_INLINE_VAR(detail::globals).thread_data_root;
@@ -108,7 +125,22 @@ LSTM_BEGIN
             return true;
         }
 
-        void add_read_set(const detail::var_base& src_var) { read_set.emplace_back(&src_var); }
+        static bool
+        wait_list(const gp_t gp, detail::pod_vector<detail::wait_elem_t>& active) noexcept
+        {
+            for (auto iter = active.begin(); iter < active.end();) {
+                if (iter->version <= gp) {
+                    const gp_t new_v = iter->td->active.load(LSTM_ACQUIRE);
+                    if (iter->version == new_v)
+                        return false;
+                    else
+                        active.unordered_erase(iter);
+                } else {
+                    ++iter;
+                }
+            }
+            return true;
+        }
 
         void remove_read_set(const detail::var_base& src_var) noexcept
         {
@@ -154,15 +186,17 @@ LSTM_BEGIN
             do {
                 do_succ_callbacks(succ_callbacks.front().callbacks);
                 succ_callbacks.pop_front();
-            } while (!succ_callbacks.empty() && try_wait(succ_callbacks.front().version));
+            } while (!succ_callbacks.empty()
+                     && wait_list(succ_callbacks.front().version, succ_callbacks.wait_list()));
         }
 
         LSTM_NOINLINE void reclaim_slow_path() noexcept
         {
             mut.lock_shared();
             {
-                wait(succ_callbacks.front().version);
+                wait_make_list(succ_callbacks.front().version, succ_callbacks.wait_list());
                 reclaim_all_possible();
+                succ_callbacks.wait_list().clear();
             }
             mut.unlock_shared();
         }
