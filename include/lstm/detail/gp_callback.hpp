@@ -32,9 +32,9 @@ LSTM_DETAIL_BEGIN
             (*reinterpret_cast<F*>(&payload))();
         }
 
-    public:
         gp_callback() noexcept = default;
 
+    public:
         template<typename F, LSTM_REQUIRES_(sbo_concept<F>{})>
         gp_callback(F&& f) noexcept(std::is_nothrow_constructible<uncvref<F>, F&&>{})
         {

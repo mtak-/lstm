@@ -11,8 +11,9 @@ LSTM_DETAIL_BEGIN
     private:
         const var_base* src_var_;
 
-    public:
         inline read_set_value_type() noexcept = default;
+
+    public:
         inline constexpr read_set_value_type(const var_base* const in_src_var) noexcept
             : src_var_(in_src_var)
         {

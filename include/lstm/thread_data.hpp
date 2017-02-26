@@ -35,8 +35,6 @@ LSTM_DETAIL_BEGIN
 LSTM_DETAIL_END
 
 LSTM_BEGIN
-    LSTM_ALWAYS_INLINE thread_data& tls_thread_data() noexcept;
-
     struct thread_data
     {
     private:

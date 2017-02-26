@@ -14,7 +14,7 @@ LSTM_DETAIL_BEGIN
 
         static constexpr const uint_t write_bit = uint_t(1) << (sizeof(uint_t) * 8 - 1);
         static constexpr const uint_t read_mask = ~write_bit;
-        LSTM_CACHE_ALIGNED std::atomic<uint_t> read_count{0};
+        LSTM_CACHE_ALIGNED std::atomic<uint_t> read_count;
 
         static bool write_locked(const std::atomic<uint_t>& state) = delete;
         inline static constexpr bool write_locked(const uint_t state) noexcept
@@ -31,14 +31,62 @@ LSTM_DETAIL_BEGIN
         static bool unlocked(const std::atomic<uint_t>& state) = delete;
         inline static constexpr bool unlocked(const uint_t state) noexcept { return state == 0; }
 
-        LSTM_NOINLINE void lock_shared_slow_path() noexcept;
-        LSTM_NOINLINE void lock_slow_path() noexcept;
+        LSTM_NOINLINE void lock_shared_slow_path() noexcept
+        {
+            // didn't succeed in acquiring read access, so undo the reader count increment
+            read_count.fetch_sub(1, LSTM_RELAXED);
 
-        uint_t request_write_lock() noexcept;
-        void wait_for_readers(uint_t prev_read_count) noexcept;
+            uint_t          read_state;
+            default_backoff backoff;
+            do {
+                backoff();
+                read_state = read_count.load(LSTM_RELAXED);
+            } while (write_locked(read_state)
+                     || !read_count.compare_exchange_weak(read_state,
+                                                          read_state + 1,
+                                                          LSTM_ACQUIRE,
+                                                          LSTM_RELAXED));
+
+            assert(read_locked(read_count.load(LSTM_RELAXED)));
+        }
+
+        LSTM_NOINLINE void lock_slow_path() noexcept
+        {
+            uint_t prev_read_count = request_write_lock();
+            wait_for_readers(prev_read_count);
+        }
+
+        uint_t request_write_lock() noexcept
+        {
+            uint_t          prev_read_count = read_count.load(LSTM_RELAXED);
+            default_backoff backoff;
+            // first come first serve
+            while (write_locked(prev_read_count)
+                   || !read_count.compare_exchange_weak(prev_read_count,
+                                                        prev_read_count | write_bit,
+                                                        LSTM_ACQUIRE,
+                                                        LSTM_RELAXED)) {
+                backoff();
+                prev_read_count = read_count.load(LSTM_RELAXED);
+            }
+
+            return prev_read_count;
+        }
+
+        void wait_for_readers(uint_t prev_read_count) noexcept
+        {
+            default_backoff backoff;
+            while (LSTM_LIKELY(read_locked(prev_read_count))) {
+                backoff();
+                prev_read_count = read_count.load(LSTM_ACQUIRE);
+            }
+        }
 
     public:
-        fast_rw_mutex() noexcept = default;
+        fast_rw_mutex() noexcept
+            : read_count{0}
+        {
+        }
 
 #ifndef NDEBUG
         ~fast_rw_mutex() noexcept { assert(unlocked(read_count.load(LSTM_RELAXED))); }
@@ -72,57 +120,6 @@ LSTM_DETAIL_BEGIN
             assert(write_locked(prev));
         }
     };
-
-    LSTM_NOINLINE void fast_rw_mutex::lock_shared_slow_path() noexcept
-    {
-        // didn't succeed in acquiring read access, so undo the reader count increment
-        read_count.fetch_sub(1, LSTM_RELAXED);
-
-        uint_t          read_state;
-        default_backoff backoff;
-        do {
-            backoff();
-            read_state = read_count.load(LSTM_RELAXED);
-        } while (write_locked(read_state)
-                 || !read_count.compare_exchange_weak(read_state,
-                                                      read_state + 1,
-                                                      LSTM_ACQUIRE,
-                                                      LSTM_RELAXED));
-
-        assert(read_locked(read_count.load(LSTM_RELAXED)));
-    }
-
-    LSTM_NOINLINE void fast_rw_mutex::lock_slow_path() noexcept
-    {
-        uint_t prev_read_count = request_write_lock();
-        wait_for_readers(prev_read_count);
-    }
-
-    fast_rw_mutex::uint_t fast_rw_mutex::request_write_lock() noexcept
-    {
-        uint_t          prev_read_count = read_count.load(LSTM_RELAXED);
-        default_backoff backoff;
-        // first come first serve
-        while (write_locked(prev_read_count)
-               || !read_count.compare_exchange_weak(prev_read_count,
-                                                    prev_read_count | write_bit,
-                                                    LSTM_ACQUIRE,
-                                                    LSTM_RELAXED)) {
-            backoff();
-            prev_read_count = read_count.load(LSTM_RELAXED);
-        }
-
-        return prev_read_count;
-    }
-
-    void fast_rw_mutex::wait_for_readers(uint_t prev_read_count) noexcept
-    {
-        default_backoff backoff;
-        while (LSTM_LIKELY(read_locked(prev_read_count))) {
-            backoff();
-            prev_read_count = read_count.load(LSTM_ACQUIRE);
-        }
-    }
 LSTM_DETAIL_END
 
 #endif /* LSTM_DETAIL_FAST_RW_MUTEX_HPP */

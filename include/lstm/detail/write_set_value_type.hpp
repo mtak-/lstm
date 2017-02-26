@@ -12,9 +12,9 @@ LSTM_DETAIL_BEGIN
         var_base*   dest_var_;
         var_storage pending_write_;
 
-    public:
         inline write_set_value_type() noexcept = default;
 
+    public:
         inline constexpr write_set_value_type(var_base* const in_dest_var,
                                               var_storage     in_pending_write) noexcept
             : dest_var_(in_dest_var)
