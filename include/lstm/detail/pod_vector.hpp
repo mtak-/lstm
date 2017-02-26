@@ -27,8 +27,8 @@ LSTM_DETAIL_BEGIN
         static constexpr bool has_noexcept_alloc
             = noexcept(std::declval<Alloc&>().allocate(std::declval<std::size_t>()));
 
-        iterator begin_;
         iterator end_;
+        iterator begin_;
         iterator last_valid_address_;
 
         using alloc_traits = std::allocator_traits<allocator_type>;
@@ -57,9 +57,9 @@ LSTM_DETAIL_BEGIN
         pod_vector(const allocator_type& alloc = {}) noexcept(has_noexcept_alloc)
             : allocator_type(alloc)
             , begin_(this->alloc().allocate(1))
-            , end_(begin_)
             , last_valid_address_(begin_)
         {
+            end_ = begin_;
         }
 
         pod_vector(const pod_vector&) = delete;

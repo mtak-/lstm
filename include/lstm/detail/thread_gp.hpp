@@ -29,13 +29,10 @@ LSTM_DETAIL_BEGIN
     {
     private:
         mutable mutex_type mut;
+        char               padding2_[32 - sizeof(mutex_type)];
         thread_gp_node*    next;
+        char               padding_[LSTM_CACHE_LINE_SIZE - sizeof(thread_gp_node*)];
         std::atomic<gp_t>  active;
-
-        static constexpr std::size_t padding_size = LSTM_CACHE_LINE_SIZE - sizeof(mutex_type)
-                                                    - sizeof(thread_gp_node*)
-                                                    - sizeof(std::atomic<gp_t>);
-        char padding_[padding_size];
 
         static void lock_all() noexcept
         {
@@ -81,6 +78,9 @@ LSTM_DETAIL_BEGIN
         thread_gp_node() noexcept
         {
             (void)padding_;
+            (void)padding2_;
+            assert(std::uintptr_t(&mut) % LSTM_CACHE_LINE_SIZE == 0);
+            assert(std::uintptr_t(&active) % LSTM_CACHE_LINE_SIZE == 0);
 
             active.store(off_state, LSTM_RELEASE);
 

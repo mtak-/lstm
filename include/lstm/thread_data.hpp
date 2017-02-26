@@ -10,7 +10,7 @@
 #include <lstm/detail/write_set_value_type.hpp>
 
 LSTM_BEGIN
-    struct thread_data
+    struct LSTM_CACHE_ALIGNED thread_data
     {
     private:
         friend detail::read_write_fn;
@@ -25,12 +25,12 @@ LSTM_BEGIN
         using callbacks_iter      = typename callbacks_t::iterator;
 
         // TODO: optimize this layout once batching is implemented
-        LSTM_CACHE_ALIGNED detail::thread_gp_node tgp_node;
-        read_set_t                                read_set;
-        write_set_t                               write_set;
-        callbacks_t                               fail_callbacks;
-        detail::succ_callbacks_t<8>               succ_callbacks;
-        bool                                      in_transaction_;
+        read_set_t                  read_set;
+        write_set_t                 write_set;
+        callbacks_t                 fail_callbacks;
+        detail::succ_callbacks_t<4> succ_callbacks;
+        bool                        in_transaction_;
+        detail::thread_gp_node      tgp_node;
 
         void remove_read_set(const detail::var_base& src_var) noexcept
         {
