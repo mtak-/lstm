@@ -64,7 +64,6 @@ LSTM_BEGIN
             assert(!write_set.allocates_on_next_push());
             assert(in_critical_section());
             assert(in_transaction());
-            assert(!write_set.lookup(dest_var).success());
 
             remove_read_set(dest_var);
             write_set.unchecked_push_back(&dest_var, pending_write, hash);
@@ -79,7 +78,6 @@ LSTM_BEGIN
         {
             assert(in_critical_section());
             assert(in_transaction());
-            assert(!write_set.lookup(dest_var).success());
 
             remove_read_set(dest_var);
             write_set.push_back(&dest_var, pending_write, hash);

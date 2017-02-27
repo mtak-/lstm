@@ -116,6 +116,8 @@ LSTM_DETAIL_BEGIN
                   const hash_t hash) noexcept(noexcept(data.emplace_back(value, pending_write)))
         {
             assert(hash != 0);
+            assert(find(*value) == end());
+
             filter_ |= hash;
             data.emplace_back(value, pending_write);
         }
@@ -126,6 +128,8 @@ LSTM_DETAIL_BEGIN
             const hash_t hash) noexcept(noexcept(data.unchecked_emplace_back(value, pending_write)))
         {
             assert(hash != 0);
+            assert(find(*value) == end());
+
             filter_ |= hash;
             data.unchecked_emplace_back(value, pending_write);
         }
