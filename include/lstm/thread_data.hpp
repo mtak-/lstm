@@ -25,17 +25,30 @@ LSTM_BEGIN
         using callbacks_iter      = typename callbacks_t::iterator;
 
         // TODO: optimize this layout once batching is implemented
-        read_set_t                  read_set;
-        write_set_t                 write_set;
-        callbacks_t                 fail_callbacks;
-        detail::succ_callbacks_t<4> succ_callbacks;
-        bool                        in_transaction_;
-        detail::thread_gp_node      tgp_node;
+        struct _cache_line_offset_calculation
+        {
+            read_set_t                  a;
+            write_set_t                 b;
+            callbacks_t                 c;
+            detail::succ_callbacks_t<4> d;
+            bool                        e;
+            int*                        desired;
+        };
+        static constexpr std::size_t tgp_cache_line_offset
+            = offsetof(_cache_line_offset_calculation, desired) % LSTM_CACHE_LINE_SIZE;
+
+        read_set_t                                    read_set;
+        write_set_t                                   write_set;
+        callbacks_t                                   fail_callbacks;
+        detail::succ_callbacks_t<4>                   succ_callbacks;
+        bool                                          in_transaction_;
+        detail::thread_gp_node<tgp_cache_line_offset> tgp_node;
 
         void remove_read_set(const detail::var_base& src_var) noexcept
         {
             assert(in_critical_section());
             assert(in_transaction());
+
             for (read_set_const_iter read_iter = read_set.begin(); read_iter < read_set.end();) {
                 if (read_iter->is_src_var(src_var))
                     read_set.unordered_erase(read_iter);
@@ -46,23 +59,28 @@ LSTM_BEGIN
 
         void add_write_set_unchecked(detail::var_base&         dest_var,
                                      const detail::var_storage pending_write,
-                                     const detail::hash_t      hash)
+                                     const detail::hash_t      hash) noexcept
         {
             assert(!write_set.allocates_on_next_push());
             assert(in_critical_section());
             assert(in_transaction());
             assert(!write_set.lookup(dest_var).success());
+
             remove_read_set(dest_var);
             write_set.unchecked_push_back(&dest_var, pending_write, hash);
         }
 
-        void add_write_set(detail::var_base&         dest_var,
-                           const detail::var_storage pending_write,
-                           const detail::hash_t      hash)
+        void add_write_set(
+            detail::var_base&         dest_var,
+            const detail::var_storage pending_write,
+            const detail::hash_t      hash) noexcept(noexcept(write_set.push_back(&dest_var,
+                                                                             pending_write,
+                                                                             hash)))
         {
             assert(in_critical_section());
             assert(in_transaction());
             assert(!write_set.lookup(dest_var).success());
+
             remove_read_set(dest_var);
             write_set.push_back(&dest_var, pending_write, hash);
         }

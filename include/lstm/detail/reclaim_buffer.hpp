@@ -41,10 +41,7 @@ LSTM_DETAIL_BEGIN
 
         bool empty() const noexcept { return start == end; }
 
-        void pop_front() noexcept
-        {
-            start = (start + 1) % StackCount;
-        }
+        void pop_front() noexcept { start = (start + 1) % StackCount; }
 
         void shrink_to_fit() noexcept(noexcept(active().callbacks.shrink_to_fit()))
         {

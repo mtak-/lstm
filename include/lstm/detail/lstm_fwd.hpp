@@ -126,6 +126,8 @@ LSTM_DETAIL_BEGIN
     struct commit_algorithm;
     struct read_write_fn;
     struct var_base;
+
+    template<std::size_t Padding>
     struct thread_gp_node;
 
     struct tx_retry

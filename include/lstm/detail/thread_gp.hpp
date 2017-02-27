@@ -17,28 +17,49 @@ LSTM_DETAIL_BEGIN
     inline bool locked(const gp_t version) noexcept { return version & lock_bit; }
     inline gp_t as_locked(const gp_t version) noexcept { return version | lock_bit; }
 
-    struct thread_gp_list_t
+    template<std::size_t CacheLineOffset>
+    struct thread_gp_list
     {
-        LSTM_CACHE_ALIGNED mutex_type mut{};
-        thread_gp_node*               gp{nullptr};
+        LSTM_CACHE_ALIGNED mutex_type    mut{};
+        thread_gp_node<CacheLineOffset>* root{nullptr};
     };
 
-    LSTM_INLINE_VAR LSTM_CACHE_ALIGNED thread_gp_list_t thread_gp_list{};
+    template<std::size_t            CacheLineOffset>
+    thread_gp_list<CacheLineOffset> global_tgp_list{};
 
+    template<std::size_t CacheLineOffset>
     struct thread_gp_node
     {
     private:
-        mutable mutex_type mut;
-        char               padding2_[32 - sizeof(mutex_type)];
-        thread_gp_node*    next;
-        char               padding_[LSTM_CACHE_LINE_SIZE - sizeof(thread_gp_node*)];
-        std::atomic<gp_t>  active;
+        static_assert(CacheLineOffset < LSTM_CACHE_LINE_SIZE, "");
+        static constexpr std::size_t remaining_bytes = LSTM_CACHE_LINE_SIZE - CacheLineOffset;
+        static_assert(remaining_bytes % alignof(mutex_type) == 0, "probly breaks on some platform");
+        static_assert(sizeof(mutex_type) == alignof(mutex_type), "");
+
+        union
+        {
+            mutable mutex_type mut;
+            char               padding_[remaining_bytes >= sizeof(mutex_type) ? remaining_bytes
+                                                                : LSTM_CACHE_LINE_SIZE];
+        };
+
+        union
+        {
+            thread_gp_node* next;
+            char            padding2_[LSTM_CACHE_LINE_SIZE];
+        };
+
+        union
+        {
+            std::atomic<gp_t> active;
+            char              padding3_[LSTM_CACHE_LINE_SIZE];
+        };
 
         static void lock_all() noexcept
         {
-            LSTM_ACCESS_INLINE_VAR(thread_gp_list).mut.lock();
+            global_tgp_list<CacheLineOffset>.mut.lock();
 
-            thread_gp_node* current = LSTM_ACCESS_INLINE_VAR(thread_gp_list).gp;
+            thread_gp_node* current = global_tgp_list<CacheLineOffset>.root;
             while (current) {
                 current->mut.lock();
                 current = current->next;
@@ -47,19 +68,19 @@ LSTM_DETAIL_BEGIN
 
         static void unlock_all() noexcept
         {
-            thread_gp_node* current = LSTM_ACCESS_INLINE_VAR(thread_gp_list).gp;
+            thread_gp_node* current = global_tgp_list<CacheLineOffset>.root;
             while (current) {
                 current->mut.unlock();
                 current = current->next;
             }
 
-            LSTM_ACCESS_INLINE_VAR(thread_gp_list).mut.unlock();
+            global_tgp_list<CacheLineOffset>.mut.unlock();
         }
 
         static gp_t wait_min_gp(const gp_t gp) noexcept
         {
             gp_t result = off_state;
-            for (thread_gp_node* q = LSTM_ACCESS_INLINE_VAR(thread_gp_list).gp; q != nullptr;
+            for (thread_gp_node* q = global_tgp_list<CacheLineOffset>.root; q != nullptr;
                  q                 = q->next) {
                 default_backoff backoff;
                 const gp_t      td_gp = q->active.load(LSTM_ACQUIRE);
@@ -77,8 +98,6 @@ LSTM_DETAIL_BEGIN
     public:
         thread_gp_node() noexcept
         {
-            (void)padding_;
-            (void)padding2_;
             assert(std::uintptr_t(&next) % LSTM_CACHE_LINE_SIZE == 0);
             assert(std::uintptr_t(&active) % LSTM_CACHE_LINE_SIZE == 0);
 
@@ -87,8 +106,8 @@ LSTM_DETAIL_BEGIN
             mut.lock();
             lock_all(); // this->mut does not get locked here
             {
-                next = LSTM_ACCESS_INLINE_VAR(thread_gp_list).gp;
-                LSTM_ACCESS_INLINE_VAR(thread_gp_list).gp = this;
+                next                                  = global_tgp_list<CacheLineOffset>.root;
+                global_tgp_list<CacheLineOffset>.root = this;
             }
             unlock_all(); // this->mut gets unlocked here
         }
@@ -102,7 +121,7 @@ LSTM_DETAIL_BEGIN
 
             lock_all(); // this->mut gets locked here
             {
-                thread_gp_node** indirect = &LSTM_ACCESS_INLINE_VAR(thread_gp_list).gp;
+                thread_gp_node** indirect = &global_tgp_list<CacheLineOffset>.root;
                 assert(*indirect);
                 while (*indirect != this) {
                     indirect = &(*indirect)->next;
