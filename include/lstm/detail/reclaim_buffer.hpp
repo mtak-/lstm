@@ -14,39 +14,36 @@ LSTM_DETAIL_BEGIN
         pod_vector<gp_callback> callbacks;
     };
 
-    template<std::size_t StackCount = 4>
+    template<std::int8_t StackCount>
     struct succ_callbacks_t
     {
     private:
         succ_callback_t callbacks[StackCount];
         std::int8_t     start{0};
-        std::int8_t     size{0};
-
-        std::int8_t active_index() const noexcept { return (start + size) % StackCount; }
+        std::int8_t     end{0};
 
     public:
-        succ_callback_t& active() noexcept { return callbacks[active_index()]; }
+        succ_callback_t& active() noexcept { return callbacks[end]; }
         succ_callback_t& front() noexcept { return callbacks[start]; }
-        succ_callback_t& back() noexcept { return callbacks[(start + size - 1) % StackCount]; }
+        succ_callback_t& back() noexcept { return callbacks[(end - 1 + StackCount) % StackCount]; }
 
         bool push_is_full(const gp_t version) noexcept
         {
             assert(!active().callbacks.empty());
             active().version = version;
 
-            const bool result = ++size == StackCount;
+            end = (end + 1) % StackCount;
+
+            const bool result = end == start;
             assert(active().callbacks.empty() || result);
             return result;
         }
 
-        bool empty() const noexcept { return size == 0; }
+        bool empty() const noexcept { return start == end; }
 
         void pop_front() noexcept
         {
-            assert(size != 0);
-            assert(front().callbacks.empty());
             start = (start + 1) % StackCount;
-            --size;
         }
 
         void shrink_to_fit() noexcept(noexcept(active().callbacks.shrink_to_fit()))

@@ -34,6 +34,8 @@ LSTM_BEGIN
 
         void remove_read_set(const detail::var_base& src_var) noexcept
         {
+            assert(in_critical_section());
+            assert(in_transaction());
             for (read_set_const_iter read_iter = read_set.begin(); read_iter < read_set.end();) {
                 if (read_iter->is_src_var(src_var))
                     read_set.unordered_erase(read_iter);
@@ -46,7 +48,9 @@ LSTM_BEGIN
                                      const detail::var_storage pending_write,
                                      const detail::hash_t      hash)
         {
-            // up to caller to ensure dest_var is not already in the write_set
+            assert(!write_set.allocates_on_next_push());
+            assert(in_critical_section());
+            assert(in_transaction());
             assert(!write_set.lookup(dest_var).success());
             remove_read_set(dest_var);
             write_set.unchecked_push_back(&dest_var, pending_write, hash);
@@ -56,32 +60,66 @@ LSTM_BEGIN
                            const detail::var_storage pending_write,
                            const detail::hash_t      hash)
         {
-            // up to caller to ensure dest_var is not already in the write_set
+            assert(in_critical_section());
+            assert(in_transaction());
             assert(!write_set.lookup(dest_var).success());
             remove_read_set(dest_var);
             write_set.push_back(&dest_var, pending_write, hash);
         }
 
+        void do_succ_callbacks_front() noexcept
+        {
+            assert(!in_transaction());
+            assert(!in_critical_section());
+
+            callbacks_t& callbacks = succ_callbacks.front().callbacks;
+            succ_callbacks.pop_front();
+            for (detail::gp_callback& callback : callbacks)
+                callback();
+            callbacks.clear();
+        }
+
+        void do_fail_callbacks() noexcept
+        {
+#ifndef NDEBUG
+            const std::size_t fail_start_size = fail_callbacks.size();
+#endif
+            const callbacks_iter begin = fail_callbacks.begin();
+            for (callbacks_iter riter = fail_callbacks.end(); riter != begin;)
+                (*--riter)();
+
+            assert(fail_start_size == fail_callbacks.size());
+
+            fail_callbacks.clear();
+        }
+
         void reclaim_all() noexcept
         {
+            assert(!in_transaction());
+            assert(!in_critical_section());
+
             synchronize_min_gp(succ_callbacks.back().version);
             do {
-                do_succ_callbacks(succ_callbacks.front().callbacks);
-                succ_callbacks.pop_front();
+                do_succ_callbacks_front();
             } while (!succ_callbacks.empty());
         }
 
         LSTM_ALWAYS_INLINE void reclaim_all_possible(const gp_t min_gp) noexcept
         {
+            assert(!in_transaction());
+            assert(!in_critical_section());
+
             do {
-                do_succ_callbacks(succ_callbacks.front().callbacks);
-                succ_callbacks.pop_front();
+                do_succ_callbacks_front();
             } while (!succ_callbacks.empty() && succ_callbacks.front().version < min_gp);
         }
 
         LSTM_NOINLINE void reclaim_slow_path() noexcept
         {
-            const gp_t min_gp = tgp_node.synchronize_min_gp(succ_callbacks.front().version);
+            assert(!in_transaction());
+            assert(!in_critical_section());
+
+            const gp_t min_gp = synchronize_min_gp(succ_callbacks.front().version);
             reclaim_all_possible(min_gp);
         }
 
@@ -111,6 +149,7 @@ LSTM_BEGIN
         {
             return tgp_node.in_critical_section();
         }
+
         LSTM_ALWAYS_INLINE gp_t gp() const noexcept { return tgp_node.gp(); }
 
         LSTM_ALWAYS_INLINE void access_lock(const gp_t gp) noexcept
@@ -142,6 +181,7 @@ LSTM_BEGIN
         void queue_succ_callback(Func&& func) noexcept(
             noexcept(succ_callbacks.active().callbacks.emplace_back((Func &&) func)))
         {
+            assert(in_transaction());
             succ_callbacks.active().callbacks.emplace_back((Func &&) func);
         }
 
@@ -151,28 +191,8 @@ LSTM_BEGIN
         queue_fail_callback(Func&& func) noexcept(noexcept(fail_callbacks.emplace_back((Func &&)
                                                                                            func)))
         {
+            assert(in_transaction());
             fail_callbacks.emplace_back((Func &&) func);
-        }
-
-        static void do_succ_callbacks(callbacks_t& succ_callbacks) noexcept
-        {
-            for (detail::gp_callback& succ_callback : succ_callbacks)
-                succ_callback();
-            succ_callbacks.clear();
-        }
-
-        void do_fail_callbacks() noexcept
-        {
-#ifndef NDEBUG
-            const std::size_t fail_start_size = fail_callbacks.size();
-#endif
-            const callbacks_iter begin = fail_callbacks.begin();
-            for (callbacks_iter riter = fail_callbacks.end(); riter != begin;)
-                (*--riter)();
-
-            assert(fail_start_size == fail_callbacks.size());
-
-            fail_callbacks.clear();
         }
 
         void reclaim(const gp_t sync_version) noexcept

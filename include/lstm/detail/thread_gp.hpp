@@ -79,7 +79,7 @@ LSTM_DETAIL_BEGIN
         {
             (void)padding_;
             (void)padding2_;
-            assert(std::uintptr_t(&mut) % LSTM_CACHE_LINE_SIZE == 0);
+            assert(std::uintptr_t(&next) % LSTM_CACHE_LINE_SIZE == 0);
             assert(std::uintptr_t(&active) % LSTM_CACHE_LINE_SIZE == 0);
 
             active.store(off_state, LSTM_RELEASE);
