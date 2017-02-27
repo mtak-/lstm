@@ -59,11 +59,12 @@ LSTM_DETAIL_BEGIN
 
     struct yield
     {
-        LSTM_ALWAYS_INLINE void operator()() const noexcept { std::this_thread::yield(); }
+        // noinline, cause yield on libc++ is inline, and calls a non-noexcept func
+        LSTM_NOINLINE void      operator()() const noexcept { std::this_thread::yield(); }
         LSTM_ALWAYS_INLINE void reset() const noexcept {}
     };
 
-    using default_backoff = exponential_delay<std::chrono::nanoseconds, 100000, 10000000>;
+    using default_backoff = yield;
 LSTM_DETAIL_END
 
 #endif /* LSTM_DETAIL_BACKOFF_HPP */

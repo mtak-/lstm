@@ -209,7 +209,7 @@ LSTM_BEGIN
         }
 
         template<typename T, typename Alloc, LSTM_REQUIRES_(!var<T, Alloc>::atomic)>
-        LSTM_NOINLINE const T& untracked_read(const var<T, Alloc>& src_var) const
+        LSTM_ALWAYS_INLINE const T& untracked_read(const var<T, Alloc>& src_var) const
         {
             static_assert(std::is_reference<decltype(
                               var<T, Alloc>::load(src_var.storage.load()))>{},
