@@ -106,7 +106,7 @@ LSTM_DETAIL_BEGIN
             const gp_t sync_version = domain.fetch_and_bump_clock();
             assert(tx.version() <= sync_version);
 
-            commit_publish(write_set, sync_version + 1);
+            commit_publish(write_set, sync_version + transaction_domain::bump_size());
 
             return sync_version;
         }

@@ -10,8 +10,6 @@ LSTM_BEGIN
     struct transaction_domain
     {
     private:
-        static constexpr gp_t max_version = ~(gp_t(1) << (sizeof(gp_t) * 8 - 1));
-
         LSTM_CACHE_ALIGNED std::atomic<gp_t> clock;
 
     public:
@@ -28,9 +26,15 @@ LSTM_BEGIN
         // returns the previous version
         inline gp_t fetch_and_bump_clock() noexcept
         {
-            const gp_t result = clock.fetch_add(1, LSTM_RELEASE);
-            assert(result < max_version - 1);
+            const gp_t result = clock.fetch_add(bump_size(), LSTM_RELEASE);
+            assert(result < max_version() - bump_size());
             return result;
+        }
+
+        static inline constexpr gp_t bump_size() noexcept { return 1; }
+        static inline constexpr gp_t max_version() noexcept
+        {
+            return ~(gp_t(1) << (sizeof(gp_t) * 8 - bump_size()));
         }
     };
 
