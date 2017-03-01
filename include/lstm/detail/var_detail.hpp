@@ -28,6 +28,7 @@ LSTM_DETAIL_BEGIN
         }
 
         friend struct ::lstm::transaction;
+        friend struct ::lstm::read_transaction;
         friend commit_algorithm;
     };
 

@@ -110,6 +110,7 @@ LSTM_BEGIN
     struct var;
 
     struct transaction;
+    struct read_transaction;
     struct transaction_domain;
     struct thread_data;
 LSTM_END

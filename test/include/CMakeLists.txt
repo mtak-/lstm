@@ -1,6 +1,7 @@
 add_executable(lstm_easy_var lstm/easy_var.cpp)
 add_executable(lstm_lstm lstm/lstm.cpp)
 add_executable(lstm_memory lstm/memory.cpp)
+add_executable(lstm_read_transaction lstm/read_transaction.cpp)
 add_executable(lstm_read_write lstm/read_write.cpp)
 add_executable(lstm_retry lstm/retry.cpp)
 add_executable(lstm_thread_data lstm/thread_data.cpp)

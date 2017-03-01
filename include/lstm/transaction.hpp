@@ -12,6 +12,20 @@ LSTM_BEGIN
         thread_data* tls_td;
         gp_t         version_;
 
+    protected:
+        static constexpr struct read_only_t
+        {
+        } read_only{};
+
+        transaction(read_only_t, const gp_t in_version) noexcept
+            : tls_td(nullptr)
+            , version_(in_version)
+        {
+        }
+
+        thread_data* raw_tls_td_ptr() const noexcept { return tls_td; }
+
+    private:
         LSTM_NOINLINE detail::var_storage read_impl_slow_path(const detail::var_base& src_var) const
         {
             const write_set_const_iter iter = tls_td->write_set.find(src_var);
@@ -28,6 +42,7 @@ LSTM_BEGIN
             detail::internal_retry();
         }
 
+    protected:
         LSTM_NOINLINE_LUKEWARM detail::var_storage read_impl(const detail::var_base& src_var) const
         {
             assert(valid());
@@ -44,6 +59,7 @@ LSTM_BEGIN
             return read_impl_slow_path(src_var);
         }
 
+    private:
         LSTM_NOINLINE void
         atomic_write_slow_path(detail::var_base& dest_var, const detail::var_storage storage) const
         {
@@ -57,6 +73,7 @@ LSTM_BEGIN
                 detail::internal_retry();
         }
 
+    protected:
         // atomic var's perform no allocation (therefore, no callbacks)
         LSTM_NOINLINE_LUKEWARM void
         atomic_write_impl(detail::var_base& dest_var, const detail::var_storage storage) const
@@ -73,6 +90,7 @@ LSTM_BEGIN
                 tls_td->add_write_set_unchecked(dest_var, storage, hash);
         }
 
+    private:
         LSTM_NOINLINE detail::var_storage
         untracked_read_impl_slow_path(const detail::var_base& src_var) const
         {
@@ -88,6 +106,7 @@ LSTM_BEGIN
             detail::internal_retry();
         }
 
+    protected:
         LSTM_NOINLINE_LUKEWARM detail::var_storage
         untracked_read_impl(const detail::var_base& src_var) const
         {
