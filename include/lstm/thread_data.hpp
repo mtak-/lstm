@@ -49,11 +49,11 @@ LSTM_BEGIN
             assert(in_critical_section());
             assert(in_transaction());
 
-            for (read_set_const_iter read_iter = read_set.begin(); read_iter < read_set.end();) {
+            const read_set_const_iter begin = read_set.begin();
+            for (read_set_const_iter read_iter = read_set.end(); read_iter != begin;) {
+                --read_iter;
                 if (read_iter->is_src_var(src_var))
                     read_set.unordered_erase(read_iter);
-                else
-                    ++read_iter;
             }
         }
 
