@@ -134,6 +134,12 @@ LSTM_DETAIL_BEGIN
     {
     };
 
+    [[noreturn]] void internal_retry()
+    {
+        LSTM_INTERNAL_FAIL_TX();
+        throw tx_retry{};
+    }
+
     template<typename T>
     using uncvref = std::remove_cv_t<std::remove_reference_t<T>>;
 

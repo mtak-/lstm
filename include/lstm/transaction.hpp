@@ -3,14 +3,6 @@
 
 #include <lstm/thread_data.hpp>
 
-LSTM_DETAIL_BEGIN
-    [[noreturn]] void internal_retry()
-    {
-        LSTM_INTERNAL_FAIL_TX();
-        throw tx_retry{};
-    }
-LSTM_DETAIL_END
-
 LSTM_BEGIN
     struct transaction
     {
@@ -123,7 +115,7 @@ LSTM_BEGIN
         thread_data& get_thread_data() const noexcept { return *tls_td; }
         gp_t         version() const noexcept { return version_; }
 
-        inline void reset_version(const gp_t new_version) noexcept
+        void reset_version(const gp_t new_version) noexcept
         {
             assert(version_ <= new_version);
 
