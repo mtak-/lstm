@@ -19,12 +19,11 @@ LSTM_BEGIN
         {
             assert(valid());
 
-            if (LSTM_UNLIKELY(nested_in_rw()))
-                return read_impl_slow_path(src_var);
-
-            const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
-            if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE))))
-                return result;
+            if (LSTM_LIKELY(!nested_in_rw())) {
+                const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
+                if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE))))
+                    return result;
+            }
             return read_impl_slow_path(src_var);
         }
 
@@ -42,17 +41,16 @@ LSTM_BEGIN
         {
             assert(valid());
 
-            if (LSTM_UNLIKELY(nested_in_rw()))
-                return untracked_read_impl_slow_path(src_var);
-
-            const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
-            if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE))))
-                return result;
+            if (LSTM_LIKELY(!nested_in_rw())) {
+                const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
+                if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE))))
+                    return result;
+            }
             return untracked_read_impl_slow_path(src_var);
         }
 
     public:
-        inline read_transaction(const gp_t in_version) noexcept
+        explicit inline read_transaction(const gp_t in_version) noexcept
             : transaction(transaction::read_only, in_version)
         {
         }

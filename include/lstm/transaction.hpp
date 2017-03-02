@@ -13,9 +13,10 @@ LSTM_BEGIN
         gp_t         version_;
 
     protected:
-        static constexpr struct read_only_t
+        struct read_only_t
         {
-        } read_only{};
+        };
+        static constexpr read_only_t read_only{};
 
         transaction(read_only_t, const gp_t in_version) noexcept
             : tls_td(nullptr)
@@ -47,14 +48,13 @@ LSTM_BEGIN
         {
             assert(valid());
 
-            if (LSTM_UNLIKELY(tls_td->read_set.allocates_on_next_push()
-                              || (tls_td->write_set.filter() & dumb_reference_hash(src_var))))
-                return read_impl_slow_path(src_var);
-
-            const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
-            if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE)))) {
-                tls_td->read_set.unchecked_emplace_back(&src_var);
-                return result;
+            if (LSTM_LIKELY(!tls_td->read_set.allocates_on_next_push()
+                            && !(tls_td->write_set.filter() & dumb_reference_hash(src_var)))) {
+                const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
+                if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE)))) {
+                    tls_td->read_set.unchecked_emplace_back(&src_var);
+                    return result;
+                }
             }
             return read_impl_slow_path(src_var);
         }
@@ -112,12 +112,11 @@ LSTM_BEGIN
         {
             assert(valid());
 
-            if (LSTM_UNLIKELY(tls_td->write_set.filter() & dumb_reference_hash(src_var)))
-                return untracked_read_impl_slow_path(src_var);
-
-            const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
-            if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE))))
-                return result;
+            if (LSTM_LIKELY(!(tls_td->write_set.filter() & dumb_reference_hash(src_var)))) {
+                const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
+                if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE))))
+                    return result;
+            }
             return untracked_read_impl_slow_path(src_var);
         }
 
