@@ -6,13 +6,11 @@
 LSTM_BEGIN
     struct read_transaction : private detail::transaction_base
     {
-    private:
         inline read_transaction(thread_data& in_tls_td, const gp_t in_version) noexcept
             : transaction_base(&in_tls_td, in_version)
         {
         }
 
-    public:
         explicit inline read_transaction(const gp_t in_version) noexcept
             : transaction_base(nullptr, in_version)
         {

@@ -39,7 +39,7 @@ LSTM_DETAIL_BEGIN
 
         LSTM_NOINLINE_LUKEWARM var_storage rw_read_base(const var_base& src_var) const
         {
-            assert(valid());
+            assert(valid(*tls_td));
 
             if (LSTM_LIKELY(!tls_td->read_set.allocates_on_next_push()
                             && !(tls_td->write_set.filter() & dumb_reference_hash(src_var)))) {
@@ -69,7 +69,7 @@ LSTM_DETAIL_BEGIN
         LSTM_NOINLINE_LUKEWARM void
         rw_atomic_write_base(var_base& dest_var, const var_storage storage) const
         {
-            assert(valid());
+            assert(valid(*tls_td));
 
             const hash_t hash = dumb_reference_hash(dest_var);
 
@@ -97,7 +97,7 @@ LSTM_DETAIL_BEGIN
 
         LSTM_NOINLINE_LUKEWARM var_storage rw_untracked_read_base(const var_base& src_var) const
         {
-            assert(valid());
+            assert(valid(*tls_td));
 
             if (LSTM_LIKELY(!(tls_td->write_set.filter() & dumb_reference_hash(src_var)))) {
                 const var_storage result = src_var.storage.load(LSTM_ACQUIRE);
@@ -120,7 +120,7 @@ LSTM_DETAIL_BEGIN
 
         LSTM_NOINLINE_LUKEWARM var_storage ro_read_base(const var_base& src_var) const
         {
-            assert(valid());
+            assert(valid(*tls_td));
 
             if (LSTM_LIKELY(!can_write())) {
                 const var_storage result = src_var.storage.load(LSTM_ACQUIRE);
@@ -140,7 +140,7 @@ LSTM_DETAIL_BEGIN
 
         LSTM_NOINLINE_LUKEWARM var_storage ro_untracked_read_base(const var_base& src_var) const
         {
-            assert(valid());
+            assert(valid(*tls_td));
 
             if (LSTM_LIKELY(!can_write())) {
                 const var_storage result = src_var.storage.load(LSTM_ACQUIRE);
@@ -157,7 +157,7 @@ LSTM_DETAIL_BEGIN
         {
             assert(version_ != off_state);
             assert(!locked(version_));
-            assert(valid());
+            assert(valid(*tls_td));
         }
 
         thread_data& get_thread_data() const noexcept { return *tls_td; }
@@ -171,7 +171,7 @@ LSTM_DETAIL_BEGIN
 
             assert(version_ != off_state);
             assert(!locked(version_));
-            assert(valid());
+            assert(valid(*tls_td));
         }
 
         bool can_write() const noexcept { return tls_td; }
@@ -217,7 +217,7 @@ LSTM_DETAIL_BEGIN
                                 && std::is_constructible<T, U&&>())>
         void rw_write(var<T, Alloc>& dest_var, U&& u) const
         {
-            assert(valid());
+            assert(valid(*tls_td));
 
             const write_set_lookup lookup = tls_td->write_set.lookup(dest_var);
             if (LSTM_LIKELY(!lookup.success())) {
