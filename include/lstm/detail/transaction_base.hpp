@@ -1,5 +1,5 @@
-#ifndef LSTM_DETAIL_TRANSACTION_DETAIL_HPP
-#define LSTM_DETAIL_TRANSACTION_DETAIL_HPP
+#ifndef LSTM_DETAIL_TRANSACTION_BASE_HPP
+#define LSTM_DETAIL_TRANSACTION_BASE_HPP
 
 #include <lstm/thread_data.hpp>
 
@@ -18,6 +18,9 @@ LSTM_DETAIL_BEGIN
         thread_data* tls_td;
         gp_t         version_;
 
+        /*************************/
+        /* read write operations */
+        /*************************/
         LSTM_NOINLINE var_storage rw_read_slow_path(const var_base& src_var) const
         {
             const write_set_const_iter iter = tls_td->write_set.find(src_var);
@@ -34,6 +37,21 @@ LSTM_DETAIL_BEGIN
             internal_retry();
         }
 
+        LSTM_NOINLINE_LUKEWARM var_storage rw_read_base(const var_base& src_var) const
+        {
+            assert(valid());
+
+            if (LSTM_LIKELY(!tls_td->read_set.allocates_on_next_push()
+                            && !(tls_td->write_set.filter() & dumb_reference_hash(src_var)))) {
+                const var_storage result = src_var.storage.load(LSTM_ACQUIRE);
+                if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE)))) {
+                    tls_td->read_set.unchecked_emplace_back(&src_var);
+                    return result;
+                }
+            }
+            return rw_read_slow_path(src_var);
+        }
+
         LSTM_NOINLINE void
         rw_atomic_write_slow_path(var_base& dest_var, const var_storage storage) const
         {
@@ -45,6 +63,22 @@ LSTM_DETAIL_BEGIN
 
             if (!rw_valid(dest_var))
                 internal_retry();
+        }
+
+        // atomic var's perform no allocation (therefore, no callbacks)
+        LSTM_NOINLINE_LUKEWARM void
+        rw_atomic_write_base(var_base& dest_var, const var_storage storage) const
+        {
+            assert(valid());
+
+            const hash_t hash = dumb_reference_hash(dest_var);
+
+            if (LSTM_UNLIKELY(tls_td->write_set.allocates_on_next_push()
+                              || (tls_td->write_set.filter() & hash)
+                              || !rw_valid(dest_var)))
+                rw_atomic_write_slow_path(dest_var, storage);
+            else
+                tls_td->add_write_set_unchecked(dest_var, storage, hash);
         }
 
         LSTM_NOINLINE var_storage rw_untracked_read_slow_path(const var_base& src_var) const
@@ -61,6 +95,21 @@ LSTM_DETAIL_BEGIN
             internal_retry();
         }
 
+        LSTM_NOINLINE_LUKEWARM var_storage rw_untracked_read_base(const var_base& src_var) const
+        {
+            assert(valid());
+
+            if (LSTM_LIKELY(!(tls_td->write_set.filter() & dumb_reference_hash(src_var)))) {
+                const var_storage result = src_var.storage.load(LSTM_ACQUIRE);
+                if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE))))
+                    return result;
+            }
+            return rw_untracked_read_slow_path(src_var);
+        }
+
+        /************************/
+        /* read only operations */
+        /************************/
         LSTM_NOINLINE var_storage ro_read_slow_path(const var_base& src_var) const
         {
             if (can_write())
@@ -69,12 +118,36 @@ LSTM_DETAIL_BEGIN
                 internal_retry();
         }
 
+        LSTM_NOINLINE_LUKEWARM var_storage ro_read_base(const var_base& src_var) const
+        {
+            assert(valid());
+
+            if (LSTM_LIKELY(!can_write())) {
+                const var_storage result = src_var.storage.load(LSTM_ACQUIRE);
+                if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE))))
+                    return result;
+            }
+            return ro_read_slow_path(src_var);
+        }
+
         LSTM_NOINLINE var_storage ro_untracked_read_slow_path(const var_base& src_var) const
         {
             if (can_write())
                 return rw_untracked_read_base(src_var);
             else
                 internal_retry();
+        }
+
+        LSTM_NOINLINE_LUKEWARM var_storage ro_untracked_read_base(const var_base& src_var) const
+        {
+            assert(valid());
+
+            if (LSTM_LIKELY(!can_write())) {
+                const var_storage result = src_var.storage.load(LSTM_ACQUIRE);
+                if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE))))
+                    return result;
+            }
+            return ro_untracked_read_slow_path(src_var);
         }
 
     public:
@@ -114,52 +187,9 @@ LSTM_DETAIL_BEGIN
             return rw_valid(v.version_lock.load(LSTM_RELAXED));
         }
 
-        /*
-         * read write operations
-         */
-        LSTM_NOINLINE_LUKEWARM var_storage rw_read_base(const var_base& src_var) const
-        {
-            assert(valid());
-
-            if (LSTM_LIKELY(!tls_td->read_set.allocates_on_next_push()
-                            && !(tls_td->write_set.filter() & dumb_reference_hash(src_var)))) {
-                const var_storage result = src_var.storage.load(LSTM_ACQUIRE);
-                if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE)))) {
-                    tls_td->read_set.unchecked_emplace_back(&src_var);
-                    return result;
-                }
-            }
-            return rw_read_slow_path(src_var);
-        }
-
-        // atomic var's perform no allocation (therefore, no callbacks)
-        LSTM_NOINLINE_LUKEWARM void
-        rw_atomic_write_base(var_base& dest_var, const var_storage storage) const
-        {
-            assert(valid());
-
-            const hash_t hash = dumb_reference_hash(dest_var);
-
-            if (LSTM_UNLIKELY(tls_td->write_set.allocates_on_next_push()
-                              || (tls_td->write_set.filter() & hash)
-                              || !rw_valid(dest_var)))
-                rw_atomic_write_slow_path(dest_var, storage);
-            else
-                tls_td->add_write_set_unchecked(dest_var, storage, hash);
-        }
-
-        LSTM_NOINLINE_LUKEWARM var_storage rw_untracked_read_base(const var_base& src_var) const
-        {
-            assert(valid());
-
-            if (LSTM_LIKELY(!(tls_td->write_set.filter() & dumb_reference_hash(src_var)))) {
-                const var_storage result = src_var.storage.load(LSTM_ACQUIRE);
-                if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE))))
-                    return result;
-            }
-            return rw_untracked_read_slow_path(src_var);
-        }
-
+        /*************************/
+        /* read write operations */
+        /*************************/
         template<typename T, typename Alloc, LSTM_REQUIRES_(!var<T, Alloc>::atomic)>
         LSTM_ALWAYS_INLINE const T& rw_read(const var<T, Alloc>& src_var) const
         {
@@ -241,33 +271,9 @@ LSTM_DETAIL_BEGIN
             return var<T, Alloc>::load(rw_untracked_read_base(src_var));
         }
 
-        /*
-         * read only operations
-         */
-        LSTM_NOINLINE_LUKEWARM var_storage ro_read_base(const var_base& src_var) const
-        {
-            assert(valid());
-
-            if (LSTM_LIKELY(!can_write())) {
-                const var_storage result = src_var.storage.load(LSTM_ACQUIRE);
-                if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE))))
-                    return result;
-            }
-            return ro_read_slow_path(src_var);
-        }
-
-        LSTM_NOINLINE_LUKEWARM var_storage ro_untracked_read_base(const var_base& src_var) const
-        {
-            assert(valid());
-
-            if (LSTM_LIKELY(!can_write())) {
-                const var_storage result = src_var.storage.load(LSTM_ACQUIRE);
-                if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE))))
-                    return result;
-            }
-            return ro_untracked_read_slow_path(src_var);
-        }
-
+        /************************/
+        /* read only operations */
+        /************************/
         template<typename T, typename Alloc, LSTM_REQUIRES_(!var<T, Alloc>::atomic)>
         LSTM_ALWAYS_INLINE const T& ro_read(const var<T, Alloc>& src_var) const
         {
@@ -306,4 +312,4 @@ LSTM_DETAIL_BEGIN
     };
 LSTM_DETAIL_END
 
-#endif /* LSTM_DETAIL_TRANSACTION_DETAIL_HPP */
+#endif /* LSTM_DETAIL_TRANSACTION_BASE_HPP */

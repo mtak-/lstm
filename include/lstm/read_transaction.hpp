@@ -1,7 +1,7 @@
 #ifndef LSTM_READ_TRANSACTION_HPP
 #define LSTM_READ_TRANSACTION_HPP
 
-#include <lstm/detail/transaction_detail.hpp>
+#include <lstm/detail/transaction_base.hpp>
 
 LSTM_BEGIN
     struct read_transaction : private detail::transaction_base
