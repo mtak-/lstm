@@ -28,8 +28,6 @@ LSTM_DETAIL_BEGIN
         }
 
         friend struct ::lstm::detail::transaction_base;
-        friend struct ::lstm::transaction;
-        friend struct ::lstm::read_transaction;
         friend commit_algorithm;
     };
 
@@ -84,7 +82,6 @@ LSTM_DETAIL_BEGIN
         static constexpr var_type type   = Var_type;
 
     protected:
-        friend struct ::lstm::transaction;
         using alloc_traits = std::allocator_traits<Alloc>;
         using alloc_wrapper<Alloc>::alloc;
 
@@ -175,7 +172,6 @@ LSTM_DETAIL_BEGIN
         static constexpr var_type type   = var_type::atomic;
 
     protected:
-        friend struct ::lstm::transaction;
         using alloc_traits = std::allocator_traits<Alloc>;
         using alloc_wrapper<Alloc>::alloc;
 

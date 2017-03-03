@@ -10,8 +10,6 @@ LSTM_BEGIN
     private:
         using base = detail::var_alloc_policy<T, Alloc>;
 
-        friend struct ::lstm::transaction;
-        friend struct ::lstm::read_transaction;
         friend struct ::lstm::detail::transaction_base;
 
     public:
