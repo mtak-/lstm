@@ -127,6 +127,7 @@ LSTM_DETAIL_BEGIN
     struct commit_algorithm;
     struct read_write_fn;
     struct var_base;
+    struct transaction_base;
 
     template<std::size_t Padding>
     struct thread_gp_node;
@@ -134,12 +135,6 @@ LSTM_DETAIL_BEGIN
     struct tx_retry
     {
     };
-
-    [[noreturn]] void internal_retry()
-    {
-        LSTM_INTERNAL_FAIL_TX();
-        throw tx_retry{};
-    }
 
     template<typename T>
     using uncvref = std::remove_cv_t<std::remove_reference_t<T>>;

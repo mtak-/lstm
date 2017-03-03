@@ -1,76 +1,33 @@
 #ifndef LSTM_READ_TRANSACTION_HPP
 #define LSTM_READ_TRANSACTION_HPP
 
-#include <lstm/transaction.hpp>
+#include <lstm/detail/transaction_detail.hpp>
 
 LSTM_BEGIN
-    struct read_transaction : private transaction
+    struct read_transaction : private detail::transaction_base
     {
     private:
-        LSTM_NOINLINE detail::var_storage read_impl_slow_path(const detail::var_base& src_var) const
+        inline read_transaction(thread_data& in_tls_td, const gp_t in_version) noexcept
+            : transaction_base(&in_tls_td, in_version)
         {
-            if (nested_in_rw())
-                return transaction::read_impl(src_var);
-            else
-                detail::internal_retry();
-        }
-
-        LSTM_NOINLINE_LUKEWARM detail::var_storage read_impl(const detail::var_base& src_var) const
-        {
-            assert(valid());
-
-            if (LSTM_LIKELY(!nested_in_rw())) {
-                const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
-                if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE))))
-                    return result;
-            }
-            return read_impl_slow_path(src_var);
-        }
-
-        LSTM_NOINLINE detail::var_storage
-        untracked_read_impl_slow_path(const detail::var_base& src_var) const
-        {
-            if (nested_in_rw())
-                return transaction::untracked_read_impl(src_var);
-            else
-                detail::internal_retry();
-        }
-
-        LSTM_NOINLINE_LUKEWARM detail::var_storage
-        untracked_read_impl(const detail::var_base& src_var) const
-        {
-            assert(valid());
-
-            if (LSTM_LIKELY(!nested_in_rw())) {
-                const detail::var_storage result = src_var.storage.load(LSTM_ACQUIRE);
-                if (LSTM_LIKELY(rw_valid(src_var.version_lock.load(LSTM_ACQUIRE))))
-                    return result;
-            }
-            return untracked_read_impl_slow_path(src_var);
         }
 
     public:
         explicit inline read_transaction(const gp_t in_version) noexcept
-            : transaction(transaction::read_only, in_version)
+            : transaction_base(nullptr, in_version)
         {
         }
 
-        bool nested_in_rw() const noexcept { return transaction::raw_tls_td_ptr(); }
-        gp_t version() const noexcept { return transaction::version(); }
+        bool nested_in_rw() const noexcept { return can_write(); }
+        gp_t version() const noexcept { return transaction_base::version(); }
         void reset_version(const gp_t new_version) noexcept
         {
-            transaction::reset_version(new_version);
+            transaction_base::reset_version(new_version);
         }
 
-        bool valid(const thread_data& td = tls_thread_data()) const noexcept
-        {
-            if (nested_in_rw())
-                return transaction::valid(td);
-            return td.gp() == version() && td.in_transaction();
-        }
-
-        bool rw_valid(const gp_t version) const noexcept { return transaction::rw_valid(version); }
-        bool rw_valid(const detail::var_base& v) const noexcept { return transaction::rw_valid(v); }
+        bool valid(const thread_data& td) const noexcept { return transaction_base::valid(td); }
+        bool read_valid(const gp_t version) const noexcept { return rw_valid(version); }
+        bool read_valid(const detail::var_base& v) const noexcept { return rw_valid(v); }
 
         template<typename T, typename Alloc, LSTM_REQUIRES_(!var<T, Alloc>::atomic)>
         LSTM_NOINLINE const T& read(const var<T, Alloc>& src_var) const
@@ -78,7 +35,7 @@ LSTM_BEGIN
             static_assert(std::is_reference<decltype(
                               var<T, Alloc>::load(src_var.storage.load()))>{},
                           "");
-            return var<T, Alloc>::load(read_impl(src_var));
+            return var<T, Alloc>::load(ro_read(src_var));
         }
 
         template<typename T, typename Alloc, LSTM_REQUIRES_(var<T, Alloc>::atomic)>
@@ -87,7 +44,7 @@ LSTM_BEGIN
             static_assert(!std::is_reference<decltype(
                               var<T, Alloc>::load(src_var.storage.load()))>{},
                           "");
-            return var<T, Alloc>::load(read_impl(src_var));
+            return var<T, Alloc>::load(ro_read(src_var));
         }
 
         template<typename T, typename Alloc, LSTM_REQUIRES_(!var<T, Alloc>::atomic)>
@@ -96,7 +53,7 @@ LSTM_BEGIN
             static_assert(std::is_reference<decltype(
                               var<T, Alloc>::load(src_var.storage.load()))>{},
                           "");
-            return var<T, Alloc>::load(untracked_read_impl(src_var));
+            return var<T, Alloc>::load(ro_untracked_read(src_var));
         }
 
         template<typename T, typename Alloc, LSTM_REQUIRES_(var<T, Alloc>::atomic)>
@@ -105,7 +62,7 @@ LSTM_BEGIN
             static_assert(!std::is_reference<decltype(
                               var<T, Alloc>::load(src_var.storage.load()))>{},
                           "");
-            return var<T, Alloc>::load(untracked_read_impl(src_var));
+            return var<T, Alloc>::load(ro_untracked_read(src_var));
         }
 
         // reading/writing an rvalue probably never makes sense

@@ -12,6 +12,7 @@ LSTM_BEGIN
 
         friend struct ::lstm::transaction;
         friend struct ::lstm::read_transaction;
+        friend struct ::lstm::detail::transaction_base;
 
     public:
         using value_type                 = T;

@@ -19,7 +19,7 @@ LSTM_DETAIL_BEGIN
         static inline bool lock(var_base& v, const transaction tx) noexcept
         {
             gp_t version_buf = v.version_lock.load(LSTM_RELAXED);
-            return tx.rw_valid(version_buf)
+            return tx.read_write_valid(version_buf)
                    && v.version_lock.compare_exchange_strong(version_buf,
                                                              as_locked(version_buf),
                                                              LSTM_ACQUIRE,
@@ -72,7 +72,7 @@ LSTM_DETAIL_BEGIN
         {
             thread_data& tls_td = tx.get_thread_data();
             for (read_set_value_type read_set_vaue : tls_td.read_set) {
-                if (!tx.rw_valid(read_set_vaue.src_var())) {
+                if (!tx.read_write_valid(read_set_vaue.src_var())) {
                     unlock_write_set(tls_td.write_set.begin(), tls_td.write_set.end());
                     return false;
                 }

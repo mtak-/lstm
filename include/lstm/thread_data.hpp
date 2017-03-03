@@ -15,6 +15,7 @@ LSTM_BEGIN
     private:
         friend detail::read_write_fn;
         friend detail::commit_algorithm;
+        friend detail::transaction_base;
         friend transaction;
 
         using read_set_t  = detail::pod_vector<detail::read_set_value_type>;
