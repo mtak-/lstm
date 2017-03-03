@@ -32,37 +32,25 @@ LSTM_BEGIN
         template<typename T, typename Alloc, LSTM_REQUIRES_(!var<T, Alloc>::atomic)>
         LSTM_NOINLINE const T& read(const var<T, Alloc>& src_var) const
         {
-            static_assert(std::is_reference<decltype(
-                              var<T, Alloc>::load(src_var.storage.load()))>{},
-                          "");
-            return var<T, Alloc>::load(ro_read(src_var));
+            return ro_read(src_var);
         }
 
         template<typename T, typename Alloc, LSTM_REQUIRES_(var<T, Alloc>::atomic)>
         LSTM_ALWAYS_INLINE T read(const var<T, Alloc>& src_var) const
         {
-            static_assert(!std::is_reference<decltype(
-                              var<T, Alloc>::load(src_var.storage.load()))>{},
-                          "");
-            return var<T, Alloc>::load(ro_read(src_var));
+            return ro_read(src_var);
         }
 
         template<typename T, typename Alloc, LSTM_REQUIRES_(!var<T, Alloc>::atomic)>
         LSTM_ALWAYS_INLINE const T& untracked_read(const var<T, Alloc>& src_var) const
         {
-            static_assert(std::is_reference<decltype(
-                              var<T, Alloc>::load(src_var.storage.load()))>{},
-                          "");
-            return var<T, Alloc>::load(ro_untracked_read(src_var));
+            return ro_untracked_read(src_var);
         }
 
         template<typename T, typename Alloc, LSTM_REQUIRES_(var<T, Alloc>::atomic)>
         LSTM_ALWAYS_INLINE T untracked_read(const var<T, Alloc>& src_var) const
         {
-            static_assert(!std::is_reference<decltype(
-                              var<T, Alloc>::load(src_var.storage.load()))>{},
-                          "");
-            return var<T, Alloc>::load(ro_untracked_read(src_var));
+            return ro_untracked_read(src_var);
         }
 
         // reading/writing an rvalue probably never makes sense

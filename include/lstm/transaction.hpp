@@ -26,63 +26,40 @@ LSTM_BEGIN
         bool valid(const thread_data& td) const noexcept { return transaction_base::valid(td); }
         bool read_write_valid(const gp_t version) const noexcept { return rw_valid(version); }
         bool read_write_valid(const detail::var_base& v) const noexcept { return rw_valid(v); }
+        bool read_valid(const gp_t version) const noexcept { return rw_valid(version); }
+        bool read_valid(const detail::var_base& v) const noexcept { return rw_valid(v); }
 
         template<typename T, typename Alloc, LSTM_REQUIRES_(!var<T, Alloc>::atomic)>
         LSTM_NOINLINE const T& read(const var<T, Alloc>& src_var) const
         {
-            static_assert(std::is_reference<decltype(
-                              var<T, Alloc>::load(src_var.storage.load()))>{},
-                          "");
-            return var<T, Alloc>::load(rw_read(src_var));
+            return rw_read(src_var);
         }
 
         template<typename T, typename Alloc, LSTM_REQUIRES_(var<T, Alloc>::atomic)>
         LSTM_ALWAYS_INLINE T read(const var<T, Alloc>& src_var) const
         {
-            static_assert(!std::is_reference<decltype(
-                              var<T, Alloc>::load(src_var.storage.load()))>{},
-                          "");
-            return var<T, Alloc>::load(rw_read(src_var));
-        }
-
-        // TODO: tease out the parts of this function that don't depend on template params
-        // TODO: optimize it
-        template<typename T,
-                 typename Alloc,
-                 typename U = T,
-                 LSTM_REQUIRES_(!var<T, Alloc>::atomic && std::is_assignable<T&, U&&>()
-                                && std::is_constructible<T, U&&>())>
-        void write(var<T, Alloc>& dest_var, U&& u) const
-        {
-            rw_write(dest_var, (U &&) u);
+            return rw_read(src_var);
         }
 
         template<typename T,
                  typename Alloc,
                  typename U = T,
-                 LSTM_REQUIRES_(var<T, Alloc>::atomic&& std::is_assignable<T&, U&&>()
-                                && std::is_constructible<T, U&&>())>
+                 LSTM_REQUIRES_(std::is_assignable<T&, U&&>() && std::is_constructible<T, U&&>())>
         LSTM_ALWAYS_INLINE void write(var<T, Alloc>& dest_var, U&& u) const
         {
-            rw_atomic_write(dest_var, dest_var.allocate_construct((U &&) u));
+            rw_write(dest_var, (U &&) u);
         }
 
         template<typename T, typename Alloc, LSTM_REQUIRES_(!var<T, Alloc>::atomic)>
         LSTM_ALWAYS_INLINE const T& untracked_read(const var<T, Alloc>& src_var) const
         {
-            static_assert(std::is_reference<decltype(
-                              var<T, Alloc>::load(src_var.storage.load()))>{},
-                          "");
-            return var<T, Alloc>::load(rw_untracked_read(src_var));
+            return rw_untracked_read(src_var);
         }
 
         template<typename T, typename Alloc, LSTM_REQUIRES_(var<T, Alloc>::atomic)>
         LSTM_ALWAYS_INLINE T untracked_read(const var<T, Alloc>& src_var) const
         {
-            static_assert(!std::is_reference<decltype(
-                              var<T, Alloc>::load(src_var.storage.load()))>{},
-                          "");
-            return var<T, Alloc>::load(rw_untracked_read(src_var));
+            return rw_untracked_read(src_var);
         }
 
         // reading/writing an rvalue probably never makes sense
