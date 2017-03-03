@@ -52,6 +52,37 @@ LSTM_DETAIL_BEGIN
             return rw_read_slow_path(src_var);
         }
 
+        template<typename T,
+                 typename Alloc,
+                 typename U = T,
+                 LSTM_REQUIRES_(!var<T, Alloc>::atomic && std::is_assignable<T&, U&&>()
+                                && std::is_constructible<T, U&&>())>
+        LSTM_NOINLINE void rw_write_slow_path(var<T, Alloc>& dest_var, U&& u) const
+        {
+            const write_set_lookup lookup = tls_td->write_set.lookup(dest_var);
+            if (LSTM_LIKELY(!lookup.success())) {
+                const var_storage cur_storage = dest_var.storage.load(LSTM_ACQUIRE);
+                if (LSTM_LIKELY(rw_valid(dest_var.version_lock.load(LSTM_ACQUIRE)))) {
+                    const var_storage new_storage = dest_var.allocate_construct((U &&) u);
+                    tls_td->add_write_set(dest_var, new_storage, lookup.hash());
+                    tls_td->queue_succ_callback(
+                        [ alloc = dest_var.alloc(), cur_storage ]() mutable noexcept {
+                            var<T, Alloc>::destroy_deallocate(alloc, cur_storage);
+                        });
+                    tls_td->queue_fail_callback(
+                        [ alloc = dest_var.alloc(), new_storage ]() mutable noexcept {
+                            var<T, Alloc>::destroy_deallocate(alloc, new_storage);
+                        });
+                    return;
+                }
+            } else if (rw_valid(dest_var)) {
+                var<T>::store(lookup.pending_write(), (U &&) u);
+                return;
+            }
+
+            internal_retry();
+        }
+
         LSTM_NOINLINE void
         rw_atomic_write_slow_path(var_base& dest_var, const var_storage storage) const
         {
@@ -215,32 +246,31 @@ LSTM_DETAIL_BEGIN
                  typename U = T,
                  LSTM_REQUIRES_(!var<T, Alloc>::atomic && std::is_assignable<T&, U&&>()
                                 && std::is_constructible<T, U&&>())>
-        void rw_write(var<T, Alloc>& dest_var, U&& u) const
+        LSTM_NOINLINE_LUKEWARM void rw_write(var<T, Alloc>& dest_var, U&& u) const
         {
             assert(valid(*tls_td));
 
-            const write_set_lookup lookup = tls_td->write_set.lookup(dest_var);
-            if (LSTM_LIKELY(!lookup.success())) {
-                const var_storage cur_storage = dest_var.storage.load(LSTM_ACQUIRE);
-                if (LSTM_LIKELY(rw_valid(dest_var.version_lock.load(LSTM_ACQUIRE)))) {
-                    const var_storage new_storage = dest_var.allocate_construct((U &&) u);
-                    tls_td->add_write_set(dest_var, new_storage, lookup.hash());
-                    tls_td->queue_succ_callback(
-                        [ alloc = dest_var.alloc(), cur_storage ]() mutable noexcept {
-                            var<T, Alloc>::destroy_deallocate(alloc, cur_storage);
-                        });
-                    tls_td->queue_fail_callback(
-                        [ alloc = dest_var.alloc(), new_storage ]() mutable noexcept {
-                            var<T, Alloc>::destroy_deallocate(alloc, new_storage);
-                        });
-                    return;
-                }
-            } else if (rw_valid(dest_var)) {
-                var<T>::store(lookup.pending_write(), (U &&) u);
-                return;
-            }
+            const hash_t hash = dumb_reference_hash(dest_var);
 
-            internal_retry();
+            if (LSTM_UNLIKELY(tls_td->write_set.allocates_on_next_push()
+                              || (tls_td->write_set.filter() & hash)
+                              || tls_td->fail_callbacks.allocates_on_next_push()
+                              || tls_td->succ_callbacks.active().callbacks.allocates_on_next_push()
+                              || !rw_valid(dest_var))) {
+                rw_write_slow_path(dest_var, (U &&) u);
+            } else {
+                const var_storage new_storage = dest_var.allocate_construct((U &&) u);
+                tls_td->add_write_set_unchecked(dest_var, new_storage, hash);
+                const var_storage cur_storage = dest_var.storage.load(LSTM_RELAXED);
+                tls_td->fail_callbacks.unchecked_emplace_back(
+                    [ alloc = dest_var.alloc(), new_storage ]() mutable noexcept {
+                        var<T, Alloc>::destroy_deallocate(alloc, new_storage);
+                    });
+                tls_td->succ_callbacks.active().callbacks.unchecked_emplace_back(
+                    [ alloc = dest_var.alloc(), cur_storage ]() mutable noexcept {
+                        var<T, Alloc>::destroy_deallocate(alloc, cur_storage);
+                    });
+            }
         }
 
         template<typename T,

@@ -28,7 +28,7 @@ LSTM_BEGIN
         bool read_valid(const detail::var_base& v) const noexcept { return rw_valid(v); }
 
         template<typename T, typename Alloc, LSTM_REQUIRES_(!var<T, Alloc>::atomic)>
-        LSTM_NOINLINE const T& read(const var<T, Alloc>& src_var) const
+        LSTM_ALWAYS_INLINE const T& read(const var<T, Alloc>& src_var) const
         {
             return ro_read(src_var);
         }
