@@ -88,6 +88,7 @@ LSTM_DETAIL_BEGIN
                                                       transaction_domain& domain = default_domain(),
                                                       thread_data& tls_td = tls_thread_data()) const
         {
+            assert(!in_transaction() || in_read_write_transaction());
             if (tls_td.in_transaction())
                 return atomic_base_fn::call((Func &&) func, transaction{tls_td, tls_td.gp()});
 

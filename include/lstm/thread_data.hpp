@@ -12,7 +12,7 @@
 LSTM_DETAIL_BEGIN
     enum class tx_kind : char
     {
-        none,
+        none = 0,
         read_write,
         read_only
     };
