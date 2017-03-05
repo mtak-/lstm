@@ -92,6 +92,12 @@ LSTM_BEGIN
             write_set.push_back(&dest_var, pending_write, hash);
         }
 
+        void clear_read_write_sets() noexcept
+        {
+            read_set.clear();
+            write_set.clear();
+        }
+
         void do_succ_callbacks_front() noexcept
         {
             assert(!in_transaction());

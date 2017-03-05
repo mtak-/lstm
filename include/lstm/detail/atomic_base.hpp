@@ -35,10 +35,8 @@ LSTM_DETAIL_BEGIN
         {
             static_assert(kind != tx_kind::none);
 
-            if (kind != tx_kind::read_only) {
-                tls_td.write_set.clear();
-                tls_td.read_set.clear();
-            }
+            if (kind != tx_kind::read_only)
+                tls_td.clear_read_write_sets();
             tls_td.succ_callbacks.active().callbacks.clear();
             tls_td.do_fail_callbacks();
         }
@@ -47,8 +45,8 @@ LSTM_DETAIL_BEGIN
         [[noreturn]] static void unhandled_exception(thread_data& tls_td)
         {
             tls_td.access_unlock();
-            tx_failure<kind>(tls_td);
             tls_td.tx_state = tx_kind::none;
+            tx_failure<kind>(tls_td);
             throw;
         }
 
@@ -72,10 +70,8 @@ LSTM_DETAIL_BEGIN
             tls_td.access_unlock();
             tls_td.tx_state = tx_kind::none;
 
-            if (kind != tx_kind::read_only) {
-                tls_td.write_set.clear();
-                tls_td.read_set.clear();
-            }
+            if (kind != tx_kind::read_only)
+                tls_td.clear_read_write_sets();
             tls_td.fail_callbacks.clear();
             tls_td.reclaim(sync_version);
         }
