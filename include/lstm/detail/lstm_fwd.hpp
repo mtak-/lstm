@@ -125,9 +125,9 @@ LSTM_DETAIL_BEGIN
     using hash_t = std::uint64_t;
 
     struct commit_algorithm;
-    struct read_write_fn;
     struct var_base;
     struct transaction_base;
+    struct atomic_base_fn;
 
     template<std::size_t Padding>
     struct thread_gp_node;
@@ -135,6 +135,9 @@ LSTM_DETAIL_BEGIN
     struct tx_retry
     {
     };
+
+    template<typename T>
+    constexpr const T static_const{};
 
     template<typename T>
     using uncvref = std::remove_cv_t<std::remove_reference_t<T>>;
@@ -245,11 +248,11 @@ LSTM_DETAIL_BEGIN
     {
     };
 
-    template<typename Func>
-    using callable_with_tx_ = decltype(std::declval<Func>()(std::declval<const transaction&>()));
+    template<typename Func, typename Tx>
+    using callable_with_tx_ = decltype(std::declval<Func>()(std::declval<const Tx&>()));
 
-    template<typename Func>
-    using callable_with_tx = supports<callable_with_tx_, Func>;
+    template<typename Func, typename Tx>
+    using callable_with_tx = supports<callable_with_tx_, Func, Tx>;
 
     template<typename Func>
     using callable_ = decltype(std::declval<Func>()());
@@ -257,51 +260,55 @@ LSTM_DETAIL_BEGIN
     template<typename Func>
     using callable = supports<callable_, Func>;
 
-    template<typename Func, bool = callable_with_tx<Func>{}(), bool = callable<Func>{}()>
+    template<typename Func,
+             typename Tx,
+             bool = callable_with_tx<Func, Tx>{}(),
+             bool = callable<Func>{}()>
     struct transact_result_impl;
 
-    template<typename Func, bool b>
-    struct transact_result_impl<Func, true, b>
+    template<typename Func, typename Tx, bool b>
+    struct transact_result_impl<Func, Tx, true, b>
     {
-        using type = decltype(std::declval<Func>()(std::declval<const transaction&>()));
-        static constexpr bool nothrow
-            = noexcept(std::declval<Func>()(std::declval<const transaction&>()));
+        using type                    = decltype(std::declval<Func>()(std::declval<const Tx&>()));
+        static constexpr bool nothrow = noexcept(std::declval<Func>()(std::declval<const Tx&>()));
     };
 
-    template<typename Func>
-    struct transact_result_impl<Func, false, true>
+    template<typename Func, typename Tx>
+    struct transact_result_impl<Func, Tx, false, true>
     {
         using type                    = decltype(std::declval<Func>()());
         static constexpr bool nothrow = noexcept(std::declval<Func>()());
     };
 
-    template<typename Func>
-    using transact_result = typename transact_result_impl<Func>::type;
+    template<typename Func, typename Tx>
+    using transact_result = typename transact_result_impl<Func, Tx>::type;
 
-    template<typename Func>
-    constexpr bool transact_nothrow = transact_result_impl<Func>::nothrow;
+    template<typename Func, typename Tx>
+    constexpr bool transact_nothrow = transact_result_impl<Func, Tx>::nothrow;
 
-    template<typename Func, typename = void>
+    template<typename Func, typename Tx, typename = void>
     struct is_void_transact_function : std::false_type
     {
     };
 
-    template<typename Func>
-    struct is_void_transact_function<Func, std::enable_if_t<std::is_void<transact_result<Func>>{}>>
+    template<typename Func, typename Tx>
+    struct is_void_transact_function<Func,
+                                     Tx,
+                                     std::enable_if_t<std::is_void<transact_result<Func, Tx>>{}>>
         : std::true_type
     {
     };
 
-    template<typename Func>
-    using is_transact_function = supports<transact_result, Func>;
+    template<typename Func, typename Tx>
+    using is_transact_function = supports<transact_result, Func, Tx>;
 
-    template<typename Func, typename = void>
+    template<typename Func, typename Tx, typename = void>
     struct is_nothrow_transact_function : std::false_type
     {
     };
 
-    template<typename Func>
-    struct is_nothrow_transact_function<Func, std::enable_if_t<transact_nothrow<Func>>>
+    template<typename Func, typename Tx>
+    struct is_nothrow_transact_function<Func, Tx, std::enable_if_t<transact_nothrow<Func, Tx>>>
         : std::true_type
     {
     };

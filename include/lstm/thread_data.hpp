@@ -9,11 +9,20 @@
 #include <lstm/detail/var_detail.hpp>
 #include <lstm/detail/write_set_value_type.hpp>
 
+LSTM_DETAIL_BEGIN
+    enum class tx_kind : char
+    {
+        none,
+        read_write,
+        read_only
+    };
+LSTM_DETAIL_END
+
 LSTM_BEGIN
     struct LSTM_CACHE_ALIGNED thread_data
     {
     private:
-        friend detail::read_write_fn;
+        friend detail::atomic_base_fn;
         friend detail::commit_algorithm;
         friend detail::transaction_base;
 
@@ -31,7 +40,7 @@ LSTM_BEGIN
             write_set_t                 b;
             callbacks_t                 c;
             detail::succ_callbacks_t<4> d;
-            bool                        e;
+            detail::tx_kind             e;
             int*                        desired;
         };
         static constexpr std::size_t tgp_cache_line_offset
@@ -41,13 +50,13 @@ LSTM_BEGIN
         write_set_t                                   write_set;
         callbacks_t                                   fail_callbacks;
         detail::succ_callbacks_t<4>                   succ_callbacks;
-        bool                                          in_transaction_;
+        detail::tx_kind                               tx_state;
         detail::thread_gp_node<tgp_cache_line_offset> tgp_node;
 
         void remove_read_set(const detail::var_base& src_var) noexcept
         {
             assert(in_critical_section());
-            assert(in_transaction());
+            assert(in_read_write_transaction());
 
             const read_set_const_iter begin = read_set.begin();
             for (read_set_const_iter read_iter = read_set.end(); read_iter != begin;) {
@@ -63,7 +72,7 @@ LSTM_BEGIN
         {
             assert(!write_set.allocates_on_next_push());
             assert(in_critical_section());
-            assert(in_transaction());
+            assert(in_read_write_transaction());
 
             remove_read_set(dest_var);
             write_set.unchecked_push_back(&dest_var, pending_write, hash);
@@ -77,7 +86,7 @@ LSTM_BEGIN
                                                                              hash)))
         {
             assert(in_critical_section());
-            assert(in_transaction());
+            assert(in_read_write_transaction());
 
             remove_read_set(dest_var);
             write_set.push_back(&dest_var, pending_write, hash);
@@ -141,7 +150,7 @@ LSTM_BEGIN
 
     public:
         LSTM_NOINLINE thread_data() noexcept
-            : in_transaction_(false)
+            : tx_state(detail::tx_kind::none)
         {
         }
 
@@ -160,11 +169,22 @@ LSTM_BEGIN
                 reclaim_all();
         }
 
-        LSTM_ALWAYS_INLINE bool in_transaction() const noexcept { return in_transaction_; }
+        LSTM_ALWAYS_INLINE bool in_transaction() const noexcept
+        {
+            return tx_state != detail::tx_kind::none;
+        }
+
+        LSTM_ALWAYS_INLINE bool in_read_write_transaction() const noexcept
+        {
+            return tx_state == detail::tx_kind::read_write;
+        }
+
         LSTM_ALWAYS_INLINE bool in_critical_section() const noexcept
         {
             return tgp_node.in_critical_section();
         }
+
+        LSTM_ALWAYS_INLINE detail::tx_kind tx_kind() const noexcept { return tx_state; }
 
         LSTM_ALWAYS_INLINE gp_t gp() const noexcept { return tgp_node.gp(); }
 

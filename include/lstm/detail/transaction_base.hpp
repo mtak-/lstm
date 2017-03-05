@@ -196,6 +196,15 @@ LSTM_DETAIL_BEGIN
 
         void reset_version(const gp_t new_version) noexcept
         {
+#ifndef NDEBUG
+            // TODO: could these asserts fail for correct code?
+            if (tls_td) {
+                assert(tls_td->write_set.empty());
+                assert(tls_td->read_set.empty());
+                assert(tls_td->fail_callbacks.empty());
+                assert(tls_td->succ_callbacks.active().callbacks.empty());
+            }
+#endif
             assert(version_ <= new_version);
 
             version_ = new_version;
@@ -209,7 +218,9 @@ LSTM_DETAIL_BEGIN
 
         bool valid(const thread_data& td) const noexcept
         {
-            return (!tls_td || &td == tls_td) && td.gp() == version_ && td.in_transaction();
+            return ((!tls_td && td.tx_state != tx_kind::read_write)
+                    || (&td == tls_td && td.tx_state != tx_kind::read_only))
+                   && td.gp() == version_ && td.in_transaction();
         }
 
         bool rw_valid(const gp_t version) const noexcept { return version <= version_; }
