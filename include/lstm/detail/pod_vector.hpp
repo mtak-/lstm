@@ -106,7 +106,7 @@ LSTM_DETAIL_BEGIN
 
         void clear() noexcept { end_ = begin_; }
 
-        void shrink_to_fit() noexcept(has_noexcept_alloc)
+        LSTM_NOINLINE void shrink_to_fit() noexcept(has_noexcept_alloc)
         {
             const uword new_capacity = size() + 1;
             if (new_capacity != capacity()) {

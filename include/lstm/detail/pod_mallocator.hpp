@@ -22,8 +22,10 @@ LSTM_DETAIL_BEGIN
 
         T* allocate(std::size_t n) noexcept
         {
-            T* result = (T*)std::malloc(sizeof(T) * n);
+            T* const result = (T*)std::malloc(sizeof(T) * n);
             assert(result);
+            if (!result)
+                std::terminate();
             return result;
         }
 
