@@ -3,8 +3,6 @@
 
 #include <lstm/detail/pod_mallocator.hpp>
 
-#include <cassert>
-
 LSTM_DETAIL_BEGIN
     // this class never calls construct/destroy... there's no need for POD types
     // if an allocator "requires" construct/destroy to be called, it will be in for

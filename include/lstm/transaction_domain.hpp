@@ -4,7 +4,6 @@
 #include <lstm/detail/lstm_fwd.hpp>
 
 #include <atomic>
-#include <cassert>
 
 LSTM_BEGIN
     struct transaction_domain

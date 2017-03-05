@@ -3,8 +3,6 @@
 
 #include <lstm/detail/lstm_fwd.hpp>
 
-#include <cassert>
-
 LSTM_DETAIL_BEGIN
     struct read_set_value_type
     {

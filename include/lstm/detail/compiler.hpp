@@ -284,6 +284,20 @@
 #  endif /* NDEBUG */
 /******************* end inline *******************/
 
+#  ifndef NDEBUG
+#    include <cassert>
+#    define LSTM_ASSERT(a) assert(a)
+#  else
+#    if LSTM_COMPILER_IS_MSVC
+#      define LSTM_ASSERT(a) __assume(a)
+#    elif LSTM_COMPILER_IS_Clang || LSTM_COMPILER_IS_GNU || LSTM_COMPILER_IS_AppleClang
+#      define LSTM_ASSERT(a) do { if (a) __builtin_unreachable(); } while(0)
+#    else
+#      include <cassert>
+#      define LSTM_ASSERT(a) assert(a)
+#    endif
+#  endif
+
 #endif
 // clang-format off
 

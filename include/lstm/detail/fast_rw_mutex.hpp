@@ -3,8 +3,6 @@
 
 #include <lstm/detail/backoff.hpp>
 
-#include <cassert>
-
 LSTM_DETAIL_BEGIN
     // this class is probly best for use in otherwise wait-free write side algorithms
     struct fast_rw_mutex

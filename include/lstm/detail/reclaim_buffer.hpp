@@ -5,8 +5,6 @@
 #include <lstm/detail/gp_callback.hpp>
 #include <lstm/detail/pod_vector.hpp>
 
-#include <cassert>
-
 LSTM_DETAIL_BEGIN
     struct succ_callback_t
     {

@@ -3,7 +3,6 @@
 
 #include <lstm/detail/lstm_fwd.hpp>
 
-#include <cassert>
 #include <cstdlib>
 
 LSTM_DETAIL_BEGIN
