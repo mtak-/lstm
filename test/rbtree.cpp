@@ -76,7 +76,7 @@ int main()
                         for (int i = iter_count / (thread_count / 2); i >= 0; --i) {
                             lstm::read_only(
                                 [&data, &intmap, &tls_td, i, t](const lstm::read_transaction tx) {
-                                    intmap.find(tx, data[i + t * iter_count / (thread_count / 2)]);
+                                    intmap.find(tx, data[i + (t / 2) * iter_count / (thread_count / 2)]);
                                 });
                         }
                     });
@@ -113,7 +113,7 @@ int main()
                         for (int i = iter_count / (thread_count / 2); i >= 0; --i) {
                             lstm::read_only(
                                 [&data, &intmap, &tls_td, i, t](const lstm::read_transaction tx) {
-                                    intmap.find(tx, data[i + t * iter_count / (thread_count / 2)]);
+                                    intmap.find(tx, data[i + (t / 2) * iter_count / (thread_count / 2)]);
                                 });
                         }
                     });
