@@ -494,15 +494,15 @@ LSTM_BEGIN
             }
         }
 
-        node_t* find(const transaction tx, const Key& u) const
+        node_t* find(const read_transaction tx, const Key& u) const
         {
-            node_t* cur = (node_t*)tx.read(root_);
+            node_t* cur = (node_t*)tx.untracked_read(root_);
             while (cur) {
-                const auto& key = tx.read(cur->key);
+                const auto& key = tx.untracked_read(cur->key);
                 if (compare(u, key))
-                    cur = (node_t*)tx.read(cur->left_);
+                    cur = (node_t*)tx.untracked_read(cur->left_);
                 else if (compare(key, u))
-                    cur = (node_t*)tx.read(cur->right_);
+                    cur = (node_t*)tx.untracked_read(cur->right_);
                 else
                     break;
             }
@@ -517,7 +517,7 @@ LSTM_BEGIN
 
         bool erase_one(const transaction tx, const Key& key)
         {
-            if (auto to_erase = find(tx, key)) {
+            if (auto to_erase = find(tx.unsafe_checked_demote(), key)) {
                 erase_impl(tx, to_erase);
                 return true;
             }

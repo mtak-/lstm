@@ -27,7 +27,7 @@ auto get_loop(philosopher& p, fork& f0, fork& f1)
     return [&] {
         while (p.food != 0) {
             read_write([&](const lstm::transaction tx) {
-                if (!tx.read(f0.in_use) && !tx.read(f1.in_use)) {
+                if (!tx.untracked_read(f0.in_use) && !tx.untracked_read(f1.in_use)) {
                     tx.write(f0.in_use, true);
                     tx.write(f1.in_use, true);
                 } else

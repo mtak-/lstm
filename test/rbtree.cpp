@@ -5,10 +5,34 @@
 
 #include <random>
 
-static constexpr int iter_count   = LSTM_TEST_INIT(1000000, 1000);
+static constexpr int iter_count   = LSTM_TEST_INIT(500000, 1000);
 static constexpr int loop_count   = LSTM_TEST_INIT(1, 1);
 static constexpr int thread_count = 8;
 static_assert(iter_count % thread_count == 0, "");
+
+template<typename T>
+struct SimpleAllocator
+{
+    using value_type = T;
+
+    constexpr SimpleAllocator() noexcept = default;
+
+    template<typename U, LSTM_REQUIRES_(!std::is_same<T, U>{})>
+    LSTM_ALWAYS_INLINE constexpr SimpleAllocator(const SimpleAllocator<U>&) noexcept
+    {
+    }
+
+    LSTM_ALWAYS_INLINE T* allocate(std::size_t n) const noexcept
+    {
+        return (T*)std::malloc(sizeof(T) * n);
+    }
+    constexpr LSTM_ALWAYS_INLINE void deallocate(T*, std::size_t) const noexcept {}
+};
+
+template<typename T, typename U>
+bool operator==(const SimpleAllocator<T>&, const SimpleAllocator<U>&);
+template<typename T, typename U>
+bool operator!=(const SimpleAllocator<T>&, const SimpleAllocator<U>&);
 
 LSTM_NOINLINE std::vector<int> get_data()
 {
@@ -28,22 +52,34 @@ int main()
 {
     auto data = get_data();
     for (int loop = 0; loop < loop_count; ++loop) {
-        lstm::rbtree<int, int> intmap;
+        lstm::rbtree<int, int, std::less<>, SimpleAllocator<std::pair<int, int>>> intmap;
         {
             thread_manager manager;
 
             for (int t = 0; t < thread_count; ++t) {
-                manager.queue_thread([&intmap, &data, t] {
-                    lstm::thread_data& tls_td = lstm::tls_thread_data();
-                    for (int i = 0; i < iter_count / thread_count; ++i) {
-                        lstm::read_write([&data, &intmap, &tls_td, i, t](
-                            const lstm::transaction tx) {
-                            intmap.emplace(tx,
-                                           data[i + t * iter_count / thread_count],
-                                           data[i + t * iter_count / thread_count + iter_count]);
-                        });
-                    }
-                });
+                if (t < thread_count / 2)
+                    manager.queue_thread([&intmap, &data, t] {
+                        lstm::thread_data& tls_td = lstm::tls_thread_data();
+                        for (int i = 0; i < iter_count / (thread_count / 2); ++i) {
+                            lstm::read_write(
+                                [&data, &intmap, &tls_td, i, t](const lstm::transaction tx) {
+                                    intmap.emplace(tx,
+                                                   data[i + t * iter_count / (thread_count / 2)],
+                                                   data[i + t * iter_count / (thread_count / 2)
+                                                        + iter_count]);
+                                });
+                        }
+                    });
+                else
+                    manager.queue_thread([&intmap, &data, t] {
+                        lstm::thread_data& tls_td = lstm::tls_thread_data();
+                        for (int i = iter_count / (thread_count / 2); i >= 0; --i) {
+                            lstm::read_only(
+                                [&data, &intmap, &tls_td, i, t](const lstm::read_transaction tx) {
+                                    intmap.find(tx, data[i + t * iter_count / (thread_count / 2)]);
+                                });
+                        }
+                    });
             }
 
             auto start = std::chrono::high_resolution_clock::now();
@@ -61,15 +97,26 @@ int main()
             thread_manager manager;
 
             for (int t = 0; t < thread_count; ++t) {
-                manager.queue_thread([&intmap, &data, t] {
-                    lstm::thread_data& tls_td = lstm::tls_thread_data();
-                    for (int i = iter_count / thread_count; i >= 0; --i) {
-                        lstm::read_write(
-                            [&data, &intmap, &tls_td, i, t](const lstm::transaction tx) {
-                                intmap.erase_one(tx, data[i + t * iter_count / thread_count]);
+                if (t < thread_count / 2)
+                    manager.queue_thread([&intmap, &data, t] {
+                        lstm::thread_data& tls_td = lstm::tls_thread_data();
+                        for (int i = iter_count / (thread_count / 2); i >= 0; --i) {
+                            lstm::read_write([&data, &intmap, &tls_td, i, t](
+                                const lstm::transaction tx) {
+                                intmap.erase_one(tx, data[i + t * iter_count / (thread_count / 2)]);
                             });
-                    }
-                });
+                        }
+                    });
+                else
+                    manager.queue_thread([&intmap, &data, t] {
+                        lstm::thread_data& tls_td = lstm::tls_thread_data();
+                        for (int i = iter_count / (thread_count / 2); i >= 0; --i) {
+                            lstm::read_only(
+                                [&data, &intmap, &tls_td, i, t](const lstm::read_transaction tx) {
+                                    intmap.find(tx, data[i + t * iter_count / (thread_count / 2)]);
+                                });
+                        }
+                    });
             }
 
             auto start = std::chrono::high_resolution_clock::now();
