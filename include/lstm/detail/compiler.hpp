@@ -284,6 +284,7 @@
 #  endif /* NDEBUG */
 /******************* end inline *******************/
 
+/********************* assert *********************/
 #  ifndef NDEBUG
 #    include <cassert>
 #    define LSTM_ASSERT(a) assert(a)
@@ -291,12 +292,31 @@
 #    if LSTM_COMPILER_IS_MSVC
 #      define LSTM_ASSERT(a) __assume(a)
 #    elif LSTM_COMPILER_IS_Clang || LSTM_COMPILER_IS_GNU || LSTM_COMPILER_IS_AppleClang
-#      define LSTM_ASSERT(a) do { if (a) __builtin_unreachable(); } while(0)
+#      define LSTM_ASSERT(a) __builtin_assume(a)
 #    else
 #      include <cassert>
 #      define LSTM_ASSERT(a) assert(a)
 #    endif
 #  endif
+/******************* end assert *******************/
+
+/********************** pure **********************/
+#  ifndef NDEBUG
+#    define LSTM_PURE /**/
+#    define LSTM_CONST /**/
+#  else
+#    if LSTM_COMPILER_IS_MSVC
+#      define LSTM_PURE /**/
+#      define LSTM_CONST /**/
+#    elif LSTM_COMPILER_IS_Clang || LSTM_COMPILER_IS_GNU || LSTM_COMPILER_IS_AppleClang
+#      define LSTM_PURE __attribute__((pure))
+#      define LSTM_CONST __attribute__((const))
+#    else
+#      define LSTM_PURE /**/
+#      define LSTM_CONST /**/
+#    endif
+#  endif
+/******************** end pure ********************/
 
 #endif
 // clang-format off

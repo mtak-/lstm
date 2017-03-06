@@ -27,13 +27,13 @@ LSTM_DETAIL_BEGIN
 
         bool push_is_full(const gp_t version) noexcept
         {
-            assert(!active().callbacks.empty());
+            LSTM_ASSERT(!active().callbacks.empty());
             active().version = version;
 
             end = (end + 1) % StackCount;
 
             const bool result = end == start;
-            assert(active().callbacks.empty() || result);
+            LSTM_ASSERT(active().callbacks.empty() || result);
             return result;
         }
 

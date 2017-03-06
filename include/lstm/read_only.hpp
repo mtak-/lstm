@@ -18,14 +18,14 @@ LSTM_DETAIL_BEGIN
 
             while (true) {
                 try {
-                    assert(valid_start_state(tls_td));
+                    LSTM_ASSERT(valid_start_state(tls_td));
 
                     transact_result<Func, read_transaction> result = atomic_base_fn::call(func, tx);
 
                     // commit does not throw
                     tx_success<tx_kind::read_only>(tls_td, 0);
-                    assert(valid_start_state(tls_td));
-                    assert(!tls_td.in_critical_section());
+                    LSTM_ASSERT(valid_start_state(tls_td));
+                    LSTM_ASSERT(!tls_td.in_critical_section());
 
                     if (std::is_reference<transact_result<Func, read_transaction>>{})
                         return static_cast<transact_result<Func, read_transaction>&&>(result);
@@ -50,14 +50,14 @@ LSTM_DETAIL_BEGIN
 
             while (true) {
                 try {
-                    assert(valid_start_state(tls_td));
+                    LSTM_ASSERT(valid_start_state(tls_td));
 
                     atomic_base_fn::call(func, tx);
 
                     // commit does not throw
                     tx_success<tx_kind::read_only>(tls_td, 0);
-                    assert(valid_start_state(tls_td));
-                    assert(!tls_td.in_critical_section());
+                    LSTM_ASSERT(valid_start_state(tls_td));
+                    LSTM_ASSERT(!tls_td.in_critical_section());
 
                     return;
                 } catch (const tx_retry&) {

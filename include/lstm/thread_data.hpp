@@ -55,8 +55,8 @@ LSTM_BEGIN
 
         void remove_read_set(const detail::var_base& src_var) noexcept
         {
-            assert(in_critical_section());
-            assert(in_read_write_transaction());
+            LSTM_ASSERT(in_critical_section());
+            LSTM_ASSERT(in_read_write_transaction());
 
             const read_set_const_iter begin = read_set.begin();
             for (read_set_const_iter read_iter = read_set.end(); read_iter != begin;) {
@@ -70,9 +70,9 @@ LSTM_BEGIN
                                      const detail::var_storage pending_write,
                                      const detail::hash_t      hash) noexcept
         {
-            assert(!write_set.allocates_on_next_push());
-            assert(in_critical_section());
-            assert(in_read_write_transaction());
+            LSTM_ASSERT(!write_set.allocates_on_next_push());
+            LSTM_ASSERT(in_critical_section());
+            LSTM_ASSERT(in_read_write_transaction());
 
             remove_read_set(dest_var);
             write_set.unchecked_push_back(&dest_var, pending_write, hash);
@@ -85,8 +85,8 @@ LSTM_BEGIN
                                                                              pending_write,
                                                                              hash)))
         {
-            assert(in_critical_section());
-            assert(in_read_write_transaction());
+            LSTM_ASSERT(in_critical_section());
+            LSTM_ASSERT(in_read_write_transaction());
 
             remove_read_set(dest_var);
             write_set.push_back(&dest_var, pending_write, hash);
@@ -100,8 +100,8 @@ LSTM_BEGIN
 
         void do_succ_callbacks_front() noexcept
         {
-            assert(!in_transaction());
-            assert(!in_critical_section());
+            LSTM_ASSERT(!in_transaction());
+            LSTM_ASSERT(!in_critical_section());
 
             callbacks_t& callbacks = succ_callbacks.front().callbacks;
             succ_callbacks.pop_front();
@@ -119,15 +119,17 @@ LSTM_BEGIN
             for (callbacks_iter riter = fail_callbacks.end(); riter != begin;)
                 (*--riter)();
 
-            assert(fail_start_size == fail_callbacks.size());
+#ifndef NDEBUG
+            LSTM_ASSERT(fail_start_size == fail_callbacks.size());
+#endif
 
             fail_callbacks.clear();
         }
 
         void reclaim_all() noexcept
         {
-            assert(!in_transaction());
-            assert(!in_critical_section());
+            LSTM_ASSERT(!in_transaction());
+            LSTM_ASSERT(!in_critical_section());
 
             synchronize_min_gp(succ_callbacks.back().version);
             do {
@@ -137,8 +139,8 @@ LSTM_BEGIN
 
         LSTM_ALWAYS_INLINE void reclaim_all_possible(const gp_t min_gp) noexcept
         {
-            assert(!in_transaction());
-            assert(!in_critical_section());
+            LSTM_ASSERT(!in_transaction());
+            LSTM_ASSERT(!in_critical_section());
 
             do {
                 do_succ_callbacks_front();
@@ -147,8 +149,8 @@ LSTM_BEGIN
 
         LSTM_NOINLINE void reclaim_slow_path() noexcept
         {
-            assert(!in_transaction());
-            assert(!in_critical_section());
+            LSTM_ASSERT(!in_transaction());
+            LSTM_ASSERT(!in_critical_section());
 
             const gp_t min_gp = synchronize_min_gp(succ_callbacks.front().version);
             reclaim_all_possible(min_gp);
@@ -165,11 +167,11 @@ LSTM_BEGIN
 
         LSTM_NOINLINE ~thread_data() noexcept
         {
-            assert(!in_transaction());
-            assert(read_set.empty());
-            assert(write_set.empty());
-            assert(fail_callbacks.empty());
-            assert(succ_callbacks.active().callbacks.empty());
+            LSTM_ASSERT(!in_transaction());
+            LSTM_ASSERT(read_set.empty());
+            LSTM_ASSERT(write_set.empty());
+            LSTM_ASSERT(fail_callbacks.empty());
+            LSTM_ASSERT(succ_callbacks.active().callbacks.empty());
 
             if (!succ_callbacks.empty())
                 reclaim_all();
@@ -196,7 +198,7 @@ LSTM_BEGIN
 
         LSTM_ALWAYS_INLINE void access_lock(const gp_t gp) noexcept
         {
-            assert(!in_transaction());
+            LSTM_ASSERT(!in_transaction());
             tgp_node.access_lock(gp);
         }
 
@@ -214,7 +216,7 @@ LSTM_BEGIN
 
         LSTM_ALWAYS_INLINE gp_t synchronize_min_gp(const gp_t sync_version) const noexcept
         {
-            assert(!in_transaction());
+            LSTM_ASSERT(!in_transaction());
             return tgp_node.synchronize_min_gp(sync_version);
         }
 
@@ -223,7 +225,7 @@ LSTM_BEGIN
         void queue_succ_callback(Func&& func) noexcept(
             noexcept(succ_callbacks.active().callbacks.emplace_back((Func &&) func)))
         {
-            assert(in_transaction());
+            LSTM_ASSERT(in_transaction());
             succ_callbacks.active().callbacks.emplace_back((Func &&) func);
         }
 
@@ -233,16 +235,16 @@ LSTM_BEGIN
         queue_fail_callback(Func&& func) noexcept(noexcept(fail_callbacks.emplace_back((Func &&)
                                                                                            func)))
         {
-            assert(in_transaction());
+            LSTM_ASSERT(in_transaction());
             fail_callbacks.emplace_back((Func &&) func);
         }
 
         void reclaim(const gp_t sync_version) noexcept
         {
-            assert(!in_critical_section());
-            assert(!in_transaction());
-            assert(sync_version != detail::off_state);
-            assert(!detail::locked(sync_version));
+            LSTM_ASSERT(!in_critical_section());
+            LSTM_ASSERT(!in_transaction());
+            LSTM_ASSERT(sync_version != detail::off_state);
+            LSTM_ASSERT(!detail::locked(sync_version));
 
             detail::succ_callback_t& active_buf = succ_callbacks.active();
             if (active_buf.callbacks.empty())

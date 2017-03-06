@@ -45,7 +45,7 @@ LSTM_DETAIL_BEGIN
                                                           LSTM_ACQUIRE,
                                                           LSTM_RELAXED));
 
-            assert(read_locked(read_count.load(LSTM_RELAXED)));
+            LSTM_ASSERT(read_locked(read_count.load(LSTM_RELAXED)));
         }
 
         LSTM_NOINLINE void lock_slow_path() noexcept
@@ -87,7 +87,7 @@ LSTM_DETAIL_BEGIN
         }
 
 #ifndef NDEBUG
-        ~fast_rw_mutex() noexcept { assert(unlocked(read_count.load(LSTM_RELAXED))); }
+        ~fast_rw_mutex() noexcept { LSTM_ASSERT(unlocked(read_count.load(LSTM_RELAXED))); }
 #endif /* NDEBUG */
 
         LSTM_ALWAYS_INLINE void lock_shared() noexcept
@@ -100,7 +100,7 @@ LSTM_DETAIL_BEGIN
         {
             const uint_t prev = read_count.fetch_sub(1, LSTM_RELEASE);
             (void)prev;
-            assert(read_locked(prev));
+            LSTM_ASSERT(read_locked(prev));
         }
 
         void lock() noexcept
@@ -115,7 +115,7 @@ LSTM_DETAIL_BEGIN
         {
             uint_t prev = read_count.fetch_and(read_mask, LSTM_RELEASE);
             (void)prev;
-            assert(write_locked(prev));
+            LSTM_ASSERT(write_locked(prev));
         }
     };
 LSTM_DETAIL_END

@@ -18,7 +18,7 @@ LSTM_DETAIL_BEGIN
 
             while (true) {
                 try {
-                    assert(valid_start_state(tls_td));
+                    LSTM_ASSERT(valid_start_state(tls_td));
 
                     transact_result<Func, transaction> result = atomic_base_fn::call(func, tx);
 
@@ -27,8 +27,8 @@ LSTM_DETAIL_BEGIN
                     if ((sync_version = detail::commit_algorithm::try_commit(tx, domain))
                         != commit_failed) {
                         tx_success<tx_kind::read_write>(tls_td, sync_version);
-                        assert(valid_start_state(tls_td));
-                        assert(!tls_td.in_critical_section());
+                        LSTM_ASSERT(valid_start_state(tls_td));
+                        LSTM_ASSERT(!tls_td.in_critical_section());
 
                         if (std::is_reference<transact_result<Func, transaction>>{})
                             return static_cast<transact_result<Func, transaction>&&>(result);
@@ -53,7 +53,7 @@ LSTM_DETAIL_BEGIN
 
             while (true) {
                 try {
-                    assert(valid_start_state(tls_td));
+                    LSTM_ASSERT(valid_start_state(tls_td));
 
                     atomic_base_fn::call(func, tx);
 
@@ -62,8 +62,8 @@ LSTM_DETAIL_BEGIN
                     if ((sync_version = detail::commit_algorithm::try_commit(tx, domain))
                         != commit_failed) {
                         tx_success<tx_kind::read_write>(tls_td, sync_version);
-                        assert(valid_start_state(tls_td));
-                        assert(!tls_td.in_critical_section());
+                        LSTM_ASSERT(valid_start_state(tls_td));
+                        LSTM_ASSERT(!tls_td.in_critical_section());
 
                         return;
                     }
@@ -88,7 +88,7 @@ LSTM_DETAIL_BEGIN
                                                       transaction_domain& domain = default_domain(),
                                                       thread_data& tls_td = tls_thread_data()) const
         {
-            assert(!in_transaction() || in_read_write_transaction());
+            LSTM_ASSERT(!tls_td.in_transaction() || tls_td.in_read_write_transaction());
             if (tls_td.in_transaction())
                 return atomic_base_fn::call((Func &&) func, transaction{tls_td, tls_td.gp()});
 

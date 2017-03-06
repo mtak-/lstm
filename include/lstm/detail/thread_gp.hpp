@@ -98,8 +98,8 @@ LSTM_DETAIL_BEGIN
     public:
         thread_gp_node() noexcept
         {
-            assert(std::uintptr_t(&next) % LSTM_CACHE_LINE_SIZE == 0);
-            assert(std::uintptr_t(&active) % LSTM_CACHE_LINE_SIZE == 0);
+            LSTM_ASSERT(std::uintptr_t(&next) % LSTM_CACHE_LINE_SIZE == 0);
+            LSTM_ASSERT(std::uintptr_t(&active) % LSTM_CACHE_LINE_SIZE == 0);
 
             active.store(off_state, LSTM_RELEASE);
 
@@ -117,15 +117,15 @@ LSTM_DETAIL_BEGIN
 
         ~thread_gp_node() noexcept
         {
-            assert(!in_critical_section());
+            LSTM_ASSERT(!in_critical_section());
 
             lock_all(); // this->mut gets locked here
             {
                 thread_gp_node** indirect = &global_tgp_list<CacheLineOffset>.root;
-                assert(*indirect);
+                LSTM_ASSERT(*indirect);
                 while (*indirect != this) {
                     indirect = &(*indirect)->next;
-                    assert(*indirect);
+                    LSTM_ASSERT(*indirect);
                 }
                 *indirect = next;
             }
@@ -142,8 +142,8 @@ LSTM_DETAIL_BEGIN
 
         inline void access_lock(const gp_t gp) noexcept
         {
-            assert(!in_critical_section());
-            assert(gp != off_state);
+            LSTM_ASSERT(!in_critical_section());
+            LSTM_ASSERT(gp != off_state);
 
             active.store(gp, LSTM_RELEASE);
             std::atomic_thread_fence(LSTM_ACQUIRE);
@@ -151,9 +151,9 @@ LSTM_DETAIL_BEGIN
 
         inline void access_relock(const gp_t gp) noexcept
         {
-            assert(in_critical_section());
-            assert(gp != off_state);
-            assert(active.load(LSTM_RELAXED) <= gp);
+            LSTM_ASSERT(in_critical_section());
+            LSTM_ASSERT(gp != off_state);
+            LSTM_ASSERT(active.load(LSTM_RELAXED) <= gp);
 
             active.store(gp, LSTM_RELEASE);
             std::atomic_thread_fence(LSTM_ACQUIRE);
@@ -161,7 +161,7 @@ LSTM_DETAIL_BEGIN
 
         inline void access_unlock() noexcept
         {
-            assert(in_critical_section());
+            LSTM_ASSERT(in_critical_section());
             active.store(off_state, LSTM_RELEASE);
         }
 
@@ -174,8 +174,8 @@ LSTM_DETAIL_BEGIN
         // TODO: allow specifying a backoff strategy
         inline gp_t synchronize_min_gp(const gp_t gp) const noexcept
         {
-            assert(!in_critical_section());
-            assert(gp != off_state);
+            LSTM_ASSERT(!in_critical_section());
+            LSTM_ASSERT(gp != off_state);
 
             gp_t result;
 

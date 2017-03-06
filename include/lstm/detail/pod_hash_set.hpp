@@ -115,8 +115,8 @@ LSTM_DETAIL_BEGIN
                   const var_storage pending_write,
                   const hash_t hash) noexcept(noexcept(data.emplace_back(value, pending_write)))
         {
-            assert(hash != 0);
-            assert(find(*value) == end());
+            LSTM_ASSERT(hash != 0);
+            LSTM_ASSERT(find(*value) == end());
 
             filter_ |= hash;
             data.emplace_back(value, pending_write);
@@ -127,8 +127,8 @@ LSTM_DETAIL_BEGIN
             const var_storage pending_write,
             const hash_t hash) noexcept(noexcept(data.unchecked_emplace_back(value, pending_write)))
         {
-            assert(hash != 0);
-            assert(find(*value) == end());
+            LSTM_ASSERT(hash != 0);
+            LSTM_ASSERT(find(*value) == end());
 
             filter_ |= hash;
             data.unchecked_emplace_back(value, pending_write);
@@ -137,7 +137,7 @@ LSTM_DETAIL_BEGIN
         void push_back(const var_base* const value,
                        const hash_t          hash) noexcept(noexcept(data.emplace_back(value)))
         {
-            assert(hash != 0);
+            LSTM_ASSERT(hash != 0);
             filter_ |= hash;
             data.emplace_back(value);
         }
@@ -145,7 +145,7 @@ LSTM_DETAIL_BEGIN
         void unchecked_push_back(const var_base* const value, const hash_t hash) noexcept(
             noexcept(data.unchecked_emplace_back(value)))
         {
-            assert(hash != 0);
+            LSTM_ASSERT(hash != 0);
             filter_ |= hash;
             data.unchecked_emplace_back(value);
         }

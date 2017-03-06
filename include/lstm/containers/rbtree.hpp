@@ -429,17 +429,17 @@ LSTM_BEGIN
             auto height_l = minmax_height(tx, left);
             auto height_r = minmax_height(tx, right);
 
-            assert(height_l.black_height == height_r.black_height);
+            LSTM_ASSERT(height_l.black_height == height_r.black_height);
 
-            assert(!left || tx.read(left->parent_) == node);
-            assert(!right || tx.read(right->parent_) == node);
+            LSTM_ASSERT(!left || tx.read(left->parent_) == node);
+            LSTM_ASSERT(!right || tx.read(right->parent_) == node);
 
-            assert(!left || !compare(tx.read(node->key), tx.read(left->key)));
-            assert(!right || !compare(tx.read(right->key), tx.read(node->key)));
+            LSTM_ASSERT(!left || !compare(tx.read(node->key), tx.read(left->key)));
+            LSTM_ASSERT(!right || !compare(tx.read(right->key), tx.read(node->key)));
 
             if (tx.read(node->color_) == detail::color::red) {
-                assert(!left || tx.read(left->color_) == detail::color::black);
-                assert(!right || tx.read(right->color_) == detail::color::black);
+                LSTM_ASSERT(!left || tx.read(left->color_) == detail::color::black);
+                LSTM_ASSERT(!right || tx.read(right->color_) == detail::color::black);
             }
 
             return {std::min(height_l.min_height, height_r.min_height) + 1,
@@ -529,10 +529,10 @@ LSTM_BEGIN
         {
             auto root = (node_t*)tx.read(root_);
             if (root)
-                assert(tx.read(root->color_) == detail::color::black);
+                LSTM_ASSERT(tx.read(root->color_) == detail::color::black);
             const detail::height_info heights = minmax_height(tx, root);
             (void)heights;
-            assert(heights.min_height * 2 >= heights.max_height);
+            LSTM_ASSERT(heights.min_height * 2 >= heights.max_height);
         }
 #endif
     };

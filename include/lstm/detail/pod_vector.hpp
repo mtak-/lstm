@@ -38,9 +38,9 @@ LSTM_DETAIL_BEGIN
 
         LSTM_NOINLINE void reserve_more() noexcept(has_noexcept_alloc)
         {
-            assert((capacity() << 1) > size()); // zomg big transaction
+            LSTM_ASSERT((capacity() << 1) > size()); // zomg big transaction
             const pointer new_begin = alloc().allocate(capacity() << 1);
-            assert(new_begin);
+            LSTM_ASSERT(new_begin);
 
             std::memcpy(new_begin, begin_, sizeof(value_type) * size());
 
@@ -65,7 +65,7 @@ LSTM_DETAIL_BEGIN
 
         ~pod_vector() noexcept
         {
-            assert(empty());
+            LSTM_ASSERT(empty());
             alloc().deallocate(begin_, capacity());
         }
 
@@ -86,19 +86,19 @@ LSTM_DETAIL_BEGIN
         void unchecked_emplace_back(Us&&... us) noexcept
         {
             // if you hit this you probly forgot to check allocates_on_next_push
-            assert(!allocates_on_next_push());
+            LSTM_ASSERT(!allocates_on_next_push());
             ::new (end_++) value_type((Us &&) us...);
         }
 
         void unordered_erase(const pointer ptr) noexcept
         {
-            assert(ptr >= begin_ && ptr < end_);
+            LSTM_ASSERT(ptr >= begin_ && ptr < end_);
             std::memmove(ptr, --end_, sizeof(value_type));
         }
 
         void unordered_erase(const const_pointer ptr) noexcept
         {
-            assert(ptr >= begin_ && ptr < end_);
+            LSTM_ASSERT(ptr >= begin_ && ptr < end_);
             std::memmove((void*)ptr, --end_, sizeof(value_type));
         }
 
@@ -109,7 +109,7 @@ LSTM_DETAIL_BEGIN
             const uword new_capacity = size() + 1;
             if (new_capacity != capacity()) {
                 const pointer new_begin = alloc().allocate(new_capacity);
-                assert(new_begin);
+                LSTM_ASSERT(new_begin);
 
                 std::memcpy(new_begin, begin_, sizeof(value_type) * size());
 

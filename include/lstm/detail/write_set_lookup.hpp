@@ -15,26 +15,26 @@ LSTM_DETAIL_BEGIN
             : hash_(0)
             , pending_write_(in_pending_write)
         {
-            assert(pending_write_ != nullptr);
+            LSTM_ASSERT(pending_write_ != nullptr);
         }
 
         inline write_set_lookup(const hash_t in_hash) noexcept
             : hash_(in_hash)
         {
-            assert(hash_ != 0);
+            LSTM_ASSERT(hash_ != 0);
         }
 
         inline constexpr bool success() const noexcept { return !hash_; }
 
         inline constexpr var_storage& pending_write() const noexcept
         {
-            assert(success());
+            LSTM_ASSERT(success());
             return *pending_write_;
         }
 
         inline constexpr hash_t hash() const noexcept
         {
-            assert(!success());
+            LSTM_ASSERT(!success());
             return hash_;
         }
     };

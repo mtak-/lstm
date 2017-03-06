@@ -26,7 +26,7 @@ LSTM_BEGIN
         inline gp_t fetch_and_bump_clock() noexcept
         {
             const gp_t result = clock.fetch_add(bump_size(), LSTM_RELEASE);
-            assert(result < max_version() - bump_size());
+            LSTM_ASSERT(result < max_version() - bump_size());
             return result;
         }
 

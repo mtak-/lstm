@@ -22,7 +22,6 @@ LSTM_DETAIL_BEGIN
         T* allocate(std::size_t n) noexcept
         {
             T* const result = (T*)std::malloc(sizeof(T) * n);
-            assert(result);
             if (!result)
                 std::terminate();
             return result;
@@ -30,7 +29,7 @@ LSTM_DETAIL_BEGIN
 
         void deallocate(T* p, std::size_t) noexcept
         {
-            assert(p);
+            LSTM_ASSERT(p);
             std::free(p);
         }
     };

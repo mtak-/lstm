@@ -29,8 +29,8 @@ LSTM_DETAIL_BEGIN
         // x86_64: likely compiles to mov
         static inline void unlock_as_version(var_base& v, const gp_t version_to_set) noexcept
         {
-            assert(locked(v.version_lock.load(LSTM_RELAXED)));
-            assert(!locked(version_to_set));
+            LSTM_ASSERT(locked(v.version_lock.load(LSTM_RELAXED)));
+            LSTM_ASSERT(!locked(version_to_set));
 
             v.version_lock.store(version_to_set, LSTM_RELEASE);
         }
@@ -40,7 +40,7 @@ LSTM_DETAIL_BEGIN
         {
             const gp_t locked_version = v.version_lock.load(LSTM_RELAXED);
 
-            assert(locked(locked_version));
+            LSTM_ASSERT(locked(locked_version));
 
             v.version_lock.store(locked_version ^ lock_bit, LSTM_RELEASE);
         }
@@ -104,7 +104,7 @@ LSTM_DETAIL_BEGIN
             commit_write(write_set);
 
             const gp_t sync_version = domain.fetch_and_bump_clock();
-            assert(tx.version() <= sync_version);
+            LSTM_ASSERT(tx.version() <= sync_version);
 
             commit_publish(write_set, sync_version + transaction_domain::bump_size());
 
@@ -121,7 +121,7 @@ LSTM_DETAIL_BEGIN
     public:
         static gp_t try_commit(const transaction tx, transaction_domain& domain) noexcept
         {
-            assert(tx.version() <= domain.get_clock());
+            LSTM_ASSERT(tx.version() <= domain.get_clock());
 
             const thread_data& tls_td = tx.get_thread_data();
             if (tls_td.write_set.empty())
