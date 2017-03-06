@@ -23,7 +23,7 @@ LSTM_BEGIN
             transaction_base::reset_version(new_version);
         }
 
-        bool valid(const thread_data& td) const noexcept { return transaction_base::valid(td); }
+        bool valid(const thread_data& td) const noexcept { return transaction_base::valid(&td); }
         bool read_valid(const gp_t version) const noexcept { return rw_valid(version); }
         bool read_valid(const detail::var_base& v) const noexcept { return rw_valid(v); }
 

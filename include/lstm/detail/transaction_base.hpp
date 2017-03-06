@@ -39,7 +39,7 @@ LSTM_DETAIL_BEGIN
 
         LSTM_NOINLINE_LUKEWARM var_storage rw_read_base(const var_base& src_var) const
         {
-            LSTM_ASSERT(valid(*tls_td));
+            LSTM_ASSERT(valid(tls_td));
 
             if (LSTM_LIKELY(!tls_td->read_set.allocates_on_next_push()
                             && !(tls_td->write_set.filter() & dumb_reference_hash(src_var)))) {
@@ -100,7 +100,7 @@ LSTM_DETAIL_BEGIN
         LSTM_NOINLINE_LUKEWARM void
         rw_atomic_write_base(var_base& dest_var, const var_storage storage) const
         {
-            LSTM_ASSERT(valid(*tls_td));
+            LSTM_ASSERT(valid(tls_td));
 
             const hash_t hash = dumb_reference_hash(dest_var);
 
@@ -128,7 +128,7 @@ LSTM_DETAIL_BEGIN
 
         LSTM_NOINLINE_LUKEWARM var_storage rw_untracked_read_base(const var_base& src_var) const
         {
-            LSTM_ASSERT(valid(*tls_td));
+            LSTM_ASSERT(valid(tls_td));
 
             if (LSTM_LIKELY(!(tls_td->write_set.filter() & dumb_reference_hash(src_var)))) {
                 const var_storage result = src_var.storage.load(LSTM_ACQUIRE);
@@ -151,7 +151,7 @@ LSTM_DETAIL_BEGIN
 
         LSTM_NOINLINE_LUKEWARM var_storage ro_read_base(const var_base& src_var) const
         {
-            LSTM_ASSERT(valid(*tls_td));
+            LSTM_ASSERT(valid(tls_td));
 
             if (LSTM_LIKELY(!can_write())) {
                 const var_storage result = src_var.storage.load(LSTM_ACQUIRE);
@@ -171,7 +171,7 @@ LSTM_DETAIL_BEGIN
 
         LSTM_NOINLINE_LUKEWARM var_storage ro_untracked_read_base(const var_base& src_var) const
         {
-            LSTM_ASSERT(valid(*tls_td));
+            LSTM_ASSERT(valid(tls_td));
 
             if (LSTM_LIKELY(!can_write())) {
                 const var_storage result = src_var.storage.load(LSTM_ACQUIRE);
@@ -188,7 +188,7 @@ LSTM_DETAIL_BEGIN
         {
             LSTM_ASSERT(version_ != off_state);
             LSTM_ASSERT(!locked(version_));
-            LSTM_ASSERT(valid(*tls_td));
+            LSTM_ASSERT(valid(tls_td));
         }
 
         thread_data& get_thread_data() const noexcept { return *tls_td; }
@@ -196,7 +196,6 @@ LSTM_DETAIL_BEGIN
 
         void reset_version(const gp_t new_version) noexcept
         {
-#ifndef NDEBUG
             // TODO: could these asserts fail for correct code?
             if (tls_td) {
                 LSTM_ASSERT(tls_td->write_set.empty());
@@ -204,23 +203,28 @@ LSTM_DETAIL_BEGIN
                 LSTM_ASSERT(tls_td->fail_callbacks.empty());
                 LSTM_ASSERT(tls_td->succ_callbacks.active().callbacks.empty());
             }
-#endif
+
             LSTM_ASSERT(version_ <= new_version);
 
             version_ = new_version;
 
             LSTM_ASSERT(version_ != off_state);
             LSTM_ASSERT(!locked(version_));
-            LSTM_ASSERT(valid(*tls_td));
+            LSTM_ASSERT(valid(tls_td));
         }
 
         bool can_write() const noexcept { return tls_td; }
+        bool can_demote_safely() const noexcept { return tls_td->write_set.empty(); }
 
-        bool valid(const thread_data& td) const noexcept
+        bool valid(const thread_data* td) const noexcept
         {
-            return ((!tls_td && td.tx_state != tx_kind::read_write)
-                    || (&td == tls_td && td.tx_state != tx_kind::read_only))
-                   && td.gp() == version_ && td.in_transaction();
+			if (td)
+				return ((!tls_td && td->tx_state != tx_kind::read_write)
+						|| ((td == tls_td && td->tx_state != tx_kind::read_only)
+							|| td->write_set.empty()))
+					   && td->gp() == version_ && td->in_transaction();
+			else
+				return tls_td == nullptr;
         }
 
         bool rw_valid(const gp_t version) const noexcept { return version <= version_; }
@@ -259,7 +263,7 @@ LSTM_DETAIL_BEGIN
                                 && std::is_constructible<T, U&&>())>
         LSTM_NOINLINE_LUKEWARM void rw_write(var<T, Alloc>& dest_var, U&& u) const
         {
-            LSTM_ASSERT(valid(*tls_td));
+            LSTM_ASSERT(valid(tls_td));
 
             const hash_t hash = dumb_reference_hash(dest_var);
 
