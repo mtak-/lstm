@@ -285,14 +285,17 @@
 /******************* end inline *******************/
 
 /********************* assert *********************/
+// this is here in case __builtin_assume/__assume might be used one day
 #  ifndef NDEBUG
 #    include <cassert>
 #    define LSTM_ASSERT(a) assert(a)
 #  else
 #    if LSTM_COMPILER_IS_MSVC
-#      define LSTM_ASSERT(a) __assume(a)
+#      include <cassert>
+#      define LSTM_ASSERT(a) assert(a)
 #    elif LSTM_COMPILER_IS_Clang || LSTM_COMPILER_IS_GNU || LSTM_COMPILER_IS_AppleClang
-#      define LSTM_ASSERT(a) __builtin_assume(a)
+#      include <cassert>
+#      define LSTM_ASSERT(a) assert(a)
 #    else
 #      include <cassert>
 #      define LSTM_ASSERT(a) assert(a)
