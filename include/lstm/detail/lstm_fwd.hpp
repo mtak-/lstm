@@ -284,7 +284,7 @@ LSTM_DETAIL_BEGIN
     using transact_result = typename transact_result_impl<Func, Tx>::type;
 
     template<typename Func, typename Tx>
-    constexpr bool transact_nothrow = transact_result_impl<Func, Tx>::nothrow;
+    using transact_nothrow = std::enable_if_t<transact_result_impl<Func, Tx>::nothrow>;
 
     template<typename Func, typename Tx, typename = void>
     struct is_void_transact_function : std::false_type
@@ -302,16 +302,8 @@ LSTM_DETAIL_BEGIN
     template<typename Func, typename Tx>
     using is_transact_function = supports<transact_result, Func, Tx>;
 
-    template<typename Func, typename Tx, typename = void>
-    struct is_nothrow_transact_function : std::false_type
-    {
-    };
-
     template<typename Func, typename Tx>
-    struct is_nothrow_transact_function<Func, Tx, std::enable_if_t<transact_nothrow<Func, Tx>>>
-        : std::true_type
-    {
-    };
+    using is_nothrow_transact_function = supports<transact_nothrow, Func, Tx>;
 
     template<typename T>
     using uninitialized = std::aligned_storage_t<sizeof(T), alignof(T)>;
