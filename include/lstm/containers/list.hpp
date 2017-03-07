@@ -110,19 +110,16 @@ LSTM_BEGIN
         void clear()
         {
             thread_data& tls_td = tls_thread_data();
-            lstm::atomic(
-                [&](const transaction tx) {
-                    tx.write(size_, 0);
-                    auto root = tx.read(head);
-                    tx.write(head, nullptr);
-                    if (root) {
-                        tls_td.queue_succ_callback([ alloc = alloc(), root ]() noexcept {
-                            destroy_deallocate_sublist(alloc, root);
-                        });
-                    }
-                },
-                default_domain(),
-                tls_td);
+            lstm::atomic(tls_td, [&](const transaction tx) {
+                tx.write(size_, 0);
+                auto root = tx.read(head);
+                tx.write(head, nullptr);
+                if (root) {
+                    tls_td.queue_succ_callback([ alloc = alloc(), root ]() noexcept {
+                        destroy_deallocate_sublist(alloc, root);
+                    });
+                }
+            });
         }
 
         template<typename... Us>
@@ -130,18 +127,15 @@ LSTM_BEGIN
         {
             thread_data& tls_td   = tls_thread_data();
             node_t*      new_head = lstm::allocate_construct(tls_td, alloc(), (Us &&) us...);
-            lstm::atomic(
-                [&](const transaction tx) {
-                    auto head_ = tx.read(head);
-                    new_head->next_.unsafe_write(head_);
+            lstm::atomic(tls_td, [&](const transaction tx) {
+                auto head_ = tx.read(head);
+                new_head->next_.unsafe_write(head_);
 
-                    if (head_)
-                        tx.write(head_->prev_, (void*)new_head);
-                    tx.write(size_, tx.read(size_) + 1);
-                    tx.write(head, new_head);
-                },
-                default_domain(),
-                tls_td);
+                if (head_)
+                    tx.write(head_->prev_, (void*)new_head);
+                tx.write(size_, tx.read(size_) + 1);
+                tx.write(head, new_head);
+            });
         }
 
         word size() const

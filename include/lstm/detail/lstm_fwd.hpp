@@ -248,68 +248,67 @@ LSTM_DETAIL_BEGIN
     {
     };
 
-    template<typename Func, typename Tx>
-    using callable_with_tx_ = decltype(std::declval<Func>()(std::declval<const Tx&>()));
+    template<typename Func, typename Tx, typename... Args>
+    using callable_with_tx_
+        = decltype(std::declval<Func>()(std::declval<const Tx&>(), std::declval<Args>()...));
 
-    template<typename Func, typename Tx>
-    using callable_with_tx = supports<callable_with_tx_, Func, Tx>;
+    template<typename Func, typename Tx, typename... Args>
+    using callable_with_tx = supports<callable_with_tx_, Func, Tx, Args...>;
 
-    template<typename Func>
-    using callable_ = decltype(std::declval<Func>()());
+    template<typename Func, typename... Args>
+    using callable_ = decltype(std::declval<Func>()(std::declval<Args>()...));
 
-    template<typename Func>
-    using callable = supports<callable_, Func>;
+    template<typename Func, typename... Args>
+    using callable = supports<callable_, Func, Args...>;
 
-    template<typename Func,
-             typename Tx,
-             bool = callable_with_tx<Func, Tx>{}(),
-             bool = callable<Func>{}()>
+    template<bool CallableWithTx, bool Callable, typename Func, typename Tx, typename... Args>
     struct transact_result_impl;
 
-    template<typename Func, typename Tx, bool b>
-    struct transact_result_impl<Func, Tx, true, b>
+    template<bool b, typename Func, typename Tx, typename... Args>
+    struct transact_result_impl<true, b, Func, Tx, Args...>
     {
-        using type                    = decltype(std::declval<Func>()(std::declval<const Tx&>()));
-        static constexpr bool nothrow = noexcept(std::declval<Func>()(std::declval<const Tx&>()));
+        using type
+            = decltype(std::declval<Func>()(std::declval<const Tx&>(), std::declval<Args>()...));
+        static constexpr bool nothrow
+            = noexcept(std::declval<Func>()(std::declval<const Tx&>(), std::declval<Args>()...));
     };
 
-    template<typename Func, typename Tx>
-    struct transact_result_impl<Func, Tx, false, true>
+    template<typename Func, typename Tx, typename... Args>
+    struct transact_result_impl<false, true, Func, Tx, Args...>
     {
-        using type                    = decltype(std::declval<Func>()());
-        static constexpr bool nothrow = noexcept(std::declval<Func>()());
+        using type                    = decltype(std::declval<Func>()(std::declval<Args>()...));
+        static constexpr bool nothrow = noexcept(std::declval<Func>()(std::declval<Args>()...));
     };
+    template<typename Func, typename Tx, typename... Args>
+    using transact_result = typename transact_result_impl<callable_with_tx<Func, Tx, Args...>{}(),
+                                                          callable<Func, Args...>{}(),
+                                                          Func,
+                                                          Tx,
+                                                          Args...>::type;
 
-    template<typename Func, typename Tx>
-    using transact_result = typename transact_result_impl<Func, Tx>::type;
+    template<typename Func, typename Tx, typename... Args>
+    using transact_nothrow
+        = std::enable_if_t<transact_result_impl<callable_with_tx<Func, Tx, Args...>{}(),
+                                                callable<Func, Args...>{}(),
+                                                Func,
+                                                Tx,
+                                                Args...>::nothrow>;
 
-    template<typename Func, typename Tx>
-    using transact_nothrow = std::enable_if_t<transact_result_impl<Func, Tx>::nothrow>;
+    template<typename Func, typename Tx, typename... Args>
+    using is_void_transact_function = std::is_void<transact_result<Func, Tx, Args...>>;
 
-    template<typename Func, typename Tx, typename = void>
-    struct is_void_transact_function : std::false_type
-    {
-    };
+    template<typename Func, typename Tx, typename... Args>
+    using is_transact_function_ = supports<transact_result, Func, Tx, Args...>;
 
-    template<typename Func, typename Tx>
-    struct is_void_transact_function<Func,
-                                     Tx,
-                                     std::enable_if_t<std::is_void<transact_result<Func, Tx>>{}>>
-        : std::true_type
-    {
-    };
+    template<typename Func, typename Tx, typename... Args>
+    using is_nothrow_transact_function = supports<transact_nothrow, Func, Tx, Args...>;
 
-    template<typename Func, typename Tx>
-    using is_transact_function_ = supports<transact_result, Func, Tx>;
-
-    template<typename Func, typename Tx>
-    using is_nothrow_transact_function = supports<transact_nothrow, Func, Tx>;
-
-    template<typename Func, typename Tx>
-    using is_transact_function = and_<is_transact_function_<Func, Tx>,
-                                      not_<is_nothrow_transact_function<Func, Tx>>,
-                                      is_transact_function_<uncvref<Func>&, Tx>,
-                                      not_<is_nothrow_transact_function<uncvref<Func>&, Tx>>>;
+    template<typename Func, typename Tx, typename... Args>
+    using is_transact_function
+        = and_<is_transact_function_<Func, Tx, Args...>,
+               not_<is_nothrow_transact_function<Func, Tx, Args...>>,
+               is_transact_function_<uncvref<Func>&, Tx, Args...>,
+               not_<is_nothrow_transact_function<uncvref<Func>&, Tx, Args...>>>;
 
     template<typename T>
     using uninitialized = std::aligned_storage_t<sizeof(T), alignof(T)>;

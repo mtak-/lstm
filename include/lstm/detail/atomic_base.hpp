@@ -7,16 +7,22 @@
 LSTM_DETAIL_BEGIN
     struct atomic_base_fn
     {
-        template<typename Func, typename Tx, LSTM_REQUIRES_(callable_with_tx<Func&&, Tx>())>
-        static transact_result<Func, Tx> call(Func&& func, const Tx tx)
+        template<typename Func,
+                 typename Tx,
+                 typename... Args,
+                 LSTM_REQUIRES_(callable_with_tx<Func&&, Tx, Args&&...>())>
+        static transact_result<Func, Tx> call(Func&& func, const Tx tx, Args&&... args)
         {
-            return ((Func &&) func)(tx);
+            return ((Func &&) func)(tx, (Args &&) args...);
         }
 
-        template<typename Func, typename Tx, LSTM_REQUIRES_(!callable_with_tx<Func&&, Tx>())>
-        static transact_result<Func, Tx> call(Func&& func, const Tx)
+        template<typename Func,
+                 typename Tx,
+                 typename... Args,
+                 LSTM_REQUIRES_(!callable_with_tx<Func&&, Tx, Args&&...>())>
+        static transact_result<Func, Tx> call(Func&& func, const Tx, Args&&... args)
         {
-            return ((Func &&) func)();
+            return ((Func &&) func)((Args &&) args...);
         }
 
         template<tx_kind kind>

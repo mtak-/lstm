@@ -10,9 +10,11 @@ LSTM_DETAIL_BEGIN
     {
     private:
         template<typename Func,
-                 LSTM_REQUIRES_(!is_void_transact_function<Func&, read_transaction>())>
-        static transact_result<Func, read_transaction>
-        slow_path(Func func, transaction_domain& domain, thread_data& tls_td)
+                 typename... Args,
+                 LSTM_REQUIRES_(!is_void_transact_function<Func&, read_transaction, Args&&...>()),
+                 typename Result = transact_result<Func, read_transaction, Args&&...>>
+        static Result
+        slow_path(thread_data& tls_td, transaction_domain& domain, Func func, Args&&... args)
         {
             read_transaction tx{tx_start<tx_kind::read_only>(tls_td, domain)};
 
@@ -20,15 +22,15 @@ LSTM_DETAIL_BEGIN
                 try {
                     LSTM_ASSERT(valid_start_state(tls_td));
 
-                    transact_result<Func, read_transaction> result = atomic_base_fn::call(func, tx);
+                    Result result = atomic_base_fn::call(func, tx, (Args &&) args...);
 
                     // commit does not throw
                     tx_success<tx_kind::read_only>(tls_td, 0);
                     LSTM_ASSERT(valid_start_state(tls_td));
                     LSTM_ASSERT(!tls_td.in_critical_section());
 
-                    if (std::is_reference<transact_result<Func, read_transaction>>{})
-                        return static_cast<transact_result<Func, read_transaction>&&>(result);
+                    if (std::is_reference<Result>{})
+                        return static_cast<Result>(result);
                     else
                         return result;
                 } catch (const tx_retry&) {
@@ -43,8 +45,10 @@ LSTM_DETAIL_BEGIN
         }
 
         template<typename Func,
-                 LSTM_REQUIRES_(is_void_transact_function<Func&, read_transaction>())>
-        static void slow_path(Func func, transaction_domain& domain, thread_data& tls_td)
+                 typename... Args,
+                 LSTM_REQUIRES_(is_void_transact_function<Func&, read_transaction, Args&&...>())>
+        static void
+        slow_path(thread_data& tls_td, transaction_domain& domain, Func func, Args&&... args)
         {
             read_transaction tx{tx_start<tx_kind::read_only>(tls_td, domain)};
 
@@ -52,7 +56,7 @@ LSTM_DETAIL_BEGIN
                 try {
                     LSTM_ASSERT(valid_start_state(tls_td));
 
-                    atomic_base_fn::call(func, tx);
+                    atomic_base_fn::call(func, tx, (Args &&) args...);
 
                     // commit does not throw
                     tx_success<tx_kind::read_only>(tls_td, 0);
@@ -72,34 +76,128 @@ LSTM_DETAIL_BEGIN
         }
 
     public:
-        template<typename Func, LSTM_REQUIRES_(is_transact_function<Func&&, read_transaction>())>
-        transact_result<Func, read_transaction>
-        operator()(Func&&              func,
-                   transaction_domain& domain = default_domain(),
-                   thread_data&        tls_td = tls_thread_data()) const
+        template<typename Func,
+                 typename... Args,
+                 LSTM_REQUIRES_(is_transact_function<Func&&, read_transaction, Args&&...>())>
+        transact_result<Func, read_transaction, Args&&...> operator()(thread_data& tls_td,
+                                                                      transaction_domain& domain,
+                                                                      Func&&              func,
+                                                                      Args&&... args) const
         {
             switch (tls_td.tx_kind()) {
             case tx_kind::read_only:
-                return atomic_base_fn::call((Func &&) func, read_transaction{tls_td.gp()});
+                return atomic_base_fn::call((Func &&) func,
+                                            read_transaction{tls_td.gp()},
+                                            (Args &&) args...);
             case tx_kind::read_write:
-                return atomic_base_fn::call((Func &&) func, read_transaction{tls_td, tls_td.gp()});
+                return atomic_base_fn::call((Func &&) func,
+                                            read_transaction{tls_td, tls_td.gp()},
+                                            (Args &&) args...);
             case tx_kind::none:
-                return read_only_fn::slow_path((Func &&) func, domain, tls_td);
+                return read_only_fn::slow_path(tls_td, domain, (Func &&) func, (Args &&) args...);
             }
         }
 
-#ifndef LSTM_MAKE_SFINAE_FRIENDLY
-        template<typename Func, LSTM_REQUIRES_(!is_transact_function<Func&&, read_transaction>())>
-        void operator()(Func&&,
-                        transaction_domain& = default_domain(),
-                        thread_data&        = tls_thread_data()) const
+        template<typename Func,
+                 typename... Args,
+                 LSTM_REQUIRES_(is_transact_function<Func&&, read_transaction, Args&&...>())>
+        transact_result<Func, read_transaction, Args&&...>
+        operator()(thread_data& tls_td, Func&& func, Args&&... args) const
         {
-            static_assert(is_transact_function_<Func&&, read_transaction>()
-                              && is_transact_function_<uncvref<Func>&, read_transaction>(),
+            return (*this)(tls_td, default_domain(), (Func &&) func, (Args &&) args...);
+        }
+
+        template<typename Func,
+                 typename... Args,
+                 LSTM_REQUIRES_(is_transact_function<Func&&, read_transaction, Args&&...>())>
+        transact_result<Func, read_transaction, Args&&...>
+        operator()(transaction_domain& domain, Func&& func, Args&&... args) const
+        {
+            return (*this)(tls_thread_data(), domain, (Func &&) func, (Args &&) args...);
+        }
+
+        template<typename Func,
+                 typename... Args,
+                 LSTM_REQUIRES_(is_transact_function<Func&&, read_transaction, Args&&...>())>
+        transact_result<Func, read_transaction, Args&&...>
+        operator()(Func&& func, Args&&... args) const
+        {
+            return (*this)(tls_thread_data(), default_domain(), (Func &&) func, (Args &&) args...);
+        }
+
+#ifndef LSTM_MAKE_SFINAE_FRIENDLY
+        template<typename Func,
+                 typename... Args,
+                 LSTM_REQUIRES_(!is_transact_function<Func&&, transaction, Args&&...>())>
+        transact_result<Func, transaction, Args&&...>
+        operator()(thread_data&, transaction_domain&, Func&&, Args&&...) const
+        {
+            static_assert(is_transact_function_<Func&&, read_transaction, Args&&...>()
+                              && is_transact_function_<uncvref<Func>&,
+                                                       read_transaction,
+                                                       Args&&...>(),
                           "functions passed to lstm::read_only must either take no parameters, "
                           "or take a `lstm::read_transaction` either by value or `const&`");
-            static_assert(!is_nothrow_transact_function<Func&&, read_transaction>()
-                              && !is_nothrow_transact_function<uncvref<Func>&, read_transaction>(),
+            static_assert(!is_nothrow_transact_function<Func&&, read_transaction, Args&&...>()
+                              && !is_nothrow_transact_function<uncvref<Func>&,
+                                                               read_transaction,
+                                                               Args&&...>(),
+                          "functions passed to lstm::read_only must not be marked noexcept");
+        }
+
+        template<typename Func,
+                 typename... Args,
+                 LSTM_REQUIRES_(!is_transact_function<Func&&, transaction, Args&&...>())>
+        transact_result<Func, transaction, Args&&...>
+        operator()(thread_data&, Func&&, Args&&...) const
+        {
+            static_assert(is_transact_function_<Func&&, read_transaction, Args&&...>()
+                              && is_transact_function_<uncvref<Func>&,
+                                                       read_transaction,
+                                                       Args&&...>(),
+                          "functions passed to lstm::read_only must either take no parameters, "
+                          "or take a `lstm::read_transaction` either by value or `const&`");
+            static_assert(!is_nothrow_transact_function<Func&&, read_transaction, Args&&...>()
+                              && !is_nothrow_transact_function<uncvref<Func>&,
+                                                               read_transaction,
+                                                               Args&&...>(),
+                          "functions passed to lstm::read_only must not be marked noexcept");
+        }
+
+        template<typename Func,
+                 typename... Args,
+                 LSTM_REQUIRES_(!is_transact_function<Func&&, transaction, Args&&...>())>
+        transact_result<Func, transaction, Args&&...>
+        operator()(transaction_domain&, Func&&, Args&&...) const
+        {
+            static_assert(is_transact_function_<Func&&, read_transaction, Args&&...>()
+                              && is_transact_function_<uncvref<Func>&,
+                                                       read_transaction,
+                                                       Args&&...>(),
+                          "functions passed to lstm::read_only must either take no parameters, "
+                          "or take a `lstm::read_transaction` either by value or `const&`");
+            static_assert(!is_nothrow_transact_function<Func&&, read_transaction, Args&&...>()
+                              && !is_nothrow_transact_function<uncvref<Func>&,
+                                                               read_transaction,
+                                                               Args&&...>(),
+                          "functions passed to lstm::read_only must not be marked noexcept");
+        }
+
+        template<typename Func,
+                 typename... Args,
+                 LSTM_REQUIRES_(!is_transact_function<Func&&, transaction, Args&&...>())>
+        transact_result<Func, transaction, Args&&...> operator()(Func&&, Args&&...) const
+        {
+            static_assert(is_transact_function_<Func&&, read_transaction, Args&&...>()
+                              && is_transact_function_<uncvref<Func>&,
+                                                       read_transaction,
+                                                       Args&&...>(),
+                          "functions passed to lstm::read_only must either take no parameters, "
+                          "or take a `lstm::read_transaction` either by value or `const&`");
+            static_assert(!is_nothrow_transact_function<Func&&, read_transaction, Args&&...>()
+                              && !is_nothrow_transact_function<uncvref<Func>&,
+                                                               read_transaction,
+                                                               Args&&...>(),
                           "functions passed to lstm::read_only must not be marked noexcept");
         }
 #endif
