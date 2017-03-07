@@ -79,11 +79,7 @@ LSTM_DETAIL_BEGIN
         }
 
     public:
-        template<typename Func,
-                 LSTM_REQUIRES_(is_transact_function<Func&&, transaction>()
-                                && is_transact_function<uncvref<Func>&, transaction>()),
-                 LSTM_REQUIRES_(!is_nothrow_transact_function<Func&&, transaction>()
-                                && !is_nothrow_transact_function<uncvref<Func>&, transaction>())>
+        template<typename Func, LSTM_REQUIRES_(is_transact_function<Func&&, transaction>())>
         transact_result<Func, transaction> operator()(Func&& func,
                                                       transaction_domain& domain = default_domain(),
                                                       thread_data& tls_td = tls_thread_data()) const
@@ -96,28 +92,15 @@ LSTM_DETAIL_BEGIN
         }
 
 #ifndef LSTM_MAKE_SFINAE_FRIENDLY
-        template<typename Func,
-                 LSTM_REQUIRES_(!is_transact_function<Func&&, transaction>()
-                                || !is_transact_function<uncvref<Func>&, transaction>())>
+        template<typename Func, LSTM_REQUIRES_(!is_transact_function<Func&&, transaction>())>
         void operator()(Func&&,
                         transaction_domain& = default_domain(),
                         thread_data&        = tls_thread_data()) const
         {
-            static_assert(is_transact_function<Func&&, transaction>()
-                              && !is_transact_function<uncvref<Func>&, transaction>(),
+            static_assert(is_transact_function_<Func&&, transaction>()
+                              && is_transact_function_<uncvref<Func>&, transaction>(),
                           "functions passed to lstm::read_write must either take no parameters, "
                           "or take a `lstm::transaction` either by value or `const&`");
-        }
-
-        template<typename Func,
-                 LSTM_REQUIRES_(is_transact_function<Func&&, transaction>()
-                                && is_transact_function<uncvref<Func>&, transaction>()),
-                 LSTM_REQUIRES_(is_nothrow_transact_function<Func&&, transaction>()
-                                || is_nothrow_transact_function<uncvref<Func>&, transaction>())>
-        void operator()(Func&&,
-                        transaction_domain& = default_domain(),
-                        thread_data&        = tls_thread_data()) const
-        {
             static_assert(!is_nothrow_transact_function<Func&&, transaction>()
                               && !is_nothrow_transact_function<uncvref<Func>&, transaction>(),
                           "functions passed to lstm::read_write must not be marked noexcept");

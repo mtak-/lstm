@@ -300,10 +300,16 @@ LSTM_DETAIL_BEGIN
     };
 
     template<typename Func, typename Tx>
-    using is_transact_function = supports<transact_result, Func, Tx>;
+    using is_transact_function_ = supports<transact_result, Func, Tx>;
 
     template<typename Func, typename Tx>
     using is_nothrow_transact_function = supports<transact_nothrow, Func, Tx>;
+
+    template<typename Func, typename Tx>
+    using is_transact_function = and_<is_transact_function_<Func, Tx>,
+                                      not_<is_nothrow_transact_function<Func, Tx>>,
+                                      is_transact_function_<uncvref<Func>&, Tx>,
+                                      not_<is_nothrow_transact_function<uncvref<Func>&, Tx>>>;
 
     template<typename T>
     using uninitialized = std::aligned_storage_t<sizeof(T), alignof(T)>;
