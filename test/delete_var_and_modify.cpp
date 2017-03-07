@@ -14,7 +14,7 @@
 
 static constexpr auto loop_count = LSTM_TEST_INIT(1000000, 100000);
 
-using lstm::read_write;
+using lstm::atomic;
 using lstm::var;
 
 struct big
@@ -29,7 +29,7 @@ int main()
         thread_manager tm;
         tm.queue_loop_n(
             [&] {
-                read_write([&](const lstm::transaction tx) {
+                atomic([&](const lstm::transaction tx) {
                     static std::allocator<var<big, debug_alloc<big>>> alloc{};
                     auto ptr = tx.read(x_ptr);
                     if (ptr) {
@@ -43,7 +43,7 @@ int main()
             loop_count | 1);
         tm.queue_loop_n(
             [&] {
-                read_write([&](const lstm::transaction tx) {
+                atomic([&](const lstm::transaction tx) {
                     auto ptr = tx.read(x_ptr);
                     if (ptr) {
                         tx.write(*ptr, big{});

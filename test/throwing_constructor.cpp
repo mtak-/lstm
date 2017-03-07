@@ -13,7 +13,7 @@
 
 static constexpr auto loop_count = LSTM_TEST_INIT(25000, 250);
 
-using lstm::read_write;
+using lstm::atomic;
 using lstm::var;
 
 struct modify_on_delete
@@ -44,7 +44,7 @@ int main()
         for (int i = 0; i < 5; ++i) {
             tm.queue_loop_n(
                 [&] {
-                    read_write([&](const lstm::transaction tx) {
+                    atomic([&](const lstm::transaction tx) {
                         try {
                             tx.write(x, 0);
                         } catch (...) {

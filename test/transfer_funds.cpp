@@ -19,7 +19,7 @@ int main()
 
         manager.queue_thread([] {
             for (int i = 0; i < loop_count0; ++i) {
-                lstm::read_write([] {
+                lstm::atomic([] {
                     if (account1 >= 20) {
                         account0 += 20;
                         account1 -= 20;
@@ -31,7 +31,7 @@ int main()
 
         manager.queue_thread([] {
             for (int i = 0; i < loop_count1; ++i) {
-                lstm::read_write([] {
+                lstm::atomic([] {
                     if (account0 >= 30) {
                         account1 += 30;
                         account0 -= 30;

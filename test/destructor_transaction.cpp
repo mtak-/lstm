@@ -3,7 +3,7 @@
 #include "simple_test.hpp"
 #include "thread_manager.hpp"
 
-using lstm::read_write;
+using lstm::atomic;
 using lstm::var;
 
 static constexpr auto loop_count = LSTM_TEST_INIT(1000000, 40000);
@@ -29,7 +29,7 @@ struct destruct
 {
     ~destruct() noexcept(false)
     {
-        read_write([&](const lstm::transaction tx) {
+        atomic([&](const lstm::transaction tx) {
             auto y = tx.read(x);
             ++y.w;
             tx.write(x, y);
@@ -44,7 +44,7 @@ int main()
 
         tm.queue_thread([&] {
             for (int j = 0; j < loop_count; ++j) {
-                read_write([&](const lstm::transaction tx) {
+                atomic([&](const lstm::transaction tx) {
                     auto foo = tx.read(x);
                     ++foo.x;
                     tx.write(x, foo);
@@ -54,7 +54,7 @@ int main()
 
         tm.queue_thread([&] {
             for (int j = 0; j < loop_count; ++j) {
-                read_write([&](const lstm::transaction tx) {
+                atomic([&](const lstm::transaction tx) {
                     auto foo = tx.read(x);
                     ++foo.y;
                     tx.write(x, foo);
@@ -66,7 +66,7 @@ int main()
             static std::allocator<destruct> alloc{};
             for (int j = 0; j < loop_count; ++j) {
                 auto b = lstm::allocate_construct(alloc);
-                read_write([&](const lstm::transaction tx) {
+                atomic([&](const lstm::transaction tx) {
                     lstm::destroy_deallocate(alloc, b);
                     auto foo = tx.read(x);
                     ++foo.z;

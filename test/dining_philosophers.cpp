@@ -4,7 +4,7 @@
 #include "simple_test.hpp"
 #include "thread_manager.hpp"
 
-using lstm::read_write;
+using lstm::atomic;
 using lstm::var;
 
 static constexpr std::size_t food_size    = LSTM_TEST_INIT(10000, 10000);
@@ -26,7 +26,7 @@ auto get_loop(philosopher& p, fork& f0, fork& f1)
 {
     return [&] {
         while (p.food != 0) {
-            read_write([&](const lstm::transaction tx) {
+            atomic([&](const lstm::transaction tx) {
                 if (!tx.untracked_read(f0.in_use) && !tx.untracked_read(f1.in_use)) {
                     tx.write(f0.in_use, true);
                     tx.write(f1.in_use, true);

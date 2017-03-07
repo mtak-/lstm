@@ -61,7 +61,7 @@ int main()
                     manager.queue_thread([&intmap, &data, t] {
                         lstm::thread_data& tls_td = lstm::tls_thread_data();
                         for (int i = 0; i < iter_count / (thread_count / 2); ++i) {
-                            lstm::read_write(
+                            lstm::atomic(
                                 [&data, &intmap, &tls_td, i, t](const lstm::transaction tx) {
                                     intmap.emplace(tx,
                                                    data[i + t * iter_count / (thread_count / 2)],
@@ -74,10 +74,11 @@ int main()
                     manager.queue_thread([&intmap, &data, t] {
                         lstm::thread_data& tls_td = lstm::tls_thread_data();
                         for (int i = iter_count / (thread_count / 2); i >= 0; --i) {
-                            lstm::read_only(
-                                [&data, &intmap, &tls_td, i, t](const lstm::read_transaction tx) {
-                                    intmap.find(tx, data[i + (t / 2) * iter_count / (thread_count / 2)]);
-                                });
+                            lstm::atomic([&data, &intmap, &tls_td, i, t](
+                                const lstm::read_transaction tx) {
+                                intmap.find(tx,
+                                            data[i + (t / 2) * iter_count / (thread_count / 2)]);
+                            });
                         }
                     });
             }
@@ -91,7 +92,7 @@ int main()
                       << "s" << std::endl;
         }
 #ifndef NDEBUG
-        lstm::read_write([&](const lstm::transaction tx) { return intmap.verify(tx); });
+        lstm::atomic([&](const lstm::transaction tx) { return intmap.verify(tx); });
 #endif
         {
             thread_manager manager;
@@ -101,7 +102,7 @@ int main()
                     manager.queue_thread([&intmap, &data, t] {
                         lstm::thread_data& tls_td = lstm::tls_thread_data();
                         for (int i = iter_count / (thread_count / 2); i >= 0; --i) {
-                            lstm::read_write([&data, &intmap, &tls_td, i, t](
+                            lstm::atomic([&data, &intmap, &tls_td, i, t](
                                 const lstm::transaction tx) {
                                 intmap.erase_one(tx, data[i + t * iter_count / (thread_count / 2)]);
                             });
@@ -111,10 +112,11 @@ int main()
                     manager.queue_thread([&intmap, &data, t] {
                         lstm::thread_data& tls_td = lstm::tls_thread_data();
                         for (int i = iter_count / (thread_count / 2); i >= 0; --i) {
-                            lstm::read_only(
-                                [&data, &intmap, &tls_td, i, t](const lstm::read_transaction tx) {
-                                    intmap.find(tx, data[i + (t / 2) * iter_count / (thread_count / 2)]);
-                                });
+                            lstm::atomic([&data, &intmap, &tls_td, i, t](
+                                const lstm::read_transaction tx) {
+                                intmap.find(tx,
+                                            data[i + (t / 2) * iter_count / (thread_count / 2)]);
+                            });
                         }
                     });
             }
@@ -128,7 +130,7 @@ int main()
                       << "s" << std::endl;
         }
 #ifndef NDEBUG
-        lstm::read_write([&](const lstm::transaction tx) { return intmap.verify(tx); });
+        lstm::atomic([&](const lstm::transaction tx) { return intmap.verify(tx); });
 #endif
     }
 

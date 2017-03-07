@@ -3,7 +3,7 @@
 #include "simple_test.hpp"
 #include "thread_manager.hpp"
 
-using lstm::read_write;
+using lstm::atomic;
 using lstm::var;
 
 static constexpr auto loop_count = LSTM_TEST_INIT(200000, 4000);
@@ -20,7 +20,7 @@ int main()
             tm.queue_thread([&] {
                 for (int j = 0; j < loop_count; ++j) {
                     try {
-                        read_write([&](const lstm::transaction tx) {
+                        atomic([&](const lstm::transaction tx) {
                             int foo = tx.read(x);
                             tx.write(x, foo + 5);
                             if (foo + 5 >= 10000)
