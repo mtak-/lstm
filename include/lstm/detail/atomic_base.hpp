@@ -11,7 +11,7 @@ LSTM_DETAIL_BEGIN
                  typename Tx,
                  typename... Args,
                  LSTM_REQUIRES_(callable_with_tx<Func&&, Tx, Args&&...>())>
-        static transact_result<Func, Tx> call(Func&& func, const Tx tx, Args&&... args)
+        static transact_result<Func, Tx, Args&&...> call(Func&& func, const Tx tx, Args&&... args)
         {
             return ((Func &&) func)(tx, (Args &&) args...);
         }
@@ -20,7 +20,7 @@ LSTM_DETAIL_BEGIN
                  typename Tx,
                  typename... Args,
                  LSTM_REQUIRES_(!callable_with_tx<Func&&, Tx, Args&&...>())>
-        static transact_result<Func, Tx> call(Func&& func, const Tx, Args&&... args)
+        static transact_result<Func, Tx, Args&&...> call(Func&& func, const Tx, Args&&... args)
         {
             return ((Func &&) func)((Args &&) args...);
         }
