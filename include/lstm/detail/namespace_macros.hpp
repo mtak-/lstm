@@ -2,12 +2,22 @@
 #define LSTM_DETAIL_NAMESPACE_MACROS_HPP
 
 // clang-format off
-#ifndef NDEBUG
-    #define LSTM_BEGIN namespace lstm { inline namespace v1 { inline namespace debug {
-    #define LSTM_END }}}
+#ifndef LSTM_LOG_TRANSACTIONS
+    #define LSTM__LOG_BEGIN /**/
+    #define LSTM__LOG_END /**/
 #else
-    #define LSTM_BEGIN namespace lstm { inline namespace v1 {
-    #define LSTM_END }}
+    #define LSTM__LOG_BEGIN inline namespace logged {
+    #define LSTM__LOG_END }
+#endif
+
+#ifndef NDEBUG
+    #define LSTM_BEGIN                                                                             \
+        namespace lstm { inline namespace v1 { inline namespace debug { LSTM__LOG_BEGIN            \
+    /**/
+    #define LSTM_END LSTM__LOG_END }}}
+#else
+    #define LSTM_BEGIN namespace lstm { inline namespace v1 { LSTM__LOG_BEGIN
+    #define LSTM_END LSTM__LOG_END }}
 #endif /* NDEBUG */
 
 #define LSTM_DETAIL_BEGIN LSTM_BEGIN namespace detail {

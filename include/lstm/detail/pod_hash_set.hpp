@@ -60,21 +60,21 @@ LSTM_DETAIL_BEGIN
         LSTM_NOINLINE const_iterator find_slow_path(const var_base& dest_var) const noexcept
         {
             const const_iterator iter = const_cast<pod_hash_set&>(*this).find_impl(dest_var);
+
             if (iter != end()) {
                 LSTM_LOG_BLOOM_SUCCESS();
-
-                return iter;
             } else {
                 LSTM_LOG_BLOOM_COLLISION();
-
-                return iter;
             }
+
+            return iter;
         }
 
         LSTM_NOINLINE write_set_lookup lookup_slow_path(const var_base& dest_var,
                                                         const hash_t    hash) noexcept
         {
             const iterator iter = find_impl(dest_var);
+
             if (iter != end()) {
                 LSTM_LOG_BLOOM_SUCCESS();
 
