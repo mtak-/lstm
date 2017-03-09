@@ -6,7 +6,7 @@
 LSTM_BEGIN
     [[noreturn]] LSTM_NOINLINE void retry()
     {
-        LSTM_USER_FAIL_TX();
+        LSTM_LOG_USER_FAIL_TX();
         throw detail::tx_retry{};
     }
 LSTM_END

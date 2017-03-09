@@ -9,8 +9,7 @@
 #endif
 // clang-format on
 
-#include <lstm/detail/compiler.hpp>
-#include <lstm/detail/namespace_macros.hpp>
+#include <lstm/detail/transaction_log.hpp>
 
 #include <cstdint>
 #include <memory>
@@ -36,36 +35,6 @@
              = 0> /**/
 
 // clang-format off
-#ifdef LSTM_LOG_TRANSACTIONS
-    #include <lstm/detail/transaction_log.hpp>
-    
-    #define LSTM_INTERNAL_FAIL_TX() lstm::detail::transaction_log::get().add_internal_failure()
-    #define LSTM_USER_FAIL_TX() lstm::detail::transaction_log::get().add_user_failure()
-    #define LSTM_SUCC_TX() lstm::detail::transaction_log::get().add_success()
-    #define LSTM_LOG_REGISTER_THREAD_ID(id) lstm::detail::transaction_log::get().register_thread(id)
-    #define LSTM_LOG_CLEAR() lstm::detail::transaction_log::get().clear()
-    #define LSTM_LOG_BLOOM_COLLISION() lstm::detail::transaction_log::get().add_bloom_collision()
-    #define LSTM_LOG_BLOOM_SUCCESS()                                                               \
-        if (!empty())                                                                              \
-            lstm::detail::transaction_log::get().add_bloom_success()                               \
-    /**/
-    #ifndef LSTM_LOG_DUMP
-        #include <iostream>
-        #define LSTM_LOG_DUMP() (std::cout << lstm::detail::transaction_log::get().results())
-    #endif /* LSTM_LOG_DUMP */
-#else
-    #define LSTM_INTERNAL_FAIL_TX() /**/
-    #define LSTM_USER_FAIL_TX() /**/
-    #define LSTM_SUCC_TX() /**/
-    #define LSTM_LOG_REGISTER_THREAD_ID(id) /**/
-    #define LSTM_LOG_CLEAR() /**/
-    #define LSTM_LOG_BLOOM_COLLISION() /**/
-    #define LSTM_LOG_BLOOM_SUCCESS() /**/
-    #ifndef LSTM_LOG_DUMP
-        #define LSTM_LOG_DUMP() /**/
-    #endif /* LSTM_LOG_DUMP */
-#endif /* LSTM_LOG_TRANSACTIONS */
-
 #ifndef LSTM_ALWAYS_SEQ_CST
     #define LSTM_ACQUIRE std::memory_order_acquire
     #define LSTM_RELEASE std::memory_order_release

@@ -19,13 +19,12 @@ public:
     {
         using namespace std::chrono_literals;
         threads.emplace_back([ this, f = (F &&) f ] {
-            lstm::tls_thread_data();
+            lstm::tls_thread_data(); // initialize the thread data
             while (!_run.load(LSTM_RELAXED))
                 std::this_thread::sleep_for(1ns);
 
             f();
         });
-        LSTM_LOG_REGISTER_THREAD_ID(threads.back().get_id());
     }
 
     template<typename F>
@@ -33,14 +32,13 @@ public:
     {
         using namespace std::chrono_literals;
         threads.emplace_back([ this, f = (F &&) f, n ] {
-            lstm::tls_thread_data();
+            lstm::tls_thread_data(); // initialize the thread data
             while (!_run.load(LSTM_RELAXED))
                 std::this_thread::sleep_for(1ns);
 
             for (int i = 0; i < n; ++i)
                 f();
         });
-        LSTM_LOG_REGISTER_THREAD_ID(threads.back().get_id());
     }
 
     void join_threads()

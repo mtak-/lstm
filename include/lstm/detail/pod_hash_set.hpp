@@ -61,11 +61,10 @@ LSTM_DETAIL_BEGIN
         {
             const const_iterator iter = const_cast<pod_hash_set&>(*this).find_impl(dest_var);
 
-            if (iter != end()) {
+            if (iter != end())
                 LSTM_LOG_BLOOM_SUCCESS();
-            } else {
+            else
                 LSTM_LOG_BLOOM_COLLISION();
-            }
 
             return iter;
         }
@@ -154,7 +153,8 @@ LSTM_DETAIL_BEGIN
         const_iterator find(const var_base& dest_var) const noexcept
         {
             if (LSTM_LIKELY(!(filter_ & dumb_reference_hash(dest_var)))) {
-                LSTM_LOG_BLOOM_SUCCESS();
+                if (!empty())
+                    LSTM_LOG_BLOOM_SUCCESS();
 
                 return end();
             }
@@ -166,7 +166,8 @@ LSTM_DETAIL_BEGIN
         {
             const hash_t hash = dumb_reference_hash(dest_var);
             if (LSTM_LIKELY(!(filter_ & hash))) {
-                LSTM_LOG_BLOOM_SUCCESS();
+                if (!empty())
+                    LSTM_LOG_BLOOM_SUCCESS();
 
                 return write_set_lookup{hash};
             }

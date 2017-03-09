@@ -1,34 +1,58 @@
 #ifndef LSTM_DETAIL_TRANSACTION_LOG_HPP
 #define LSTM_DETAIL_TRANSACTION_LOG_HPP
 
-#include <lstm/detail/namespace_macros.hpp>
+// clang-format off
+#ifdef LSTM_LOG_TRANSACTIONS
+    #include <lstm/detail/compiler.hpp>
+    #include <lstm/detail/namespace_macros.hpp>
 
-#include <cassert>
-#include <iomanip>
-#include <map>
-#include <mutex>
-#include <sstream>
-#include <string>
-#include <thread>
-#include <tuple>
+    #include <iomanip>
+    #include <sstream>
+    #include <string>
+    #include <vector>
+    
+    #define LSTM_LOG_INTERNAL_FAIL_TX() ++lstm::detail::tls_record().internal_failures
+    #define LSTM_LOG_USER_FAIL_TX()     ++lstm::detail::tls_record().user_failures
+    #define LSTM_LOG_SUCC_TX()          ++lstm::detail::tls_record().successes
+    #define LSTM_LOG_BLOOM_COLLISION()  ++lstm::detail::tls_record().bloom_collisions
+    #define LSTM_LOG_BLOOM_SUCCESS()    ++lstm::detail::tls_record().bloom_successes
+    #define LSTM_LOG_PUBLISH_RECORD()                                                        \
+        do {                                                                                       \
+            lstm::detail::transaction_log::get().publish(lstm::detail::tls_record());              \
+            lstm::detail::tls_record() = {};                                                       \
+        } while(0)
+    /**/
+    #define LSTM_LOG_CLEAR() lstm::detail::transaction_log::get().clear()
+    #ifndef LSTM_LOG_DUMP
+        #include <iostream>
+        #define LSTM_LOG_DUMP() (std::cout << lstm::detail::transaction_log::get().results())
+    #endif /* LSTM_LOG_DUMP */
+#else
+    #define LSTM_LOG_INTERNAL_FAIL_TX() /**/
+    #define LSTM_LOG_USER_FAIL_TX()     /**/
+    #define LSTM_LOG_SUCC_TX()          /**/
+    #define LSTM_LOG_BLOOM_COLLISION()  /**/
+    #define LSTM_LOG_BLOOM_SUCCESS()    /**/
+    #define LSTM_LOG_PUBLISH_RECORD()   /**/
+    #define LSTM_LOG_CLEAR()            /**/
+    #ifndef LSTM_LOG_DUMP
+        #define LSTM_LOG_DUMP()         /**/
+    #endif /* LSTM_LOG_DUMP */
+#endif /* LSTM_LOG_TRANSACTIONS */
+// clang-format on
+
+#ifdef LSTM_LOG_TRANSACTIONS
 
 LSTM_DETAIL_BEGIN
     struct thread_record
     {
-        std::size_t user_failures;
-        std::size_t internal_failures;
-        std::size_t successes;
-        std::size_t bloom_collisions;
-        std::size_t bloom_successes;
+        std::size_t user_failures{0};
+        std::size_t internal_failures{0};
+        std::size_t successes{0};
+        std::size_t bloom_collisions{0};
+        std::size_t bloom_successes{0};
 
-        constexpr inline thread_record() noexcept
-            : user_failures{0}
-            , internal_failures{0}
-            , successes{0}
-            , bloom_collisions{0}
-            , bloom_successes{0}
-        {
-        }
+        thread_record() noexcept = default;
 
         inline constexpr std::size_t total_failures() const noexcept
         {
@@ -96,31 +120,31 @@ LSTM_DETAIL_BEGIN
         }
     };
 
+    inline thread_record& tls_record() noexcept
+    {
+        static LSTM_THREAD_LOCAL thread_record record{};
+        return record;
+    }
+
     struct transaction_log
     {
     private:
-        using records_t          = std::map<std::thread::id, thread_record>;
+        using records_t          = std::vector<thread_record>;
         using records_iter       = typename records_t::iterator;
         using records_value_type = typename records_t::value_type;
 
-        records_t  records_;
-        std::mutex records_mut;
+        records_t records_;
 
         transaction_log()                       = default;
         transaction_log(const transaction_log&) = delete;
         transaction_log& operator=(const transaction_log&) = delete;
-
-        thread_record& find_record() noexcept
-        {
-            return records_.find(std::this_thread::get_id())->second;
-        }
 
         std::size_t
         total_count(std::function<std::size_t(const thread_record*)> accessor) const noexcept
         {
             std::size_t result = 0;
             for (auto& tid_record : records_)
-                result += accessor(&tid_record.second);
+                result += accessor(&tid_record);
             return result;
         }
 
@@ -131,18 +155,10 @@ LSTM_DETAIL_BEGIN
             return singleton;
         }
 
-        inline void register_thread(const std::thread::id& id) noexcept
+        inline void publish(thread_record record) noexcept
         {
-            bool success;
-            std::tie(std::ignore, success) = records_.emplace(id, thread_record());
-            assert(success);
+            records_.emplace_back(std::move(record));
         }
-
-        void add_success() noexcept { ++find_record().successes; }
-        void add_internal_failure() noexcept { ++find_record().internal_failures; }
-        void add_user_failure() noexcept { ++find_record().user_failures; }
-        void add_bloom_success() noexcept { ++find_record().bloom_successes; }
-        void add_bloom_collision() noexcept { ++find_record().bloom_collisions; }
 
         std::size_t total_transactions() const noexcept
         {
@@ -220,16 +236,6 @@ LSTM_DETAIL_BEGIN
 
         void clear() noexcept { records_.clear(); }
 
-        bool each_threads_successes_equals(std::size_t count) const noexcept
-        {
-            return std::find_if(std::begin(records_),
-                                std::end(records_),
-                                [count](const records_value_type& thread_record) noexcept->bool {
-                                    return thread_record.second.successes != count;
-                                })
-                   == std::end(records_);
-        }
-
         std::string results(bool per_thread = true) const
         {
             std::ostringstream ostr;
@@ -253,7 +259,7 @@ LSTM_DETAIL_BEGIN
                 std::size_t i = 0;
                 for (auto& record : records_) {
                     ostr << "--== Thread: " << std::setw(4) << i++ << " ==--" << '\n';
-                    ostr << record.second.results() << '\n';
+                    ostr << record.results() << '\n';
                 }
             }
             return ostr.str();
@@ -261,4 +267,6 @@ LSTM_DETAIL_BEGIN
     };
 LSTM_DETAIL_END
 
-#endif /*LSTM_DETAIL_TRANSACTION_LOG_HPP*/
+#endif /* LSTM_LOG_TRANSACTIONS */
+
+#endif /* LSTM_DETAIL_TRANSACTION_LOG_HPP */

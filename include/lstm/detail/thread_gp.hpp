@@ -128,6 +128,8 @@ LSTM_DETAIL_BEGIN
                     LSTM_ASSERT(*indirect);
                 }
                 *indirect = next;
+
+                LSTM_LOG_PUBLISH_RECORD();
             }
             unlock_all(); // this->mut does not get unlocked here
             mut.unlock();

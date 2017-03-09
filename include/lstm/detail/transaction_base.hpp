@@ -6,7 +6,7 @@
 LSTM_DETAIL_BEGIN
     [[noreturn]] void internal_retry()
     {
-        LSTM_INTERNAL_FAIL_TX();
+        LSTM_LOG_INTERNAL_FAIL_TX();
         throw tx_retry{};
     }
 
