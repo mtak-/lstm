@@ -9,6 +9,8 @@
 #endif
 // clang-format on
 
+#include <lstm/detail/compiler.hpp>
+#include <lstm/detail/namespace_macros.hpp>
 #include <lstm/detail/transaction_log.hpp>
 
 #include <cstdint>
