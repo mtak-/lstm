@@ -73,7 +73,7 @@ int main()
                 else
                     manager.queue_thread([&intmap, &data, t] {
                         lstm::thread_data& tls_td = lstm::tls_thread_data();
-                        for (int i = iter_count / (thread_count / 2); i >= 0; --i) {
+                        for (int i = iter_count / (thread_count / 2) - 1; i >= 0; --i) {
                             lstm::atomic([&data, &intmap, &tls_td, i, t](
                                 const lstm::read_transaction tx) {
                                 intmap.find(tx,
@@ -101,7 +101,7 @@ int main()
                 if (t < thread_count / 2)
                     manager.queue_thread([&intmap, &data, t] {
                         lstm::thread_data& tls_td = lstm::tls_thread_data();
-                        for (int i = iter_count / (thread_count / 2); i >= 0; --i) {
+                        for (int i = iter_count / (thread_count / 2) - 1; i >= 0; --i) {
                             lstm::atomic([&data, &intmap, &tls_td, i, t](
                                 const lstm::transaction tx) {
                                 intmap.erase_one(tx, data[i + t * iter_count / (thread_count / 2)]);
@@ -111,7 +111,7 @@ int main()
                 else
                     manager.queue_thread([&intmap, &data, t] {
                         lstm::thread_data& tls_td = lstm::tls_thread_data();
-                        for (int i = iter_count / (thread_count / 2); i >= 0; --i) {
+                        for (int i = iter_count / (thread_count / 2) - 1; i >= 0; --i) {
                             lstm::atomic([&data, &intmap, &tls_td, i, t](
                                 const lstm::read_transaction tx) {
                                 intmap.find(tx,

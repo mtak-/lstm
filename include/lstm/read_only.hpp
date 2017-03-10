@@ -29,6 +29,8 @@ LSTM_DETAIL_BEGIN
                     LSTM_ASSERT(valid_start_state(tls_td));
                     LSTM_ASSERT(!tls_td.in_critical_section());
 
+                    LSTM_LOG_SUCC_TX();
+
                     if (std::is_reference<Result>{})
                         return static_cast<Result>(result);
                     else
@@ -62,6 +64,8 @@ LSTM_DETAIL_BEGIN
                     tx_success<tx_kind::read_only>(tls_td, 0);
                     LSTM_ASSERT(valid_start_state(tls_td));
                     LSTM_ASSERT(!tls_td.in_critical_section());
+
+                    LSTM_LOG_SUCC_TX();
 
                     return;
                 } catch (const tx_retry&) {
