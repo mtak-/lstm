@@ -94,6 +94,8 @@ LSTM_BEGIN
 
         void clear_read_write_sets() noexcept
         {
+            LSTM_LOG_READ_SET_SIZE(read_set.size());
+            LSTM_LOG_WRITE_SET_SIZE(write_set.size());
             read_set.clear();
             write_set.clear();
         }

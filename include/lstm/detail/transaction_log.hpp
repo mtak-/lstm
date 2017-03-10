@@ -11,11 +11,18 @@
     #include <string>
     #include <vector>
     
-    #define LSTM_LOG_INTERNAL_FAIL_TX() ++lstm::detail::tls_record().internal_failures
-    #define LSTM_LOG_USER_FAIL_TX()     ++lstm::detail::tls_record().user_failures
-    #define LSTM_LOG_SUCC_TX()          ++lstm::detail::tls_record().successes
-    #define LSTM_LOG_BLOOM_COLLISION()  ++lstm::detail::tls_record().bloom_collisions
-    #define LSTM_LOG_BLOOM_SUCCESS()    ++lstm::detail::tls_record().bloom_successes
+    #define LSTM_LOG_INTERNAL_FAIL_TX()   ++lstm::detail::tls_record().internal_failures
+    #define LSTM_LOG_USER_FAIL_TX()       ++lstm::detail::tls_record().user_failures
+    #define LSTM_LOG_SUCC_TX()            ++lstm::detail::tls_record().successes
+    #define LSTM_LOG_BLOOM_COLLISION()    ++lstm::detail::tls_record().bloom_collisions
+    #define LSTM_LOG_BLOOM_SUCCESS()      ++lstm::detail::tls_record().bloom_successes
+    #define LSTM_LOG_READ_SET_SIZE(size)                                                           \
+        lstm::detail::tls_record().read_size = std::max(lstm::detail::tls_record().read_size, size)\
+    /**/
+    #define LSTM_LOG_WRITE_SET_SIZE(size)                                                          \
+        lstm::detail::tls_record().write_size = std::max(lstm::detail::tls_record().write_size,    \
+                                                         size)                                     \
+    /**/
     #define LSTM_LOG_PUBLISH_RECORD()                                                        \
         do {                                                                                       \
             lstm::detail::transaction_log::get().publish(lstm::detail::tls_record());              \
@@ -28,15 +35,17 @@
         #define LSTM_LOG_DUMP() (std::cout << lstm::detail::transaction_log::get().results())
     #endif /* LSTM_LOG_DUMP */
 #else
-    #define LSTM_LOG_INTERNAL_FAIL_TX() /**/
-    #define LSTM_LOG_USER_FAIL_TX()     /**/
-    #define LSTM_LOG_SUCC_TX()          /**/
-    #define LSTM_LOG_BLOOM_COLLISION()  /**/
-    #define LSTM_LOG_BLOOM_SUCCESS()    /**/
-    #define LSTM_LOG_PUBLISH_RECORD()   /**/
-    #define LSTM_LOG_CLEAR()            /**/
+    #define LSTM_LOG_INTERNAL_FAIL_TX()   /**/
+    #define LSTM_LOG_USER_FAIL_TX()       /**/
+    #define LSTM_LOG_SUCC_TX()            /**/
+    #define LSTM_LOG_BLOOM_COLLISION()    /**/
+    #define LSTM_LOG_BLOOM_SUCCESS()      /**/
+    #define LSTM_LOG_READ_SET_SIZE(size)  /**/
+    #define LSTM_LOG_WRITE_SET_SIZE(size) /**/
+    #define LSTM_LOG_PUBLISH_RECORD()     /**/
+    #define LSTM_LOG_CLEAR()              /**/
     #ifndef LSTM_LOG_DUMP
-        #define LSTM_LOG_DUMP()         /**/
+        #define LSTM_LOG_DUMP()           /**/
     #endif /* LSTM_LOG_DUMP */
 #endif /* LSTM_LOG_TRANSACTIONS */
 // clang-format on
@@ -51,6 +60,8 @@ LSTM_DETAIL_BEGIN
         std::size_t successes{0};
         std::size_t bloom_collisions{0};
         std::size_t bloom_successes{0};
+        std::size_t write_size{0};
+        std::size_t read_size{0};
 
         thread_record() noexcept = default;
 
@@ -115,7 +126,9 @@ LSTM_DETAIL_BEGIN
                  << "    Bloom Collisions:      " << bloom_collisions << '\n'
                  << "    Bloom Successes:       " << bloom_successes << '\n'
                  << "    Bloom Collision Rate:  " << bloom_collision_rate() << '\n'
-                 << "    Bloom Success Rate:    " << bloom_success_rate() << '\n';
+                 << "    Bloom Success Rate:    " << bloom_success_rate() << '\n'
+                 << "    Max Read Size:         " << read_size << '\n'
+                 << "    Max Write Size:        " << write_size << '\n';
             return ostr.str();
         }
     };

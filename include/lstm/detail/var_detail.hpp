@@ -14,7 +14,13 @@ LSTM_BEGIN
 LSTM_END
 
 LSTM_DETAIL_BEGIN
-    struct var_base
+    struct var_aligner
+    {
+        std::atomic<gp_t>        _dummy0;
+        std::atomic<var_storage> _dummy1;
+    };
+
+    struct alignas(alignof(var_aligner) << 1) var_base
     {
     protected:
         std::atomic<gp_t>        version_lock;
