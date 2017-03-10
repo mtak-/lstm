@@ -4,7 +4,7 @@
 #include <lstm/thread_data.hpp>
 
 LSTM_DETAIL_BEGIN
-    [[noreturn]] void internal_retry()
+    [[noreturn]] LSTM_NOINLINE inline void internal_retry()
     {
         LSTM_LOG_INTERNAL_FAIL_TX();
         throw tx_retry{};

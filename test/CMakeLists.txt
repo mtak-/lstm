@@ -1,4 +1,5 @@
 add_subdirectory(include)
+add_subdirectory(multi_file_test)
 
 add_executable(var var.cpp)
 add_test(test.var var)

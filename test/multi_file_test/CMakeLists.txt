@@ -1,0 +1,1 @@
+add_executable(multi_file_test file0.cpp file1.cpp)
