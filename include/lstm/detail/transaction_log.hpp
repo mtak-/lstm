@@ -293,7 +293,7 @@ LSTM_DETAIL_BEGIN
 
         void clear() noexcept { records_.clear(); }
 
-        std::string results(bool per_thread = false) const
+        std::string results(bool per_thread = true) const
         {
             std::ostringstream ostr;
             ostr << "Total Transactions:      " << total_transactions() << '\n'
