@@ -122,24 +122,24 @@ LSTM_DETAIL_BEGIN
         std::string results() const
         {
             std::ostringstream ostr;
-            ostr << "    Total Transactions:    " << total_transactions() << '\n'
-                 << "    Total Successes:       " << successes << '\n'
-                 << "    Total Failures:        " << total_failures() << '\n'
-                 << "    Internal Failures:     " << internal_failures << '\n'
-                 << "    User Failures:         " << user_failures << '\n'
-                 << "    Success Rate:          " << success_rate() << '\n'
-                 << "    Failure Rate:          " << failure_rate() << '\n'
-                 << "    Internal Failure Rate: " << internal_failure_rate() << '\n'
-                 << "    User Failure Rate:     " << user_failure_rate() << '\n'
-                 << "    Total Bloom Checks:    " << total_bloom_checks() << '\n'
-                 << "    Bloom Collisions:      " << bloom_collisions << '\n'
-                 << "    Bloom Successes:       " << bloom_successes << '\n'
-                 << "    Bloom Collision Rate:  " << bloom_collision_rate() << '\n'
-                 << "    Bloom Success Rate:    " << bloom_success_rate() << '\n'
-                 << "    Max Read Size:         " << max_read_size << '\n'
-                 << "    Max Write Size:        " << max_write_size << '\n'
-                 << "    Average Read Size:     " << avg_read_size << '\n'
-                 << "    Average Write Size:    " << avg_write_size << '\n';
+            ostr << "    Total Transactions:     " << total_transactions() << '\n'
+                 << "    Total Successes:        " << successes << '\n'
+                 << "    Total Failures:         " << total_failures() << '\n'
+                 << "    Internal Failures:      " << internal_failures << '\n'
+                 << "    User Failures:          " << user_failures << '\n'
+                 << "    Success Rate:           " << success_rate() << '\n'
+                 << "    Failure Rate:           " << failure_rate() << '\n'
+                 << "    Internal Failure Rate:  " << internal_failure_rate() << '\n'
+                 << "    User Failure Rate:      " << user_failure_rate() << '\n'
+                 << "    Total Bloom Checks:     " << total_bloom_checks() << '\n'
+                 << "    Bloom Collisions:       " << bloom_collisions << '\n'
+                 << "    Bloom Successes:        " << bloom_successes << '\n'
+                 << "    Bloom Collision Rate:   " << bloom_collision_rate() << '\n'
+                 << "    Bloom Success Rate:     " << bloom_success_rate() << '\n'
+                 << "    Max Read Set Size:      " << max_read_size << '\n'
+                 << "    Max Write Set Size:     " << max_write_size << '\n'
+                 << "    Average Read Set Size:  " << avg_read_size << '\n'
+                 << "    Average Write Set Size: " << avg_write_size << '\n';
             return ostr.str();
         }
     };
@@ -254,13 +254,46 @@ LSTM_DETAIL_BEGIN
             return total_bloom_collisions() / float(total_bloom_checks());
         }
 
+        inline std::size_t max_read_size() const noexcept
+        {
+            std::size_t result = 0;
+            for (auto& record : records_)
+                result = std::max(result, record.max_read_size);
+            return result;
+        }
+
+        inline std::size_t max_write_size() const noexcept
+        {
+            std::size_t result = 0;
+            for (auto& record : records_)
+                result = std::max(result, record.max_write_size);
+            return result;
+        }
+
+        inline double avg_read_size() const noexcept
+        {
+            double result = 0.f;
+            for (auto& record : records_)
+                result += record.avg_read_size * record.total_transactions() / total_transactions();
+            return result;
+        }
+
+        inline double avg_write_size() const noexcept
+        {
+            double result = 0.f;
+            for (auto& record : records_)
+                result
+                    += record.avg_write_size * record.total_transactions() / total_transactions();
+            return result;
+        }
+
         std::size_t thread_count() const noexcept { return records_.size(); }
 
         const records_t& records() const noexcept { return records_; }
 
         void clear() noexcept { records_.clear(); }
 
-        std::string results(bool per_thread = true) const
+        std::string results(bool per_thread = false) const
         {
             std::ostringstream ostr;
             ostr << "Total Transactions:      " << total_transactions() << '\n'
@@ -277,7 +310,11 @@ LSTM_DETAIL_BEGIN
                  << "Bloom Collisions:        " << total_bloom_collisions() << '\n'
                  << "Bloom Successes:         " << total_bloom_successes() << '\n'
                  << "Bloom Collision Rate:    " << bloom_collision_rate() << '\n'
-                 << "Bloom Success Rate:      " << bloom_success_rate() << "\n\n";
+                 << "Bloom Success Rate:      " << bloom_success_rate() << '\n'
+                 << "Max Read Set Size:       " << max_read_size() << '\n'
+                 << "Max Write Set Size:      " << max_write_size() << '\n'
+                 << "Average Read Set Size:   " << avg_read_size() << '\n'
+                 << "Average Write Set Size:  " << avg_write_size() << "\n\n";
 
             if (per_thread) {
                 std::size_t i = 0;
