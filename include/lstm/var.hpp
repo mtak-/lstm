@@ -327,6 +327,19 @@ LSTM_BEGIN
         {
             tx.write(*this, (U &&) u);
         }
+
+#ifndef LSTM_MAKE_SFINAE_FRIENDLY
+        template<typename U,
+                 LSTM_REQUIRES_(!std::is_assignable<value_type&, U&&>()
+                                || !std::is_constructible<value_type, U&&>())>
+        LSTM_ALWAYS_INLINE void set(const transaction tx, U&& u)
+        {
+            static_assert(std::is_assignable<value_type&, U&&>(),
+                          "set requires lstm::var<T>::value_type be assignable by U");
+            static_assert(std::is_constructible<value_type, U&&>(),
+                          "set requires lstm::var<T>::value_type be constructible by U")
+        }
+#endif /* LSTM_MAKE_SFINAE_FRIENDLY */
     };
 LSTM_END
 

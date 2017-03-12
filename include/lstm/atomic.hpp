@@ -209,7 +209,7 @@ LSTM_DETAIL_BEGIN
                                                                Args&&...>(),
                           "functions passed to lstm::atomic must not be marked noexcept");
         }
-#endif
+#endif /* LSTM_MAKE_SFINAE_FRIENDLY */
     };
 LSTM_DETAIL_END
 
