@@ -260,6 +260,17 @@ LSTM_BEGIN
                                                                              : &next_parent->right_;
                 parent = next_parent;
             }
+            auto root = tx.read(root_);
+            if (parent && parent != root) {
+                tx.read(parent->key);
+                tx.read(parent->left_);
+                tx.read(parent->right_);
+                auto pp = (node_t*)tx.read(parent->parent_);
+                if (pp && pp != root) {
+                    tx.read(pp->left_);
+                    tx.read(pp->right_);
+                }
+            }
 
             new_node->parent_.unsafe_write(parent);
             tx.write(*cur, new_node);
