@@ -335,9 +335,9 @@ LSTM_BEGIN
         LSTM_ALWAYS_INLINE void set(const transaction, U&&)
         {
             static_assert(std::is_assignable<value_type&, U&&>(),
-                          "set requires lstm::var<T>::value_type be assignable by U");
+                          "set requires lstm::var<>::value_type be assignable by U");
             static_assert(std::is_constructible<value_type, U&&>(),
-                          "set requires lstm::var<T>::value_type be constructible by U");
+                          "set requires lstm::var<>::value_type be constructible by U");
         }
 #endif /* LSTM_MAKE_SFINAE_FRIENDLY */
     };
