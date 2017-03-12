@@ -6,6 +6,9 @@
 LSTM_BEGIN
     struct transaction : private detail::transaction_base
     {
+        template<typename, typename>
+        friend struct ::lstm::var;
+
         inline transaction(thread_data& in_tls_td, const gp_t in_version) noexcept
             : transaction_base(&in_tls_td, in_version)
         {
@@ -46,53 +49,6 @@ LSTM_BEGIN
         bool read_write_valid(const detail::var_base& v) const noexcept { return rw_valid(v); }
         bool read_valid(const gp_t version) const noexcept { return rw_valid(version); }
         bool read_valid(const detail::var_base& v) const noexcept { return rw_valid(v); }
-
-        template<typename T, typename Alloc, LSTM_REQUIRES_(!var<T, Alloc>::atomic)>
-        LSTM_ALWAYS_INLINE const T& read(const var<T, Alloc>& src_var) const
-        {
-            return rw_read(src_var);
-        }
-
-        template<typename T, typename Alloc, LSTM_REQUIRES_(var<T, Alloc>::atomic)>
-        LSTM_ALWAYS_INLINE T read(const var<T, Alloc>& src_var) const
-        {
-            return rw_read(src_var);
-        }
-
-        template<typename T,
-                 typename Alloc,
-                 typename U = T,
-                 LSTM_REQUIRES_(std::is_assignable<T&, U&&>() && std::is_constructible<T, U&&>())>
-        LSTM_ALWAYS_INLINE void write(var<T, Alloc>& dest_var, U&& u) const
-        {
-            rw_write(dest_var, (U &&) u);
-        }
-
-        template<typename T, typename Alloc, LSTM_REQUIRES_(!var<T, Alloc>::atomic)>
-        LSTM_ALWAYS_INLINE const T& untracked_read(const var<T, Alloc>& src_var) const
-        {
-            return rw_untracked_read(src_var);
-        }
-
-        template<typename T, typename Alloc, LSTM_REQUIRES_(var<T, Alloc>::atomic)>
-        LSTM_ALWAYS_INLINE T untracked_read(const var<T, Alloc>& src_var) const
-        {
-            return rw_untracked_read(src_var);
-        }
-
-        // reading/writing an rvalue probably never makes sense
-        template<typename T, typename Alloc>
-        void read(var<T, Alloc>&& v) const = delete;
-        template<typename T, typename Alloc>
-        void read(const var<T, Alloc>&& v) const = delete;
-        template<typename T, typename Alloc>
-        void write(var<T, Alloc>&& v) const = delete;
-        template<typename T, typename Alloc>
-        void write(const var<T, Alloc>&& v) const = delete;
-        template<typename T, typename Alloc>
-        void untracked_read(var<T, Alloc>&& v) const = delete;
-        template<typename T, typename Alloc>
-        void untracked_read(const var<T, Alloc>&& v) const = delete;
     };
 LSTM_END
 

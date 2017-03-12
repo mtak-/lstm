@@ -276,48 +276,48 @@ LSTM_BEGIN
         }
 
         LSTM_REQUIRES(atomic)
-        LSTM_ALWAYS_INLINE value_type get(const transaction tx) const { return tx.read(*this); }
+        LSTM_ALWAYS_INLINE value_type get(const transaction tx) const { return tx.rw_read(*this); }
 
         LSTM_REQUIRES(!atomic)
         LSTM_ALWAYS_INLINE const value_type& get(const transaction tx) const
         {
-            return tx.read(*this);
+            return tx.rw_read(*this);
         }
 
         LSTM_REQUIRES(atomic)
         LSTM_ALWAYS_INLINE value_type get(const read_transaction tx) const
         {
-            return tx.read(*this);
+            return tx.ro_read(*this);
         }
 
         LSTM_REQUIRES(!atomic)
         LSTM_ALWAYS_INLINE const value_type& get(const read_transaction tx) const
         {
-            return tx.read(*this);
+            return tx.ro_read(*this);
         }
 
         LSTM_REQUIRES(atomic)
         LSTM_ALWAYS_INLINE value_type untracked_get(const transaction tx) const
         {
-            return tx.untracked_read(*this);
+            return tx.rw_untracked_read(*this);
         }
 
         LSTM_REQUIRES(!atomic)
         LSTM_ALWAYS_INLINE const value_type& untracked_get(const transaction tx) const
         {
-            return tx.untracked_read(*this);
+            return tx.rw_untracked_read(*this);
         }
 
         LSTM_REQUIRES(atomic)
         LSTM_ALWAYS_INLINE value_type untracked_get(const read_transaction tx) const
         {
-            return tx.untracked_read(*this);
+            return tx.ro_untracked_read(*this);
         }
 
         LSTM_REQUIRES(!atomic)
         LSTM_ALWAYS_INLINE const value_type& untracked_get(const read_transaction tx) const
         {
-            return tx.untracked_read(*this);
+            return tx.ro_untracked_read(*this);
         }
 
         template<typename U,
@@ -325,7 +325,7 @@ LSTM_BEGIN
                                 && std::is_constructible<value_type, U&&>())>
         LSTM_ALWAYS_INLINE void set(const transaction tx, U&& u)
         {
-            tx.write(*this, (U &&) u);
+            tx.rw_write(*this, (U &&) u);
         }
 
 #ifndef LSTM_MAKE_SFINAE_FRIENDLY
