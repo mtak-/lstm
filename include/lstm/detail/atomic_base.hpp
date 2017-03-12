@@ -43,6 +43,8 @@ LSTM_DETAIL_BEGIN
 
             if (kind != tx_kind::read_only)
                 tls_td.clear_read_write_sets();
+            else
+                LSTM_LOG_READ_AND_WRITE_SET_SIZE(0, 0);
             tls_td.succ_callbacks.active().callbacks.clear();
             tls_td.do_fail_callbacks();
         }
@@ -78,6 +80,8 @@ LSTM_DETAIL_BEGIN
 
             if (kind != tx_kind::read_only)
                 tls_td.clear_read_write_sets();
+            else
+                LSTM_LOG_READ_AND_WRITE_SET_SIZE(0, 0);
             tls_td.fail_callbacks.clear();
             tls_td.reclaim(sync_version);
         }
