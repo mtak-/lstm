@@ -49,6 +49,14 @@ LSTM_BEGIN
         bool read_write_valid(const detail::var_base& v) const noexcept { return rw_valid(v); }
         bool read_valid(const gp_t version) const noexcept { return rw_valid(version); }
         bool read_valid(const detail::var_base& v) const noexcept { return rw_valid(v); }
+
+        template<typename Func,
+                 LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
+        void sometime_after(Func&& func) const
+            noexcept(noexcept(transaction_base::sometime_after((Func &&) func)))
+        {
+            transaction_base::sometime_after((Func &&) func);
+        }
     };
 LSTM_END
 

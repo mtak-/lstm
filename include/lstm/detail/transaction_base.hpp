@@ -65,10 +65,9 @@ LSTM_DETAIL_BEGIN
                 if (LSTM_LIKELY(rw_valid(dest_var.version_lock.load(LSTM_ACQUIRE)))) {
                     const var_storage new_storage = dest_var.allocate_construct((U &&) u);
                     tls_td->add_write_set(dest_var, new_storage, lookup.hash());
-                    tls_td->sometime_after(
-                        [ alloc = dest_var.alloc(), cur_storage ]() mutable noexcept {
-                            var<T, Alloc>::destroy_deallocate(alloc, cur_storage);
-                        });
+                    sometime_after([ alloc = dest_var.alloc(), cur_storage ]() mutable noexcept {
+                        var<T, Alloc>::destroy_deallocate(alloc, cur_storage);
+                    });
                     tls_td->queue_fail_callback(
                         [ alloc = dest_var.alloc(), new_storage ]() mutable noexcept {
                             var<T, Alloc>::destroy_deallocate(alloc, new_storage);
@@ -353,6 +352,14 @@ LSTM_DETAIL_BEGIN
                               var<T, Alloc>::load(src_var.storage.load()))>{},
                           "");
             return var<T, Alloc>::load(ro_untracked_read_base(src_var));
+        }
+
+        template<typename Func, LSTM_REQUIRES_(std::is_constructible<gp_callback, Func&&>{})>
+        void
+        sometime_after(Func&& func) const noexcept(noexcept(tls_td->sometime_after((Func &&) func)))
+        {
+            LSTM_ASSERT(valid(tls_td));
+            tls_td->sometime_after((Func &&) func);
         }
     };
 LSTM_DETAIL_END

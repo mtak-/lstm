@@ -109,13 +109,12 @@ LSTM_BEGIN
 
         void clear()
         {
-            thread_data& tls_td = tls_thread_data();
-            lstm::atomic(tls_td, [&](const transaction tx) {
+            lstm::atomic([&](const transaction tx) {
                 size_.set(tx, 0);
                 auto root = head.get(tx);
                 head.set(tx, nullptr);
                 if (root) {
-                    tls_td.sometime_after([ alloc = alloc(), root ]() noexcept {
+                    tx.sometime_after([ alloc = alloc(), root ]() noexcept {
                         destroy_deallocate_sublist(alloc, root);
                     });
                 }

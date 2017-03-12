@@ -33,7 +33,7 @@ LSTM_DETAIL_BEGIN
         gp_callback() noexcept = default;
 
     public:
-        template<typename F, LSTM_REQUIRES_(sbo_concept<F>{})>
+        template<typename F, LSTM_REQUIRES_(sbo_concept<F>() && callable<uncvref<F>>())>
         gp_callback(F&& f) noexcept(std::is_nothrow_constructible<uncvref<F>, F&&>{})
         {
             static_assert(noexcept(f()), "gp_callbacks must be noexcept");
