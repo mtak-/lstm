@@ -332,7 +332,7 @@ LSTM_BEGIN
         template<typename U,
                  LSTM_REQUIRES_(!std::is_assignable<value_type&, U&&>()
                                 || !std::is_constructible<value_type, U&&>())>
-        LSTM_ALWAYS_INLINE void set(const transaction tx, U&& u)
+        LSTM_ALWAYS_INLINE void set(const transaction, U&&)
         {
             static_assert(std::is_assignable<value_type&, U&&>(),
                           "set requires lstm::var<T>::value_type be assignable by U");
