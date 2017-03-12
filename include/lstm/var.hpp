@@ -2,6 +2,8 @@
 #define LSTM_VAR_HPP
 
 #include <lstm/detail/var_detail.hpp>
+#include <lstm/read_transaction.hpp>
+#include <lstm/transaction.hpp>
 
 LSTM_BEGIN
     template<typename T, typename Alloc>
@@ -271,6 +273,59 @@ LSTM_BEGIN
                                                                         std::move(t))))
         {
             return base::store(detail::var_base::storage, std::move(t));
+        }
+
+        LSTM_REQUIRES(atomic)
+        LSTM_ALWAYS_INLINE value_type get(const transaction tx) const { return tx.read(*this); }
+
+        LSTM_REQUIRES(!atomic)
+        LSTM_ALWAYS_INLINE const value_type& get(const transaction tx) const
+        {
+            return tx.read(*this);
+        }
+
+        LSTM_REQUIRES(atomic)
+        LSTM_ALWAYS_INLINE value_type get(const read_transaction tx) const
+        {
+            return tx.read(*this);
+        }
+
+        LSTM_REQUIRES(!atomic)
+        LSTM_ALWAYS_INLINE const value_type& get(const read_transaction tx) const
+        {
+            return tx.read(*this);
+        }
+
+        LSTM_REQUIRES(atomic)
+        LSTM_ALWAYS_INLINE value_type untracked_get(const transaction tx) const
+        {
+            return tx.untracked_read(*this);
+        }
+
+        LSTM_REQUIRES(!atomic)
+        LSTM_ALWAYS_INLINE const value_type& untracked_get(const transaction tx) const
+        {
+            return tx.untracked_read(*this);
+        }
+
+        LSTM_REQUIRES(atomic)
+        LSTM_ALWAYS_INLINE value_type untracked_get(const read_transaction tx) const
+        {
+            return tx.untracked_read(*this);
+        }
+
+        LSTM_REQUIRES(!atomic)
+        LSTM_ALWAYS_INLINE const value_type& untracked_get(const read_transaction tx) const
+        {
+            return tx.untracked_read(*this);
+        }
+
+        template<typename U,
+                 LSTM_REQUIRES_(std::is_assignable<value_type&, U&&>()
+                                && std::is_constructible<value_type, U&&>())>
+        LSTM_ALWAYS_INLINE void set(const transaction tx, U&& u)
+        {
+            tx.write(*this, (U &&) u);
         }
     };
 LSTM_END
