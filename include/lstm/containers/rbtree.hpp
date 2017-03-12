@@ -498,10 +498,9 @@ LSTM_BEGIN
         {
             if (auto root = (node_t*)root_.get(tx)) {
                 root_.set(tx, nullptr);
-                lstm::tls_thread_data().queue_succ_callback(
-                    [ alloc = this->alloc(), root ]() noexcept {
-                        destroy_deallocate_subtree(alloc, root);
-                    });
+                lstm::tls_thread_data().sometime_after([ alloc = this->alloc(), root ]() noexcept {
+                    destroy_deallocate_subtree(alloc, root);
+                });
             }
         }
 

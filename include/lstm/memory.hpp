@@ -74,7 +74,7 @@ LSTM_BEGIN
              LSTM_REQUIRES_(!std::is_const<Alloc>{})>
     inline void deallocate(thread_data & tls_td, Alloc & alloc, typename AllocTraits::pointer ptr)
     {
-        tls_td.queue_succ_callback([ alloc, ptr = std::move(ptr) ]() mutable noexcept {
+        tls_td.sometime_after([ alloc, ptr = std::move(ptr) ]() mutable noexcept {
             AllocTraits::deallocate(alloc, std::move(ptr), 1);
         });
     }
@@ -88,7 +88,7 @@ LSTM_BEGIN
                            typename AllocTraits::pointer ptr,
                            const std::size_t             count)
     {
-        tls_td.queue_succ_callback([ alloc, ptr = std::move(ptr), count ]() mutable noexcept {
+        tls_td.sometime_after([ alloc, ptr = std::move(ptr), count ]() mutable noexcept {
             AllocTraits::deallocate(alloc, std::move(ptr), count);
         });
     }
@@ -172,8 +172,7 @@ LSTM_BEGIN
              LSTM_REQUIRES_(!std::is_const<Alloc>{} && !std::is_trivially_destructible<T>{})>
     inline void destroy(thread_data & tls_td, Alloc & alloc, T * t)
     {
-        tls_td.queue_succ_callback(
-            [ alloc, t ]() mutable noexcept { AllocTraits::destroy(alloc, t); });
+        tls_td.sometime_after([ alloc, t ]() mutable noexcept { AllocTraits::destroy(alloc, t); });
     }
 
     template<typename Alloc,
@@ -264,7 +263,7 @@ LSTM_BEGIN
                                    Alloc & alloc,
                                    typename AllocTraits::pointer ptr)
     {
-        tls_td.queue_succ_callback([ alloc, ptr = std::move(ptr) ]() mutable noexcept {
+        tls_td.sometime_after([ alloc, ptr = std::move(ptr) ]() mutable noexcept {
             AllocTraits::destroy(alloc, detail::to_raw_pointer(ptr));
             AllocTraits::deallocate(alloc, std::move(ptr), 1);
         });
@@ -279,7 +278,7 @@ LSTM_BEGIN
                                    Alloc & alloc,
                                    typename AllocTraits::pointer ptr)
     {
-        tls_td.queue_succ_callback([ alloc, ptr = std::move(ptr) ]() mutable noexcept {
+        tls_td.sometime_after([ alloc, ptr = std::move(ptr) ]() mutable noexcept {
             AllocTraits::deallocate(alloc, std::move(ptr), 1);
         });
     }

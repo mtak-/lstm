@@ -115,7 +115,7 @@ LSTM_BEGIN
                 auto root = head.get(tx);
                 head.set(tx, nullptr);
                 if (root) {
-                    tls_td.queue_succ_callback([ alloc = alloc(), root ]() noexcept {
+                    tls_td.sometime_after([ alloc = alloc(), root ]() noexcept {
                         destroy_deallocate_sublist(alloc, root);
                     });
                 }

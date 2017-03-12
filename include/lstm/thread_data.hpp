@@ -9,16 +9,14 @@
 #include <lstm/detail/var_detail.hpp>
 #include <lstm/detail/write_set_value_type.hpp>
 
-LSTM_DETAIL_BEGIN
+LSTM_BEGIN
     enum class tx_kind : char
     {
         none = 0,
         read_write,
         read_only
     };
-LSTM_DETAIL_END
 
-LSTM_BEGIN
     struct LSTM_CACHE_ALIGNED thread_data
     {
     private:
@@ -33,14 +31,14 @@ LSTM_BEGIN
         using write_set_iter      = typename write_set_t::iterator;
         using callbacks_iter      = typename callbacks_t::iterator;
 
-        // TODO: optimize this layout once batching is implemented
+        // TODO: optimize this layout
         struct _cache_line_offset_calculation
         {
             read_set_t                  a;
             write_set_t                 b;
             callbacks_t                 c;
             detail::succ_callbacks_t<4> d;
-            detail::tx_kind             e;
+            tx_kind                     e;
             int*                        desired;
         };
         static constexpr std::size_t tgp_cache_line_offset
@@ -50,7 +48,7 @@ LSTM_BEGIN
         write_set_t                                   write_set;
         callbacks_t                                   fail_callbacks;
         detail::succ_callbacks_t<4>                   succ_callbacks;
-        detail::tx_kind                               tx_state;
+        tx_kind                                       tx_state;
         detail::thread_gp_node<tgp_cache_line_offset> tgp_node;
 
         void remove_read_set(const detail::var_base& src_var) noexcept
@@ -159,7 +157,7 @@ LSTM_BEGIN
 
     public:
         LSTM_NOINLINE thread_data() noexcept
-            : tx_state(detail::tx_kind::none)
+            : tx_state(tx_kind::none)
         {
         }
 
@@ -180,12 +178,17 @@ LSTM_BEGIN
 
         LSTM_ALWAYS_INLINE bool in_transaction() const noexcept
         {
-            return tx_state != detail::tx_kind::none;
+            return tx_state != tx_kind::none;
+        }
+
+        LSTM_ALWAYS_INLINE bool in_read_only_transaction() const noexcept
+        {
+            return tx_state == tx_kind::read_only;
         }
 
         LSTM_ALWAYS_INLINE bool in_read_write_transaction() const noexcept
         {
-            return tx_state == detail::tx_kind::read_write;
+            return tx_state == tx_kind::read_write;
         }
 
         LSTM_ALWAYS_INLINE bool in_critical_section() const noexcept
@@ -193,7 +196,7 @@ LSTM_BEGIN
             return tgp_node.in_critical_section();
         }
 
-        LSTM_ALWAYS_INLINE detail::tx_kind tx_kind() const noexcept { return tx_state; }
+        LSTM_ALWAYS_INLINE tx_kind tx_kind() const noexcept { return tx_state; }
 
         LSTM_ALWAYS_INLINE gp_t gp() const noexcept { return tgp_node.gp(); }
 
@@ -223,7 +226,7 @@ LSTM_BEGIN
 
         template<typename Func,
                  LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
-        void queue_succ_callback(Func&& func) noexcept(
+        void sometime_after(Func&& func) noexcept(
             noexcept(succ_callbacks.active().callbacks.emplace_back((Func &&) func)))
         {
             LSTM_ASSERT(in_transaction());

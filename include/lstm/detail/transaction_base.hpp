@@ -65,7 +65,7 @@ LSTM_DETAIL_BEGIN
                 if (LSTM_LIKELY(rw_valid(dest_var.version_lock.load(LSTM_ACQUIRE)))) {
                     const var_storage new_storage = dest_var.allocate_construct((U &&) u);
                     tls_td->add_write_set(dest_var, new_storage, lookup.hash());
-                    tls_td->queue_succ_callback(
+                    tls_td->sometime_after(
                         [ alloc = dest_var.alloc(), cur_storage ]() mutable noexcept {
                             var<T, Alloc>::destroy_deallocate(alloc, cur_storage);
                         });
