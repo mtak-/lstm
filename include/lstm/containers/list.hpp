@@ -69,22 +69,22 @@ LSTM_BEGIN
 
         static node_t* unsafe_prev(node_t& n) noexcept
         {
-            return reinterpret_cast<node_t*>(n.prev_.unsafe_read());
+            return reinterpret_cast<node_t*>(n.prev_.unsafe_get());
         }
 
         static const node_t* unsafe_prev(const node_t& n) noexcept
         {
-            return reinterpret_cast<const node_t*>(n.prev_.unsafe_read());
+            return reinterpret_cast<const node_t*>(n.prev_.unsafe_get());
         }
 
         static node_t* unsafe_next(node_t& n) noexcept
         {
-            return reinterpret_cast<node_t*>(n.next_.unsafe_read());
+            return reinterpret_cast<node_t*>(n.next_.unsafe_get());
         }
 
         static const node_t* unsafe_next(const node_t& n) noexcept
         {
-            return reinterpret_cast<const node_t*>(n.next_.unsafe_read());
+            return reinterpret_cast<const node_t*>(n.next_.unsafe_get());
         }
 
         static void destroy_deallocate_sublist(Alloc alloc, node_t* node)
@@ -105,7 +105,7 @@ LSTM_BEGIN
         {
         }
 
-        ~list() { destroy_deallocate_sublist(alloc(), head.unsafe_read()); }
+        ~list() { destroy_deallocate_sublist(alloc(), head.unsafe_get()); }
 
         void clear()
         {
@@ -129,7 +129,7 @@ LSTM_BEGIN
             node_t*      new_head = lstm::allocate_construct(tls_td, alloc(), (Us &&) us...);
             lstm::atomic(tls_td, [&](const transaction tx) {
                 auto head_ = head.get(tx);
-                new_head->next_.unsafe_write(head_);
+                new_head->next_.unsafe_set(head_);
 
                 if (head_)
                     head_->prev_.set(tx, (void*)new_head);

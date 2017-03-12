@@ -252,7 +252,7 @@ LSTM_BEGIN
             node_t* next_parent;
 
             auto*       cur = &root_;
-            const auto& key = new_node->key.unsafe_read();
+            const auto& key = new_node->key.unsafe_get();
 
             auto read_tx = tx.unsafe_checked_demote();
             while ((next_parent = (node_t*)cur->untracked_get(read_tx))) {
@@ -272,7 +272,7 @@ LSTM_BEGIN
                 }
             }
 
-            new_node->parent_.unsafe_write(parent);
+            new_node->parent_.unsafe_set(parent);
             cur->set(tx, new_node);
             insert_case1(tx, new_node);
         }
@@ -462,15 +462,15 @@ LSTM_BEGIN
 
         static void destroy_deallocate_subtree(alloc_t alloc, node_t* node)
         {
-            while (node->left_.unsafe_read()) {
+            while (node->left_.unsafe_get()) {
                 node_t* parent = node;
-                auto    leaf   = (node_t*)node->left_.unsafe_read();
-                while (leaf->left_.unsafe_read()) {
+                auto    leaf   = (node_t*)node->left_.unsafe_get();
+                while (leaf->left_.unsafe_get()) {
                     parent = leaf;
-                    leaf   = (node_t*)leaf->left_.unsafe_read();
+                    leaf   = (node_t*)leaf->left_.unsafe_get();
                 }
-                parent->left_.unsafe_write(parent->right_.unsafe_read());
-                parent->right_.unsafe_write(nullptr);
+                parent->left_.unsafe_set(parent->right_.unsafe_get());
+                parent->right_.unsafe_set(nullptr);
                 alloc_traits::destroy(alloc, leaf);
                 alloc_traits::deallocate(alloc, leaf, 1);
             }
@@ -490,7 +490,7 @@ LSTM_BEGIN
         rbtree& operator=(const rbtree&) = delete;
         ~rbtree()
         {
-            if (auto root = (node_t*)root_.unsafe_read())
+            if (auto root = (node_t*)root_.unsafe_get())
                 destroy_deallocate_subtree(alloc(), root);
         }
 

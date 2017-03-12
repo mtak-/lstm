@@ -251,29 +251,31 @@ LSTM_BEGIN
         allocator_type get_allocator() const noexcept { return base::alloc(); }
 
         LSTM_REQUIRES(atomic)
-        value_type unsafe_read() const noexcept
+        value_type unsafe_get() const noexcept
         {
             return base::load(detail::var_base::storage.load(LSTM_RELAXED));
         }
 
         LSTM_REQUIRES(!atomic)
-        const value_type& unsafe_read() const noexcept
+        const value_type& unsafe_get() const noexcept
         {
             return base::load(detail::var_base::storage.load(LSTM_RELAXED));
         }
 
-        void
-        unsafe_write(const value_type& t) noexcept(noexcept(base::store(detail::var_base::storage,
-                                                                        t)))
+        template<typename U = value_type, LSTM_REQUIRES_(std::is_assignable<value_type&, U&&>())>
+        void unsafe_set(U&& u) noexcept(noexcept(base::store(detail::var_base::storage, (U &&) u)))
         {
-            return base::store(detail::var_base::storage, t);
+            base::store(detail::var_base::storage, (U &&) u);
         }
 
-        void unsafe_write(value_type&& t) noexcept(noexcept(base::store(detail::var_base::storage,
-                                                                        std::move(t))))
+#ifndef LSTM_MAKE_SFINAE_FRIENDLY
+        template<typename U = value_type, LSTM_REQUIRES_(!std::is_assignable<value_type&, U&&>())>
+        LSTM_ALWAYS_INLINE void unsafe_set(U&&)
         {
-            return base::store(detail::var_base::storage, std::move(t));
+            static_assert(std::is_assignable<value_type&, U&&>(),
+                          "unsafe_set requires lstm::var<>::value_type be assignable by U");
         }
+#endif /* LSTM_MAKE_SFINAE_FRIENDLY */
 
         LSTM_REQUIRES(atomic)
         LSTM_ALWAYS_INLINE value_type get(const transaction tx) const { return tx.rw_read(*this); }

@@ -57,18 +57,6 @@ LSTM_BEGIN
         {
             return std::move(base::underlying());
         }
-
-        LSTM_REQUIRES(atomic)
-        value_type unsafe_read() const noexcept { return underlying().unsafe_read(); }
-
-        LSTM_REQUIRES(!atomic)
-        const value_type& unsafe_read() const noexcept { return underlying().unsafe_read(); }
-
-        void unsafe_write(const value_type& t) noexcept { return underlying().unsafe_write(t); }
-        void unsafe_write(value_type&& t) noexcept
-        {
-            return underlying().unsafe_write(std::move(t));
-        }
     };
 LSTM_END
 

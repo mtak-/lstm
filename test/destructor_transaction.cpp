@@ -78,10 +78,10 @@ int main()
         tm.run();
     }
 
-    CHECK(x.unsafe_read().x == loop_count);
-    CHECK(x.unsafe_read().y == loop_count);
-    CHECK(x.unsafe_read().z == loop_count);
-    CHECK(x.unsafe_read().w == loop_count);
+    CHECK(x.unsafe_get().x == loop_count);
+    CHECK(x.unsafe_get().y == loop_count);
+    CHECK(x.unsafe_get().z == loop_count);
+    CHECK(x.unsafe_get().w == loop_count);
 
     return test_result();
 }

@@ -38,8 +38,8 @@ auto get_loop(philosopher& p, fork& f0, fork& f1)
 
             std::atomic_thread_fence(std::memory_order_release);
 
-            f0.in_use.unsafe_write(false);
-            f1.in_use.unsafe_write(false);
+            f0.in_use.unsafe_set(false);
+            f1.in_use.unsafe_set(false);
         }
     };
 }
@@ -58,7 +58,7 @@ int main()
         manager.run();
 
         for (auto& fork : forks)
-            CHECK(fork.in_use.unsafe_read() == false);
+            CHECK(fork.in_use.unsafe_get() == false);
 
         for (auto& phil : phils)
             CHECK(phil.food == 0u);

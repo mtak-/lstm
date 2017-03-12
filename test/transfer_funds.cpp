@@ -43,8 +43,8 @@ int main()
 
         manager.run();
 
-        CHECK(account0.unsafe_read() == 280);
-        CHECK(account1.unsafe_read() == 320);
+        CHECK(account0.underlying().unsafe_get() == 280);
+        CHECK(account1.underlying().unsafe_get() == 320);
     }
     CHECK(debug_live_allocations<> == 0);
 

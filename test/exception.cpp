@@ -36,7 +36,7 @@ int main()
         tm.run();
     }
 
-    CHECK(x.unsafe_read() == 10000 - 5);
+    CHECK(x.unsafe_get() == 10000 - 5);
     CHECK(y == 5 * loop_count - 9995 / 5);
 
     return test_result();
