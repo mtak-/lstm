@@ -21,9 +21,9 @@ void push(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x, int val
     CHECK(lstm::tls_thread_data().in_transaction());
 
     lstm::atomic([&](const lstm::transaction tx) {
-        auto var = tx.read(x);
+        auto var = x.get(tx);
         var.push_back(val);
-        tx.write(x, {std::move(var)});
+        x.set(tx, {std::move(var)});
     });
 }
 
@@ -32,9 +32,9 @@ void pop(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x)
     CHECK(lstm::tls_thread_data().in_transaction());
 
     lstm::atomic([&](const lstm::transaction tx) {
-        auto var = tx.read(x);
+        auto var = x.get(tx);
         var.pop_back();
-        tx.write(x, std::move(var));
+        x.set(tx, std::move(var));
     });
 }
 
@@ -42,7 +42,7 @@ auto get_loop(lstm::var<std::vector<int>, debug_alloc<std::vector<int>>>& x)
 {
     return [&] {
         lstm::atomic([&](const lstm::transaction tx) {
-            auto& var = tx.read(x);
+            auto& var = x.get(tx);
             if (var.empty())
                 push(x, 5);
             else {

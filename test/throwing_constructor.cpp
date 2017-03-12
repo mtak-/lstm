@@ -46,9 +46,9 @@ int main()
                 [&] {
                     atomic([&](const lstm::transaction tx) {
                         try {
-                            tx.write(x, 0);
+                            x.set(tx, 0);
                         } catch (...) {
-                            tx.write(x, {});
+                            x.set(tx, {});
                         }
                     });
                 },

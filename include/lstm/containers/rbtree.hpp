@@ -84,11 +84,11 @@ LSTM_BEGIN
             if (n == nullptr)
                 return nullptr;
 
-            node_t* parent = (node_t*)tx.read(n->parent_);
+            node_t* parent = (node_t*)n->parent_.get(tx);
             if (parent == nullptr)
                 return nullptr;
 
-            return (node_t*)tx.read(parent->parent_);
+            return (node_t*)parent->parent_.get(tx);
         }
 
         node_t* uncle(const transaction tx, node_t* n)
@@ -97,9 +97,9 @@ LSTM_BEGIN
             if (g == nullptr)
                 return nullptr;
 
-            node_t* left = (node_t*)tx.read(g->left_);
-            if (tx.read(n->parent_) == left)
-                return (node_t*)tx.read(g->right_);
+            node_t* left = (node_t*)g->left_.get(tx);
+            if (n->parent_.get(tx) == left)
+                return (node_t*)g->right_.get(tx);
             else
                 return left;
         }
@@ -109,23 +109,23 @@ LSTM_BEGIN
             if (parent == nullptr)
                 return nullptr;
 
-            const auto p_left = (node_t*)tx.read(parent->left_);
+            const auto p_left = (node_t*)parent->left_.get(tx);
             if (n == p_left)
-                return (node_t*)tx.read(parent->right_);
+                return (node_t*)parent->right_.get(tx);
             return p_left;
         }
 
         void insert_case1(const transaction tx, node_t* n)
         {
-            if (tx.read(n->parent_) == nullptr)
-                tx.write(n->color_, detail::color::black);
+            if (n->parent_.get(tx) == nullptr)
+                n->color_.set(tx, detail::color::black);
             else
                 insert_case2(tx, n);
         }
 
         void insert_case2(const transaction tx, node_t* n)
         {
-            if (tx.read(((node_t*)tx.read(n->parent_))->color_) == detail::color::red)
+            if (((node_t*)n->parent_.get(tx))->color_.get(tx) == detail::color::red)
                 insert_case3(tx, n);
         }
 
@@ -133,11 +133,11 @@ LSTM_BEGIN
         {
             node_t* u = uncle(tx, n);
 
-            if (u != nullptr && tx.read(u->color_) == detail::color::red) {
-                tx.write(((node_t*)tx.read(n->parent_))->color_, detail::color::black);
-                tx.write(u->color_, detail::color::black);
+            if (u != nullptr && u->color_.get(tx) == detail::color::red) {
+                ((node_t*)n->parent_.get(tx))->color_.set(tx, detail::color::black);
+                u->color_.set(tx, detail::color::black);
                 node_t* g = grandparent(tx, n);
-                tx.write(g->color_, detail::color::red);
+                g->color_.set(tx, detail::color::red);
                 insert_case1(tx, g);
             } else {
                 insert_case4(tx, n);
@@ -148,40 +148,40 @@ LSTM_BEGIN
         {
             node_t* g = grandparent(tx, n);
 
-            if (n == tx.read(((node_t*)tx.read(n->parent_))->right_)
-                && tx.read(n->parent_) == tx.read(g->left_)) {
+            if (n == ((node_t*)n->parent_.get(tx))->right_.get(tx)
+                && n->parent_.get(tx) == g->left_.get(tx)) {
                 // rotate_left(n->parent);
 
-                node_t* saved_p      = (node_t*)tx.read(g->left_);
-                node_t* saved_left_n = (node_t*)tx.read(n->left_);
+                node_t* saved_p      = (node_t*)g->left_.get(tx);
+                node_t* saved_left_n = (node_t*)n->left_.get(tx);
 
-                tx.write(g->left_, n);
-                tx.write(n->parent_, g);
+                g->left_.set(tx, n);
+                n->parent_.set(tx, g);
 
-                tx.write(n->left_, saved_p);
-                tx.write(saved_p->parent_, n);
+                n->left_.set(tx, saved_p);
+                saved_p->parent_.set(tx, n);
 
-                tx.write(saved_p->right_, saved_left_n);
+                saved_p->right_.set(tx, saved_left_n);
                 if (saved_left_n)
-                    tx.write(saved_left_n->parent_, saved_p);
+                    saved_left_n->parent_.set(tx, saved_p);
 
                 n = saved_p;
-            } else if (n == tx.read(((node_t*)tx.read(n->parent_))->left_)
-                       && tx.read(n->parent_) == tx.read(g->right_)) {
+            } else if (n == ((node_t*)n->parent_.get(tx))->left_.get(tx)
+                       && n->parent_.get(tx) == g->right_.get(tx)) {
                 // rotate_right(n->parent);
 
-                node_t* saved_p       = (node_t*)tx.read(g->right_);
-                node_t* saved_right_n = (node_t*)tx.read(n->right_);
+                node_t* saved_p       = (node_t*)g->right_.get(tx);
+                node_t* saved_right_n = (node_t*)n->right_.get(tx);
 
-                tx.write(g->right_, n);
-                tx.write(n->parent_, g);
+                g->right_.set(tx, n);
+                n->parent_.set(tx, g);
 
-                tx.write(n->right_, saved_p);
-                tx.write(saved_p->parent_, n);
+                n->right_.set(tx, saved_p);
+                saved_p->parent_.set(tx, n);
 
-                tx.write(saved_p->left_, saved_right_n);
+                saved_p->left_.set(tx, saved_right_n);
                 if (saved_right_n)
-                    tx.write(saved_right_n->parent_, saved_p);
+                    saved_right_n->parent_.set(tx, saved_p);
 
                 n = saved_p;
             }
@@ -192,9 +192,9 @@ LSTM_BEGIN
         {
             node_t* g = grandparent(tx, n);
 
-            tx.write(((node_t*)tx.read(n->parent_))->color_, detail::color::black);
-            tx.write(g->color_, detail::color::red);
-            if (n == tx.read(((node_t*)tx.read(n->parent_))->left_))
+            ((node_t*)n->parent_.get(tx))->color_.set(tx, detail::color::black);
+            g->color_.set(tx, detail::color::red);
+            if (n == ((node_t*)n->parent_.get(tx))->left_.get(tx))
                 rotate_right(tx, g);
             else
                 rotate_left(tx, g);
@@ -202,48 +202,48 @@ LSTM_BEGIN
 
         void rotate_left(const transaction tx, node_t* n)
         {
-            node_t* p        = (node_t*)tx.read(n->right_);
-            node_t* p_left   = (node_t*)tx.read(p->left_);
-            node_t* n_parent = (node_t*)tx.read(n->parent_);
-            bool    left     = n_parent && tx.read(n_parent->left_) == n;
-            tx.write(n->right_, p_left);
+            node_t* p        = (node_t*)n->right_.get(tx);
+            node_t* p_left   = (node_t*)p->left_.get(tx);
+            node_t* n_parent = (node_t*)n->parent_.get(tx);
+            bool    left     = n_parent && n_parent->left_.get(tx) == n;
+            n->right_.set(tx, p_left);
 
             if (p_left)
-                tx.write(p_left->parent_, n);
+                p_left->parent_.set(tx, n);
 
-            tx.write(p->left_, n);
-            tx.write(n->parent_, p);
+            p->left_.set(tx, n);
+            n->parent_.set(tx, p);
 
-            tx.write(p->parent_, n_parent);
+            p->parent_.set(tx, n_parent);
             if (!n_parent)
-                tx.write(root_, p);
+                root_.set(tx, p);
             else if (left)
-                tx.write(n_parent->left_, p);
+                n_parent->left_.set(tx, p);
             else
-                tx.write(n_parent->right_, p);
+                n_parent->right_.set(tx, p);
         }
 
         void rotate_right(const transaction tx, node_t* n)
         {
-            node_t* p        = (node_t*)tx.read(n->left_);
-            node_t* p_right  = (node_t*)tx.read(p->right_);
-            node_t* n_parent = (node_t*)tx.read(n->parent_);
-            bool    left     = n_parent && tx.read(n_parent->left_) == n;
-            tx.write(n->left_, p_right);
+            node_t* p        = (node_t*)n->left_.get(tx);
+            node_t* p_right  = (node_t*)p->right_.get(tx);
+            node_t* n_parent = (node_t*)n->parent_.get(tx);
+            bool    left     = n_parent && n_parent->left_.get(tx) == n;
+            n->left_.set(tx, p_right);
 
             if (p_right)
-                tx.write(p_right->parent_, n);
+                p_right->parent_.set(tx, n);
 
-            tx.write(p->right_, n);
-            tx.write(n->parent_, p);
+            p->right_.set(tx, n);
+            n->parent_.set(tx, p);
 
-            tx.write(p->parent_, n_parent);
+            p->parent_.set(tx, n_parent);
             if (!n_parent)
-                tx.write(root_, p);
+                root_.set(tx, p);
             else if (left)
-                tx.write(n_parent->left_, p);
+                n_parent->left_.set(tx, p);
             else
-                tx.write(n_parent->right_, p);
+                n_parent->right_.set(tx, p);
         }
 
         void push_impl(const transaction tx, node_t* new_node)
@@ -255,60 +255,60 @@ LSTM_BEGIN
             const auto& key = new_node->key.unsafe_read();
 
             auto read_tx = tx.unsafe_checked_demote();
-            while ((next_parent = (node_t*)read_tx.untracked_read(*cur))) {
-                cur = compare(key, read_tx.untracked_read(next_parent->key)) ? &next_parent->left_
-                                                                             : &next_parent->right_;
+            while ((next_parent = (node_t*)cur->untracked_get(read_tx))) {
+                cur = compare(key, next_parent->key.untracked_get(read_tx)) ? &next_parent->left_
+                                                                            : &next_parent->right_;
                 parent = next_parent;
             }
-            auto root = tx.read(root_);
+            auto root = root_.get(tx);
             if (parent && parent != root) {
-                tx.read(parent->key);
-                tx.read(parent->left_);
-                tx.read(parent->right_);
-                auto pp = (node_t*)tx.read(parent->parent_);
+                parent->key.get(tx);
+                parent->left_.get(tx);
+                parent->right_.get(tx);
+                auto pp = (node_t*)parent->parent_.get(tx);
                 if (pp && pp != root) {
-                    tx.read(pp->left_);
-                    tx.read(pp->right_);
+                    pp->left_.get(tx);
+                    pp->right_.get(tx);
                 }
             }
 
             new_node->parent_.unsafe_write(parent);
-            tx.write(*cur, new_node);
+            cur->set(tx, new_node);
             insert_case1(tx, new_node);
         }
 
         void replace_node(const transaction tx, node_t* n, node_t* child)
         {
-            auto parent = (node_t*)tx.read(n->parent_);
+            auto parent = (node_t*)n->parent_.get(tx);
             if (parent) {
-                if (tx.read(parent->left_) == n)
-                    tx.write(parent->left_, child);
+                if (parent->left_.get(tx) == n)
+                    parent->left_.set(tx, child);
                 else
-                    tx.write(parent->right_, child);
+                    parent->right_.set(tx, child);
             } else {
-                tx.write(root_, child);
+                root_.set(tx, child);
             }
             if (child)
-                tx.write(child->parent_, parent);
+                child->parent_.set(tx, parent);
         }
 
         static detail::color color(const transaction tx, node_t* n)
         {
-            return n ? tx.read(n->color_) : detail::color::black;
+            return n ? n->color_.get(tx) : detail::color::black;
         }
 
         void delete_case6(const transaction tx, node_t* parent, node_t* n)
         {
             auto s = sibling(tx, parent, n);
 
-            tx.write(s->color_, tx.read(parent->color_));
-            tx.write(parent->color_, detail::color::black);
+            s->color_.set(tx, parent->color_.get(tx));
+            parent->color_.set(tx, detail::color::black);
 
-            if (n == tx.read(parent->left_)) {
-                tx.write(((node_t*)tx.read(s->right_))->color_, detail::color::black);
+            if (n == parent->left_.get(tx)) {
+                ((node_t*)s->right_.get(tx))->color_.set(tx, detail::color::black);
                 rotate_left(tx, parent);
             } else {
-                tx.write(((node_t*)tx.read(s->left_))->color_, detail::color::black);
+                ((node_t*)s->left_.get(tx))->color_.set(tx, detail::color::black);
                 rotate_right(tx, parent);
             }
         }
@@ -317,25 +317,25 @@ LSTM_BEGIN
         {
             auto s = sibling(tx, parent, n);
 
-            if (tx.read(s->color_) == detail::color::black) { /* this if statement is trivial,
+            if (s->color_.get(tx) == detail::color::black) { /* this if statement is trivial,
           due to case 2 (even though case 2 changed the sibling to a sibling's child,
           the sibling's child can't be red, since no red parent can have a red child). */
                 /* the following statements just force the red to be on the left of the left of the
                    parent,
                    or right of the right, so case six will rotate correctly. */
-                auto s_left  = (node_t*)tx.read(s->left_);
-                auto s_right = (node_t*)tx.read(s->right_);
-                if (n == tx.read(parent->left_) && color(tx, s_right) == detail::color::black
+                auto s_left  = (node_t*)s->left_.get(tx);
+                auto s_right = (node_t*)s->right_.get(tx);
+                if (n == parent->left_.get(tx) && color(tx, s_right) == detail::color::black
                     && (color(tx, s_left) == detail::color::red)) {
                     // this last test is trivial too due to cases 2-4.
-                    tx.write(s->color_, detail::color::red);
-                    tx.write(s_left->color_, detail::color::black);
+                    s->color_.set(tx, detail::color::red);
+                    s_left->color_.set(tx, detail::color::black);
                     rotate_right(tx, s);
-                } else if (n == tx.read(parent->right_) && color(tx, s_left) == detail::color::black
+                } else if (n == parent->right_.get(tx) && color(tx, s_left) == detail::color::black
                            && color(tx, s_right) == detail::color::red) {
                     // this last test is trivial too due to cases 2-4.
-                    tx.write(s->color_, detail::color::red);
-                    tx.write(s_right->color_, detail::color::black);
+                    s->color_.set(tx, detail::color::red);
+                    s_right->color_.set(tx, detail::color::black);
                     rotate_left(tx, s);
                 }
             }
@@ -346,12 +346,12 @@ LSTM_BEGIN
         {
             node_t* s = sibling(tx, parent, n);
 
-            if (tx.read(parent->color_) == detail::color::red
-                && tx.read(s->color_) == detail::color::black
-                && color(tx, (node_t*)tx.read(s->left_)) == detail::color::black
-                && color(tx, (node_t*)tx.read(s->right_)) == detail::color::black) {
-                tx.write(s->color_, detail::color::red);
-                tx.write(parent->color_, detail::color::black);
+            if (parent->color_.get(tx) == detail::color::red
+                && s->color_.get(tx) == detail::color::black
+                && color(tx, (node_t*)s->left_.get(tx)) == detail::color::black
+                && color(tx, (node_t*)s->right_.get(tx)) == detail::color::black) {
+                s->color_.set(tx, detail::color::red);
+                parent->color_.set(tx, detail::color::black);
             } else {
                 delete_case5(tx, parent, n);
             }
@@ -361,12 +361,12 @@ LSTM_BEGIN
         {
             node_t* s = sibling(tx, parent, n);
 
-            if (tx.read(parent->color_) == detail::color::black
+            if (parent->color_.get(tx) == detail::color::black
                 && color(tx, s) == detail::color::black
-                && (!s || color(tx, (node_t*)tx.read(s->left_)) == detail::color::black)
-                && (!s || color(tx, (node_t*)tx.read(s->right_)) == detail::color::black)) {
-                tx.write(s->color_, detail::color::red);
-                delete_case1(tx, (node_t*)tx.read(parent->parent_), parent);
+                && (!s || color(tx, (node_t*)s->left_.get(tx)) == detail::color::black)
+                && (!s || color(tx, (node_t*)s->right_.get(tx)) == detail::color::black)) {
+                s->color_.set(tx, detail::color::red);
+                delete_case1(tx, (node_t*)parent->parent_.get(tx), parent);
             } else {
                 delete_case4(tx, parent, n);
             }
@@ -376,9 +376,9 @@ LSTM_BEGIN
         {
             auto s = sibling(tx, parent, n);
             if (color(tx, s) == detail::color::red) {
-                tx.write(parent->color_, detail::color::red);
-                tx.write(s->color_, detail::color::black);
-                if (n == tx.read(parent->left_))
+                parent->color_.set(tx, detail::color::red);
+                s->color_.set(tx, detail::color::black);
+                if (n == parent->left_.get(tx))
                     rotate_left(tx, parent);
                 else
                     rotate_right(tx, parent);
@@ -394,26 +394,26 @@ LSTM_BEGIN
 
         void delete_one_child(const transaction tx, node_t* n)
         {
-            node_t* right = (node_t*)tx.read(n->right_);
-            node_t* child = !right ? (node_t*)tx.read(n->left_) : right;
+            node_t* right = (node_t*)n->right_.get(tx);
+            node_t* child = !right ? (node_t*)n->left_.get(tx) : right;
 
             replace_node(tx, n, child);
-            if (tx.read(n->color_) == detail::color::black) {
+            if (n->color_.get(tx) == detail::color::black) {
                 if (color(tx, child) == detail::color::red)
-                    tx.write(child->color_, detail::color::black);
+                    child->color_.set(tx, detail::color::black);
                 else
-                    delete_case1(tx, (node_t*)tx.read(n->parent_), child);
+                    delete_case1(tx, (node_t*)n->parent_.get(tx), child);
             }
             lstm::destroy_deallocate(alloc(), n);
         }
 
         void erase_impl(const transaction tx, node_t* to_erase)
         {
-            if (tx.read(to_erase->left_) && tx.read(to_erase->right_)) {
-                node_t* temp = min_node(tx, (node_t*)tx.read(to_erase->right_));
+            if (to_erase->left_.get(tx) && to_erase->right_.get(tx)) {
+                node_t* temp = min_node(tx, (node_t*)to_erase->right_.get(tx));
 
-                tx.write(to_erase->key, tx.read(temp->key));
-                tx.write(to_erase->value, tx.read(temp->value));
+                to_erase->key.set(tx, temp->key.get(tx));
+                to_erase->value.set(tx, temp->value.get(tx));
                 to_erase = temp;
             }
 
@@ -424,7 +424,7 @@ LSTM_BEGIN
         {
             node_t* next;
             /* loop down to find the leftmost leaf */
-            while ((next = (node_t*)tx.read(current->left_)))
+            while ((next = (node_t*)current->left_.get(tx)))
                 current = next;
 
             return current;
@@ -436,28 +436,27 @@ LSTM_BEGIN
             if (!node)
                 return {0, 0, 0};
 
-            auto left     = (node_t*)tx.read(node->left_);
-            auto right    = (node_t*)tx.read(node->right_);
+            auto left     = (node_t*)node->left_.get(tx);
+            auto right    = (node_t*)node->right_.get(tx);
             auto height_l = minmax_height(tx, left);
             auto height_r = minmax_height(tx, right);
 
             LSTM_ASSERT(height_l.black_height == height_r.black_height);
 
-            LSTM_ASSERT(!left || tx.read(left->parent_) == node);
-            LSTM_ASSERT(!right || tx.read(right->parent_) == node);
+            LSTM_ASSERT(!left || left->parent_.get(tx) == node);
+            LSTM_ASSERT(!right || right->parent_.get(tx) == node);
 
-            LSTM_ASSERT(!left || !compare(tx.read(node->key), tx.read(left->key)));
-            LSTM_ASSERT(!right || !compare(tx.read(right->key), tx.read(node->key)));
+            LSTM_ASSERT(!left || !compare(node->key.get(tx), left->key.get(tx)));
+            LSTM_ASSERT(!right || !compare(right->key.get(tx), node->key.get(tx)));
 
-            if (tx.read(node->color_) == detail::color::red) {
-                LSTM_ASSERT(!left || tx.read(left->color_) == detail::color::black);
-                LSTM_ASSERT(!right || tx.read(right->color_) == detail::color::black);
+            if (node->color_.get(tx) == detail::color::red) {
+                LSTM_ASSERT(!left || left->color_.get(tx) == detail::color::black);
+                LSTM_ASSERT(!right || right->color_.get(tx) == detail::color::black);
             }
 
             return {std::min(height_l.min_height, height_r.min_height) + 1,
                     std::max(height_l.max_height, height_r.max_height) + 1,
-                    height_l.black_height
-                        + (tx.read(node->color_) == detail::color::black ? 1 : 0)};
+                    height_l.black_height + (node->color_.get(tx) == detail::color::black ? 1 : 0)};
         }
 #endif
 
@@ -497,8 +496,8 @@ LSTM_BEGIN
 
         void clear(const transaction tx)
         {
-            if (auto root = (node_t*)tx.read(root_)) {
-                tx.write(root_, nullptr);
+            if (auto root = (node_t*)root_.get(tx)) {
+                root_.set(tx, nullptr);
                 lstm::tls_thread_data().queue_succ_callback(
                     [ alloc = this->alloc(), root ]() noexcept {
                         destroy_deallocate_subtree(alloc, root);
@@ -508,13 +507,13 @@ LSTM_BEGIN
 
         node_t* find(const read_transaction tx, const Key& u) const
         {
-            node_t* cur = (node_t*)tx.untracked_read(root_);
+            node_t* cur = (node_t*)root_.untracked_get(tx);
             while (cur) {
-                const auto& key = tx.untracked_read(cur->key);
+                const auto& key = cur->key.untracked_get(tx);
                 if (compare(u, key))
-                    cur = (node_t*)tx.untracked_read(cur->left_);
+                    cur = (node_t*)cur->left_.untracked_get(tx);
                 else if (compare(key, u))
-                    cur = (node_t*)tx.untracked_read(cur->right_);
+                    cur = (node_t*)cur->right_.untracked_get(tx);
                 else
                     break;
             }
@@ -539,9 +538,9 @@ LSTM_BEGIN
 #ifndef NDEBUG
         void verify(const transaction tx) const
         {
-            auto root = (node_t*)tx.read(root_);
+            auto root = (node_t*)root_.get(tx);
             if (root)
-                LSTM_ASSERT(tx.read(root->color_) == detail::color::black);
+                LSTM_ASSERT(root->color_.get(tx) == detail::color::black);
             const detail::height_info heights = minmax_height(tx, root);
             (void)heights;
             LSTM_ASSERT(heights.min_height * 2 >= heights.max_height);

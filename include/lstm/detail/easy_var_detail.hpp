@@ -7,16 +7,15 @@
     template<typename U, LSTM_REQUIRES_(concept<U>{})>                                             \
     derived& operator symbol##=(const U u)                                                         \
     {                                                                                              \
-        lstm::read_write([&](const transaction tx) {                                               \
-            tx.write(underlying(), tx.read(underlying()) symbol u);                                \
-        });                                                                                        \
+        lstm::read_write(                                                                          \
+            [&](const transaction tx) { underlying().set(tx, underlying().get(tx) symbol u); });   \
         return static_cast<derived&>(*this);                                                       \
     }                                                                                              \
     template<typename U, typename UAlloc, LSTM_REQUIRES_(concept<U>{})>                            \
     derived& operator symbol##=(const easy_var<U, UAlloc>& uvar)                                   \
     {                                                                                              \
         lstm::read_write([&](const transaction tx) {                                               \
-            tx.write(underlying(), tx.read(underlying()) symbol tx.read(uvar.underlying()));       \
+            underlying().set(tx, underlying().get(tx) symbol uvar.underlying().get(tx));           \
         });                                                                                        \
         return static_cast<derived&>(*this);                                                       \
     }                                                                                              \
@@ -26,15 +25,15 @@
     derived& operator symbol##symbol()                                                             \
     {                                                                                              \
         lstm::read_write([&](const transaction tx) {                                               \
-            tx.write(underlying(), tx.read(underlying()) symbol T(1));                             \
+            underlying().set(tx, underlying().get(tx) symbol T(1));                                \
         });                                                                                        \
         return static_cast<derived&>(*this);                                                       \
     }                                                                                              \
     T operator symbol##symbol(int)                                                                 \
     {                                                                                              \
         return lstm::read_write([&](const transaction tx) {                                        \
-            auto result = tx.read(underlying());                                                   \
-            tx.write(underlying(), result symbol T(1));                                            \
+            auto result = underlying().get(tx);                                                    \
+            underlying().set(tx, result symbol T(1));                                              \
             return result;                                                                         \
         });                                                                                        \
     }                                                                                              \

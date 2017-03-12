@@ -320,7 +320,7 @@ LSTM_BEGIN
             return tx.ro_untracked_read(*this);
         }
 
-        template<typename U,
+        template<typename U = value_type,
                  LSTM_REQUIRES_(std::is_assignable<value_type&, U&&>()
                                 && std::is_constructible<value_type, U&&>())>
         LSTM_ALWAYS_INLINE void set(const transaction tx, U&& u)
@@ -329,7 +329,7 @@ LSTM_BEGIN
         }
 
 #ifndef LSTM_MAKE_SFINAE_FRIENDLY
-        template<typename U,
+        template<typename U = value_type,
                  LSTM_REQUIRES_(!std::is_assignable<value_type&, U&&>()
                                 || !std::is_constructible<value_type, U&&>())>
         LSTM_ALWAYS_INLINE void set(const transaction, U&&)

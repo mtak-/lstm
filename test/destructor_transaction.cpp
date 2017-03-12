@@ -30,9 +30,9 @@ struct destruct
     ~destruct() noexcept(false)
     {
         atomic([&](const lstm::transaction tx) {
-            auto y = tx.read(x);
+            auto y = x.get(tx);
             ++y.w;
-            tx.write(x, y);
+            x.set(tx, y);
         });
     }
 };
@@ -45,9 +45,9 @@ int main()
         tm.queue_thread([&] {
             for (int j = 0; j < loop_count; ++j) {
                 atomic([&](const lstm::transaction tx) {
-                    auto foo = tx.read(x);
+                    auto foo = x.get(tx);
                     ++foo.x;
-                    tx.write(x, foo);
+                    x.set(tx, foo);
                 });
             }
         });
@@ -55,9 +55,9 @@ int main()
         tm.queue_thread([&] {
             for (int j = 0; j < loop_count; ++j) {
                 atomic([&](const lstm::transaction tx) {
-                    auto foo = tx.read(x);
+                    auto foo = x.get(tx);
                     ++foo.y;
-                    tx.write(x, foo);
+                    x.set(tx, foo);
                 });
             }
         });
@@ -68,9 +68,9 @@ int main()
                 auto b = lstm::allocate_construct(alloc);
                 atomic([&](const lstm::transaction tx) {
                     lstm::destroy_deallocate(alloc, b);
-                    auto foo = tx.read(x);
+                    auto foo = x.get(tx);
                     ++foo.z;
-                    tx.write(x, foo);
+                    x.set(tx, foo);
                 });
             }
         });

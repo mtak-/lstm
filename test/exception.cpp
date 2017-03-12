@@ -21,8 +21,8 @@ int main()
                 for (int j = 0; j < loop_count; ++j) {
                     try {
                         atomic([&](const lstm::transaction tx) {
-                            int foo = tx.read(x);
-                            tx.write(x, foo + 5);
+                            int foo = x.get(tx);
+                            x.set(tx, foo + 5);
                             if (foo + 5 >= 10000)
                                 throw std::exception{};
                         });

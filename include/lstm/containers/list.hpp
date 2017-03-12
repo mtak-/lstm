@@ -46,25 +46,25 @@ LSTM_BEGIN
         template<typename Transaction>
         static node_t* prev(node_t& n, Transaction& tx)
         {
-            return reinterpret_cast<node_t*>(tx.read(n.prev_));
+            return reinterpret_cast<node_t*>(n.prev_.get(tx));
         }
 
         template<typename Transaction>
         static const node_t* prev(const node_t& n, Transaction& tx)
         {
-            return reinterpret_cast<const node_t*>(tx.read(n.prev_));
+            return reinterpret_cast<const node_t*>(n.prev_.get(tx));
         }
 
         template<typename Transaction>
         static node_t* next(node_t& n, Transaction& tx)
         {
-            return reinterpret_cast<node_t*>(tx.read(n.next_));
+            return reinterpret_cast<node_t*>(n.next_.get(tx));
         }
 
         template<typename Transaction>
         static const node_t* next(const node_t& n, Transaction& tx)
         {
-            return reinterpret_cast<const node_t*>(tx.read(n.next_));
+            return reinterpret_cast<const node_t*>(n.next_.get(tx));
         }
 
         static node_t* unsafe_prev(node_t& n) noexcept
@@ -111,9 +111,9 @@ LSTM_BEGIN
         {
             thread_data& tls_td = tls_thread_data();
             lstm::atomic(tls_td, [&](const transaction tx) {
-                tx.write(size_, 0);
-                auto root = tx.read(head);
-                tx.write(head, nullptr);
+                size_.set(tx, 0);
+                auto root = head.get(tx);
+                head.set(tx, nullptr);
                 if (root) {
                     tls_td.queue_succ_callback([ alloc = alloc(), root ]() noexcept {
                         destroy_deallocate_sublist(alloc, root);
@@ -128,19 +128,19 @@ LSTM_BEGIN
             thread_data& tls_td   = tls_thread_data();
             node_t*      new_head = lstm::allocate_construct(tls_td, alloc(), (Us &&) us...);
             lstm::atomic(tls_td, [&](const transaction tx) {
-                auto head_ = tx.read(head);
+                auto head_ = head.get(tx);
                 new_head->next_.unsafe_write(head_);
 
                 if (head_)
-                    tx.write(head_->prev_, (void*)new_head);
-                tx.write(size_, tx.read(size_) + 1);
-                tx.write(head, new_head);
+                    head_->prev_.set(tx, (void*)new_head);
+                size_.set(tx, size_.get(tx) + 1);
+                head.set(tx, new_head);
             });
         }
 
         word size() const
         {
-            return lstm::atomic([&](const transaction tx) { return tx.read(size_); });
+            return lstm::atomic([&](const transaction tx) { return size_.get(tx); });
         }
     };
 LSTM_END

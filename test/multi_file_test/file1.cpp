@@ -18,18 +18,18 @@ void other_function();
 void run_other_file()
 {
     other_function();
-    atomic([](transaction tx) { tx.write(y, tx.read(x)); });
-    atomic([](transaction tx) { tx.write(w, tx.read(z)); });
+    atomic([](transaction tx) { y.set(tx, x.get(tx)); });
+    atomic([](transaction tx) { w.set(tx, z.get(tx)); });
     atomic([](transaction tx) {
-        if (tx.untracked_read(x) != 0)
+        if (x.untracked_get(tx) != 0)
             std::terminate();
     });
     atomic([](read_transaction tx) {
-        if (tx.read(x) != 0)
+        if (x.get(tx) != 0)
             std::terminate();
     });
     atomic([](read_transaction tx) {
-        if (tx.untracked_read(x) != 0)
+        if (x.untracked_get(tx) != 0)
             std::terminate();
     });
 }

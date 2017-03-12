@@ -31,12 +31,12 @@ int main()
             [&] {
                 atomic([&](const lstm::transaction tx) {
                     static std::allocator<var<big, debug_alloc<big>>> alloc{};
-                    auto ptr = tx.read(x_ptr);
+                    auto ptr = x_ptr.get(tx);
                     if (ptr) {
                         destroy_deallocate(alloc, ptr);
-                        tx.write(x_ptr, nullptr);
+                        x_ptr.set(tx, nullptr);
                     } else {
-                        tx.write(x_ptr, allocate_construct(alloc));
+                        x_ptr.set(tx, allocate_construct(alloc));
                     }
                 });
             },
@@ -44,9 +44,9 @@ int main()
         tm.queue_loop_n(
             [&] {
                 atomic([&](const lstm::transaction tx) {
-                    auto ptr = tx.read(x_ptr);
+                    auto ptr = x_ptr.get(tx);
                     if (ptr) {
-                        tx.write(*ptr, big{});
+                        ptr->set(tx, {});
                     } else
                         lstm::retry();
                 });
