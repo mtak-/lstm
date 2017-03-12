@@ -1,5 +1,6 @@
 add_subdirectory(include)
 add_subdirectory(multi_file_test)
+add_subdirectory(rbtree_tests)
 
 add_executable(var var.cpp)
 add_test(test.var var)
@@ -30,9 +31,6 @@ add_test(test.destructor_transaction destructor_transaction)
 
 add_executable(delete_var_and_modify delete_var_and_modify.cpp)
 add_test(test.delete_var_and_modify delete_var_and_modify)
-
-add_executable(rbtree rbtree.cpp)
-add_test(test.rbtree rbtree)
 
 add_executable(throwing_constructor throwing_constructor.cpp)
 add_test(test.throwing_constructor throwing_constructor)
