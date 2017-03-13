@@ -57,6 +57,14 @@ LSTM_BEGIN
         {
             transaction_base::sometime_after((Func &&) func);
         }
+
+        template<typename Func,
+                 LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
+        void after_fail(Func&& func) const
+            noexcept(noexcept(transaction_base::after_fail((Func &&) func)))
+        {
+            transaction_base::after_fail((Func &&) func);
+        }
     };
 LSTM_END
 

@@ -25,7 +25,7 @@ LSTM_BEGIN
     {
         Pointer result = AllocTraits::allocate(alloc, 1);
         if (tls_td.in_critical_section()) {
-            tls_td.queue_fail_callback([ alloc, result ]() mutable noexcept {
+            tls_td.after_fail([ alloc, result ]() mutable noexcept {
                 AllocTraits::deallocate(alloc, result, 1);
             });
         }
@@ -41,7 +41,7 @@ LSTM_BEGIN
     {
         Pointer result = AllocTraits::allocate(alloc, count);
         if (tls_td.in_critical_section()) {
-            tls_td.queue_fail_callback([ alloc, result, count ]() mutable noexcept {
+            tls_td.after_fail([ alloc, result, count ]() mutable noexcept {
                 AllocTraits::deallocate(alloc, result, count);
             });
         }
@@ -123,8 +123,7 @@ LSTM_BEGIN
     {
         AllocTraits::construct(alloc, t, (Args &&) args...);
         if (tls_td.in_critical_section()) {
-            tls_td.queue_fail_callback(
-                [ alloc, t ]() mutable noexcept { AllocTraits::destroy(alloc, t); });
+            tls_td.after_fail([ alloc, t ]() mutable noexcept { AllocTraits::destroy(alloc, t); });
         }
     }
 
@@ -218,7 +217,7 @@ LSTM_BEGIN
         Pointer result = AllocTraits::allocate(alloc, 1);
         AllocTraits::construct(alloc, detail::to_raw_pointer(result), (Args &&) args...);
         if (tls_td.in_critical_section()) {
-            tls_td.queue_fail_callback([ alloc, result ]() mutable noexcept {
+            tls_td.after_fail([ alloc, result ]() mutable noexcept {
                 AllocTraits::destroy(alloc, detail::to_raw_pointer(result));
                 AllocTraits::deallocate(alloc, std::move(result), 1);
             });
@@ -237,7 +236,7 @@ LSTM_BEGIN
         Pointer result = AllocTraits::allocate(alloc, 1);
         AllocTraits::construct(alloc, detail::to_raw_pointer(result), (Args &&) args...);
         if (tls_td.in_critical_section()) {
-            tls_td.queue_fail_callback([ alloc, result ]() mutable noexcept {
+            tls_td.after_fail([ alloc, result ]() mutable noexcept {
                 AllocTraits::deallocate(alloc, std::move(result), 1);
             });
         }

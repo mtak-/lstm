@@ -68,10 +68,9 @@ LSTM_DETAIL_BEGIN
                     sometime_after([ alloc = dest_var.alloc(), cur_storage ]() mutable noexcept {
                         var<T, Alloc>::destroy_deallocate(alloc, cur_storage);
                     });
-                    tls_td->queue_fail_callback(
-                        [ alloc = dest_var.alloc(), new_storage ]() mutable noexcept {
-                            var<T, Alloc>::destroy_deallocate(alloc, new_storage);
-                        });
+                    after_fail([ alloc = dest_var.alloc(), new_storage ]() mutable noexcept {
+                        var<T, Alloc>::destroy_deallocate(alloc, new_storage);
+                    });
                     return;
                 }
             } else if (rw_valid(dest_var)) {
@@ -360,6 +359,13 @@ LSTM_DETAIL_BEGIN
         {
             LSTM_ASSERT(valid(tls_td));
             tls_td->sometime_after((Func &&) func);
+        }
+
+        template<typename Func, LSTM_REQUIRES_(std::is_constructible<gp_callback, Func&&>{})>
+        void after_fail(Func&& func) const noexcept(noexcept(tls_td->after_fail((Func &&) func)))
+        {
+            LSTM_ASSERT(valid(tls_td));
+            tls_td->after_fail((Func &&) func);
         }
     };
 LSTM_DETAIL_END
