@@ -9,7 +9,7 @@
 using tree_t = lstm::rbtree<int, int, std::less<>, mallocator<std::pair<int, int>>>;
 
 static constexpr int   elem_count   = LSTM_TEST_INIT(65536, 65536);
-static constexpr int   iter_count   = LSTM_TEST_INIT(elem_count * 1000, 1000000);
+static constexpr int   iter_count   = LSTM_TEST_INIT(elem_count * 100, 1000000);
 static constexpr int   loop_count   = LSTM_TEST_INIT(1, 1);
 static constexpr int   thread_count = 8;
 static constexpr float update_rate  = 0.33f;
@@ -79,15 +79,13 @@ static void update(tree_t& intmap)
                 for (int k = 0; k < iter_count / thread_count; ++k) {
                     const float perc = (k % 128) / 128.f;
                     if (perc < update_rate) {
-                        lstm::atomic(tls_td, [=, &intmap](const lstm::transaction tx) {
-                            const bool result
-                                = intmap.erase_one(tx, data[k + erase_offset] % elem_count);
-                            (void)result;
-                            LSTM_ASSERT(result);
-                        });
-                        lstm::atomic(tls_td, [=, &intmap](const lstm::transaction tx) {
-                            intmap.emplace(tx, data[k + emplace_offset] % elem_count, 42);
-                        });
+                        if (lstm::atomic(tls_td, [=, &intmap](const lstm::transaction tx) {
+                                return intmap.erase_one(tx, data[k + erase_offset] % elem_count);
+                            })) {
+                            lstm::atomic(tls_td, [=, &intmap](const lstm::transaction tx) {
+                                intmap.emplace(tx, data[k + emplace_offset] % elem_count, 42);
+                            });
+                        }
                     } else {
                         const bool found
                             = lstm::atomic(tls_td, [=, &intmap](const lstm::read_transaction tx) {
