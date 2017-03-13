@@ -358,6 +358,7 @@ LSTM_DETAIL_BEGIN
         void sometime_synchronized_after(Func&& func) const
             noexcept(noexcept(tls_td->sometime_synchronized_after((Func &&) func)))
         {
+            LSTM_ASSERT(tls_td);
             LSTM_ASSERT(valid(tls_td));
             tls_td->sometime_synchronized_after((Func &&) func);
         }
@@ -365,6 +366,7 @@ LSTM_DETAIL_BEGIN
         template<typename Func, LSTM_REQUIRES_(std::is_constructible<gp_callback, Func&&>{})>
         void after_fail(Func&& func) const noexcept(noexcept(tls_td->after_fail((Func &&) func)))
         {
+            LSTM_ASSERT(tls_td);
             LSTM_ASSERT(valid(tls_td));
             tls_td->after_fail((Func &&) func);
         }

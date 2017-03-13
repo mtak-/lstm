@@ -29,22 +29,6 @@ LSTM_BEGIN
         bool valid(const thread_data& td) const noexcept { return transaction_base::valid(&td); }
         bool read_valid(const gp_t version) const noexcept { return rw_valid(version); }
         bool read_valid(const detail::var_base& v) const noexcept { return rw_valid(v); }
-
-        template<typename Func,
-                 LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
-        void sometime_synchronized_after(Func&& func) const
-            noexcept(noexcept(transaction_base::sometime_synchronized_after((Func &&) func)))
-        {
-            transaction_base::sometime_synchronized_after((Func &&) func);
-        }
-
-        template<typename Func,
-                 LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
-        void after_fail(Func&& func) const
-            noexcept(noexcept(transaction_base::after_fail((Func &&) func)))
-        {
-            transaction_base::after_fail((Func &&) func);
-        }
     };
 LSTM_END
 
