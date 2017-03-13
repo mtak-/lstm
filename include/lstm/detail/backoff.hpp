@@ -60,8 +60,8 @@ LSTM_DETAIL_BEGIN
     struct yield
     {
         // noinline, cause yield on libc++ is inline, and calls a non-noexcept func
-        LSTM_NOINLINE void      operator()() const noexcept { std::this_thread::yield(); }
-        LSTM_ALWAYS_INLINE void reset() const noexcept {}
+        LSTM_NOINLINE_LUKEWARM void operator()() const noexcept { std::this_thread::yield(); }
+        LSTM_ALWAYS_INLINE void     reset() const noexcept {}
     };
 
     using default_backoff = yield;

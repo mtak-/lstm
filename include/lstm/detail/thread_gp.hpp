@@ -167,14 +167,14 @@ LSTM_DETAIL_BEGIN
             active.store(off_state, LSTM_RELEASE);
         }
 
-        inline bool not_in_grace_period(const gp_t gp) const noexcept
+        bool not_in_grace_period(const gp_t gp) const noexcept
         {
             // TODO: acquire seems unneeded
             return active.load(LSTM_ACQUIRE) <= gp;
         }
 
         // TODO: allow specifying a backoff strategy
-        inline gp_t synchronize_min_gp(const gp_t gp) const noexcept
+        gp_t synchronize_min_gp(const gp_t gp) const noexcept
         {
             LSTM_ASSERT(!in_critical_section());
             LSTM_ASSERT(gp != off_state);

@@ -146,7 +146,7 @@ LSTM_BEGIN
             } while (!succ_callbacks.empty() && succ_callbacks.front().version < min_gp);
         }
 
-        LSTM_NOINLINE void reclaim_slow_path() noexcept
+        LSTM_NOINLINE_LUKEWARM void reclaim_slow_path() noexcept
         {
             LSTM_ASSERT(!in_transaction());
             LSTM_ASSERT(!in_critical_section());
