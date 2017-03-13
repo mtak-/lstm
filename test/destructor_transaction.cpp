@@ -65,9 +65,10 @@ int main()
         tm.queue_thread([&] {
             static std::allocator<destruct> alloc{};
             for (int j = 0; j < loop_count; ++j) {
-                auto b = lstm::allocate_construct(alloc);
+                auto b = alloc.allocate(1);
+                new (b) destruct();
                 atomic([&](const lstm::transaction tx) {
-                    lstm::destroy_deallocate(alloc, b);
+                    lstm::destroy_deallocate(tx.get_thread_data(), alloc, b);
                     auto foo = x.get(tx);
                     ++foo.z;
                     x.set(tx, foo);

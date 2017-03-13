@@ -404,7 +404,7 @@ LSTM_BEGIN
                 else
                     delete_case1(tx, (node_t*)n->parent_.get(tx), child);
             }
-            lstm::destroy_deallocate(alloc(), n);
+            lstm::destroy_deallocate(tx.get_thread_data(), alloc(), n);
         }
 
         void erase_impl(const transaction tx, node_t* to_erase)
@@ -522,7 +522,11 @@ LSTM_BEGIN
         template<typename... Us, LSTM_REQUIRES_(std::is_constructible<node_t, alloc_t&, Us&&...>{})>
         void emplace(const transaction tx, Us&&... us)
         {
-            push_impl(tx, lstm::allocate_construct(alloc(), alloc(), (Us &&) us...));
+            push_impl(tx,
+                      lstm::allocate_construct(tx.get_thread_data(),
+                                               alloc(),
+                                               alloc(),
+                                               (Us &&) us...));
         }
 
         bool erase_one(const transaction tx, const Key& key)
