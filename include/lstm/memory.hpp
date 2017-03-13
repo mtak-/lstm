@@ -13,6 +13,11 @@ LSTM_DETAIL_BEGIN
 
     template<typename Alloc>
     using has_value_type = supports<has_value_type_, Alloc>;
+
+    template<typename Tx>
+    using is_transaction = std::integral_constant<bool,
+                                                  std::is_same<Tx, transaction>{}
+                                                      || std::is_same<Tx, read_transaction>{}>;
 LSTM_DETAIL_END
 
 LSTM_BEGIN
@@ -48,30 +53,60 @@ LSTM_BEGIN
         return result;
     }
 
-    template<typename Alloc,
-             LSTM_REQUIRES_(detail::has_value_type<Alloc>{}),
+    template<typename Tx,
+             typename Alloc,
+             LSTM_REQUIRES_(detail::is_transaction<Tx>{} && detail::has_value_type<Alloc>{}),
+             typename AllocTraits = std::allocator_traits<Alloc>,
+             typename Pointer     = typename AllocTraits::pointer,
+             LSTM_REQUIRES_(!std::is_const<Alloc>{})>
+    inline Pointer allocate(const Tx tx, Alloc& alloc)
+    {
+        Pointer result = AllocTraits::allocate(alloc, 1);
+        tx.after_fail(
+            [ alloc, result ]() mutable noexcept { AllocTraits::deallocate(alloc, result, 1); });
+        return result;
+    }
+
+    template<typename Tx,
+             typename Alloc,
+             LSTM_REQUIRES_(detail::is_transaction<Tx>{} && detail::has_value_type<Alloc>{}),
+             typename AllocTraits = std::allocator_traits<Alloc>,
+             typename Pointer     = typename AllocTraits::pointer,
+             LSTM_REQUIRES_(!std::is_const<Alloc>{})>
+    inline Pointer allocate(const Tx tx, Alloc& alloc, const std::size_t count)
+    {
+        Pointer result = AllocTraits::allocate(alloc, count);
+        tx.after_fail([ alloc, result, count ]() mutable noexcept {
+            AllocTraits::deallocate(alloc, result, count);
+        });
+        return result;
+    }
+
+    template<typename Tx,
+             typename Alloc,
+             LSTM_REQUIRES_(detail::is_transaction<Tx>{} && detail::has_value_type<Alloc>{}),
              typename AllocTraits = std::allocator_traits<Alloc>,
              LSTM_REQUIRES_(!std::is_const<Alloc>{})>
-    inline void deallocate(thread_data & tls_td, Alloc & alloc, typename AllocTraits::pointer ptr)
+    inline void deallocate(const Tx tx, Alloc& alloc, typename AllocTraits::pointer ptr)
     {
-        tls_td.sometime_synchronized_after([ alloc, ptr = std::move(ptr) ]() mutable noexcept {
+        tx.sometime_synchronized_after([ alloc, ptr = std::move(ptr) ]() mutable noexcept {
             AllocTraits::deallocate(alloc, std::move(ptr), 1);
         });
     }
 
-    template<typename Alloc,
-             LSTM_REQUIRES_(detail::has_value_type<Alloc>{}),
+    template<typename Tx,
+             typename Alloc,
+             LSTM_REQUIRES_(detail::is_transaction<Tx>{} && detail::has_value_type<Alloc>{}),
              typename AllocTraits = std::allocator_traits<Alloc>,
              LSTM_REQUIRES_(!std::is_const<Alloc>{})>
-    inline void deallocate(thread_data & tls_td,
-                           Alloc & alloc,
+    inline void deallocate(const Tx                      tx,
+                           Alloc&                        alloc,
                            typename AllocTraits::pointer ptr,
                            const std::size_t             count)
     {
-        tls_td.sometime_synchronized_after(
-            [ alloc, ptr = std::move(ptr), count ]() mutable noexcept {
-                AllocTraits::deallocate(alloc, std::move(ptr), count);
-            });
+        tx.sometime_synchronized_after([ alloc, ptr = std::move(ptr), count ]() mutable noexcept {
+            AllocTraits::deallocate(alloc, std::move(ptr), count);
+        });
     }
 
     template<typename Alloc,
@@ -99,23 +134,50 @@ LSTM_BEGIN
         AllocTraits::construct(alloc, t, (Args &&) args...);
     }
 
-    template<typename Alloc,
-             LSTM_REQUIRES_(detail::has_value_type<Alloc>{}),
+    template<typename Tx,
+             typename Alloc,
+             LSTM_REQUIRES_(detail::is_transaction<Tx>{} && detail::has_value_type<Alloc>{}),
+             typename T,
+             typename... Args,
+             typename AllocTraits = std::allocator_traits<Alloc>,
+             LSTM_REQUIRES_(!std::is_const<Alloc>{} && !std::is_trivially_destructible<T>{})>
+    inline void construct(const Tx tx, Alloc& alloc, T* t, Args&&... args)
+    {
+        AllocTraits::construct(alloc, t, (Args &&) args...);
+        tx.after_fail([ alloc, t ]() mutable noexcept { AllocTraits::destroy(alloc, t); });
+    }
+
+    template<typename Tx,
+             typename Alloc,
+             LSTM_REQUIRES_(detail::is_transaction<Tx>{} && detail::has_value_type<Alloc>{}),
+             typename T,
+             typename... Args,
+             typename AllocTraits = std::allocator_traits<Alloc>,
+             LSTM_REQUIRES_(!std::is_const<Alloc>{} && std::is_trivially_destructible<T>{})>
+    inline void construct(const Tx, Alloc& alloc, T* t, Args&&... args)
+    {
+        AllocTraits::construct(alloc, t, (Args &&) args...);
+    }
+
+    template<typename Tx,
+             typename Alloc,
+             LSTM_REQUIRES_(detail::is_transaction<Tx>{} && detail::has_value_type<Alloc>{}),
              typename T,
              typename AllocTraits = std::allocator_traits<Alloc>,
              LSTM_REQUIRES_(!std::is_const<Alloc>{} && !std::is_trivially_destructible<T>{})>
-    inline void destroy(thread_data & tls_td, Alloc & alloc, T * t)
+    inline void destroy(const Tx tx, Alloc& alloc, T* t)
     {
-        tls_td.sometime_synchronized_after(
+        tx.sometime_synchronized_after(
             [ alloc, t ]() mutable noexcept { AllocTraits::destroy(alloc, t); });
     }
 
-    template<typename Alloc,
-             LSTM_REQUIRES_(detail::has_value_type<Alloc>{}),
+    template<typename Tx,
+             typename Alloc,
+             LSTM_REQUIRES_(detail::is_transaction<Tx>{} && detail::has_value_type<Alloc>{}),
              typename T,
              typename AllocTraits = std::allocator_traits<Alloc>,
              LSTM_REQUIRES_(!std::is_const<Alloc>{} && std::is_trivially_destructible<T>{})>
-    inline void destroy(thread_data&, Alloc&, T*) noexcept
+    inline void destroy(const Tx, Alloc&, T*) noexcept
     {
     }
 
@@ -156,31 +218,66 @@ LSTM_BEGIN
         return result;
     }
 
-    template<typename Alloc,
-             LSTM_REQUIRES_(detail::has_value_type<Alloc>{}),
+    template<typename Tx,
+             typename Alloc,
+             typename... Args,
+             LSTM_REQUIRES_(detail::is_transaction<Tx>{} && !std::is_const<Alloc>{}
+                            && detail::has_value_type<Alloc>{}),
+             typename AllocTraits = std::allocator_traits<Alloc>,
+             typename Pointer     = typename AllocTraits::pointer,
+             LSTM_REQUIRES_(!std::is_trivially_destructible<typename AllocTraits::value_type>{})>
+    inline Pointer allocate_construct(const Tx tx, Alloc& alloc, Args&&... args)
+    {
+        Pointer result = AllocTraits::allocate(alloc, 1);
+        AllocTraits::construct(alloc, detail::to_raw_pointer(result), (Args &&) args...);
+        tx.after_fail([ alloc, result ]() mutable noexcept {
+            AllocTraits::destroy(alloc, detail::to_raw_pointer(result));
+            AllocTraits::deallocate(alloc, std::move(result), 1);
+        });
+        return result;
+    }
+
+    template<typename Tx,
+             typename Alloc,
+             typename... Args,
+             LSTM_REQUIRES_(detail::is_transaction<Tx>{} && !std::is_const<Alloc>{}
+                            && detail::has_value_type<Alloc>{}),
+             typename AllocTraits = std::allocator_traits<Alloc>,
+             typename Pointer     = typename AllocTraits::pointer,
+             LSTM_REQUIRES_(std::is_trivially_destructible<typename AllocTraits::value_type>{})>
+    inline Pointer allocate_construct(const Tx tx, Alloc& alloc, Args&&... args)
+    {
+        Pointer result = AllocTraits::allocate(alloc, 1);
+        AllocTraits::construct(alloc, detail::to_raw_pointer(result), (Args &&) args...);
+        tx.after_fail([ alloc, result ]() mutable noexcept {
+            AllocTraits::deallocate(alloc, std::move(result), 1);
+        });
+        return result;
+    }
+
+    template<typename Tx,
+             typename Alloc,
+             LSTM_REQUIRES_(detail::is_transaction<Tx>{} && detail::has_value_type<Alloc>{}),
              typename AllocTraits = std::allocator_traits<Alloc>,
              LSTM_REQUIRES_(!std::is_const<Alloc>{}
                             && !std::is_trivially_destructible<typename AllocTraits::value_type>{})>
-    inline void destroy_deallocate(thread_data & tls_td,
-                                   Alloc & alloc,
-                                   typename AllocTraits::pointer ptr)
+    inline void destroy_deallocate(const Tx tx, Alloc& alloc, typename AllocTraits::pointer ptr)
     {
-        tls_td.sometime_synchronized_after([ alloc, ptr = std::move(ptr) ]() mutable noexcept {
+        tx.sometime_synchronized_after([ alloc, ptr = std::move(ptr) ]() mutable noexcept {
             AllocTraits::destroy(alloc, detail::to_raw_pointer(ptr));
             AllocTraits::deallocate(alloc, std::move(ptr), 1);
         });
     }
 
-    template<typename Alloc,
-             LSTM_REQUIRES_(detail::has_value_type<Alloc>{}),
+    template<typename Tx,
+             typename Alloc,
+             LSTM_REQUIRES_(detail::is_transaction<Tx>{} && detail::has_value_type<Alloc>{}),
              typename AllocTraits = std::allocator_traits<Alloc>,
              LSTM_REQUIRES_(!std::is_const<Alloc>{}
                             && std::is_trivially_destructible<typename AllocTraits::value_type>{})>
-    inline void destroy_deallocate(thread_data & tls_td,
-                                   Alloc & alloc,
-                                   typename AllocTraits::pointer ptr)
+    inline void destroy_deallocate(const Tx tx, Alloc& alloc, typename AllocTraits::pointer ptr)
     {
-        tls_td.sometime_synchronized_after([ alloc, ptr = std::move(ptr) ]() mutable noexcept {
+        tx.sometime_synchronized_after([ alloc, ptr = std::move(ptr) ]() mutable noexcept {
             AllocTraits::deallocate(alloc, std::move(ptr), 1);
         });
     }

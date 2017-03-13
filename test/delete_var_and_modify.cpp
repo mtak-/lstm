@@ -33,12 +33,10 @@ int main()
                     static std::allocator<var<big, debug_alloc<big>>> alloc{};
                     auto ptr = x_ptr.get(tx);
                     if (ptr) {
-                        destroy_deallocate(tx.get_thread_data(), alloc, ptr);
+                        destroy_deallocate(tx, alloc, ptr);
                         x_ptr.set(tx, nullptr);
                     } else {
-                        auto ptr = alloc.allocate(1);
-                        new (ptr) var<big, debug_alloc<big>>();
-                        x_ptr.set(tx, ptr);
+                        x_ptr.set(tx, allocate_construct(tx, alloc));
                     }
                 });
             },
