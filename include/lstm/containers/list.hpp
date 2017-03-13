@@ -114,7 +114,7 @@ LSTM_BEGIN
                 auto root = head.get(tx);
                 head.set(tx, nullptr);
                 if (root) {
-                    tx.sometime_after([ alloc = alloc(), root ]() noexcept {
+                    tx.sometime_synchronized_after([ alloc = alloc(), root ]() noexcept {
                         destroy_deallocate_sublist(alloc, root);
                     });
                 }

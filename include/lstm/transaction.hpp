@@ -52,10 +52,10 @@ LSTM_BEGIN
 
         template<typename Func,
                  LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
-        void sometime_after(Func&& func) const
-            noexcept(noexcept(transaction_base::sometime_after((Func &&) func)))
+        void sometime_synchronized_after(Func&& func) const
+            noexcept(noexcept(transaction_base::sometime_synchronized_after((Func &&) func)))
         {
-            transaction_base::sometime_after((Func &&) func);
+            transaction_base::sometime_synchronized_after((Func &&) func);
         }
 
         template<typename Func,

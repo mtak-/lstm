@@ -226,7 +226,7 @@ LSTM_BEGIN
 
         template<typename Func,
                  LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
-        void sometime_after(Func&& func) noexcept(
+        void sometime_synchronized_after(Func&& func) noexcept(
             noexcept(succ_callbacks.active().callbacks.emplace_back((Func &&) func)))
         {
             LSTM_ASSERT(in_transaction());
