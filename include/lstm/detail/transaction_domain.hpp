@@ -5,7 +5,7 @@
 
 #include <atomic>
 
-LSTM_BEGIN
+LSTM_DETAIL_BEGIN
     struct transaction_domain
     {
     private:
@@ -42,6 +42,6 @@ LSTM_BEGIN
         static transaction_domain _default_domain{};
         return _default_domain;
     }
-LSTM_END
+LSTM_DETAIL_END
 
 #endif /* LSTM_TRANSACTION_DOMAIN_HPP */
