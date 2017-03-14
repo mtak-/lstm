@@ -1,8 +1,9 @@
 #ifndef LSTM_DETAIL_ATOMIC_BASE_HPP
 #define LSTM_DETAIL_ATOMIC_BASE_HPP
 
+#include <lstm/detail/transaction_domain.hpp>
+
 #include <lstm/thread_data.hpp>
-#include <lstm/transaction_domain.hpp>
 
 LSTM_DETAIL_BEGIN
     struct atomic_base_fn

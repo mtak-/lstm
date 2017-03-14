@@ -13,14 +13,15 @@ LSTM_DETAIL_BEGIN
                  typename... Args,
                  LSTM_REQUIRES_(!is_void_transact_function<Func&, critical_section, Args&&...>()),
                  typename Result = transact_result<Func, critical_section, Args&&...>>
-        static Result slow_path(thread_data& tls_td, Func func, Args&&... args)
+        static Result slow_path(thread_data& tls_td, Func&& func, Args&&... args)
         {
             LSTM_ASSERT(!tls_td.in_transaction());
             LSTM_ASSERT(valid_start_state(tls_td));
             try {
-                tls_td.access_lock(domain.get_clock());
+                tls_td.access_lock(default_domain().get_clock());
 
-                Result result = atomic_base_fn::call(func, critical_section{}, (Args &&) args...);
+                Result result
+                    = atomic_base_fn::call((Func &&) func, critical_section{}, (Args &&) args...);
 
                 tls_td.access_unlock();
                 LSTM_ASSERT(valid_start_state(tls_td));
@@ -39,14 +40,14 @@ LSTM_DETAIL_BEGIN
         template<typename Func,
                  typename... Args,
                  LSTM_REQUIRES_(is_void_transact_function<Func&, critical_section, Args&&...>())>
-        static void slow_path(thread_data& tls_td, domain, Func func, Args&&... args)
+        static void slow_path(thread_data& tls_td, Func func, Args&&... args)
         {
             LSTM_ASSERT(!tls_td.in_transaction());
             LSTM_ASSERT(valid_start_state(tls_td));
             try {
-                tls_td.access_lock(domain.get_clock());
+                tls_td.access_lock(default_domain().get_clock());
 
-                atomic_base_fn::call(func, critical_section{}, (Args &&) args...);
+                atomic_base_fn::call((Func &&) func, critical_section{}, (Args &&) args...);
 
                 tls_td.access_unlock();
                 LSTM_ASSERT(valid_start_state(tls_td));
@@ -65,8 +66,8 @@ LSTM_DETAIL_BEGIN
         operator()(thread_data& tls_td, Func&& func, Args&&... args) const
         {
             if (tls_td.in_critical_section())
-                return atomic_base_fn::call(func, critical_section{}, (Args &&) args...);
-            return relative_fn::slow_path(tls_td, domain, (Func &&) func, (Args &&) args...);
+                return atomic_base_fn::call((Func &&) func, critical_section{}, (Args &&) args...);
+            return relative_fn::slow_path(tls_td, (Func &&) func, (Args &&) args...);
         }
 
         template<typename Func,
@@ -75,7 +76,7 @@ LSTM_DETAIL_BEGIN
         transact_result<Func, critical_section, Args&&...>
         operator()(Func&& func, Args&&... args) const
         {
-            return (*this)(tls_thread_data(), default_domain(), (Func &&) func, (Args &&) args...);
+            return (*this)(tls_thread_data(), (Func &&) func, (Args &&) args...);
         }
 
 #ifndef LSTM_MAKE_SFINAE_FRIENDLY

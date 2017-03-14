@@ -1,8 +1,9 @@
 #ifndef LSTM_DETAIL_COMMIT_ALGORITHM_HPP
 #define LSTM_DETAIL_COMMIT_ALGORITHM_HPP
 
+#include <lstm/detail/transaction_domain.hpp>
+
 #include <lstm/transaction.hpp>
-#include <lstm/transaction_domain.hpp>
 
 LSTM_DETAIL_BEGIN
     namespace
