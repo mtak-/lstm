@@ -4,11 +4,7 @@
 #include <lstm/thread_data.hpp>
 
 LSTM_DETAIL_BEGIN
-    [[noreturn]] LSTM_NOINLINE inline void internal_retry()
-    {
-        LSTM_LOG_INTERNAL_FAIL_TX();
-        throw tx_retry{};
-    }
+    [[noreturn]] LSTM_NOINLINE inline void internal_retry() { throw tx_retry{}; }
 
     struct transaction_base
     {

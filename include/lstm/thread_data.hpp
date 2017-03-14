@@ -39,7 +39,7 @@ LSTM_BEGIN
             callbacks_t                 c;
             detail::succ_callbacks_t<4> d;
             tx_kind                     e;
-            int*                        desired;
+            void*                       desired;
         };
         static constexpr std::size_t tgp_cache_line_offset
             = offsetof(_cache_line_offset_calculation, desired) % LSTM_CACHE_LINE_SIZE;
@@ -92,7 +92,6 @@ LSTM_BEGIN
 
         void clear_read_write_sets() noexcept
         {
-            LSTM_LOG_READ_AND_WRITE_SET_SIZE(read_set.size(), write_set.size());
             read_set.clear();
             write_set.clear();
         }
@@ -159,6 +158,7 @@ LSTM_BEGIN
         LSTM_NOINLINE thread_data() noexcept
             : tx_state(tx_kind::none)
         {
+            LSTM_ASSERT(std::uintptr_t(this) % LSTM_CACHE_LINE_SIZE == 0);
         }
 
         thread_data(const thread_data&) = delete;

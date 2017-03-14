@@ -11,11 +11,11 @@
     #include <string>
     #include <vector>
     
-    #define LSTM_LOG_INTERNAL_FAIL_TX()   ++lstm::detail::tls_record().internal_failures
-    #define LSTM_LOG_USER_FAIL_TX()       ++lstm::detail::tls_record().user_failures
-    #define LSTM_LOG_SUCC_TX()            ++lstm::detail::tls_record().successes
-    #define LSTM_LOG_BLOOM_COLLISION()    ++lstm::detail::tls_record().bloom_collisions
-    #define LSTM_LOG_BLOOM_SUCCESS()      ++lstm::detail::tls_record().bloom_successes
+    #define LSTM_LOG_FAIL_TX()         ++lstm::detail::tls_record().failures
+    #define LSTM_LOG_USER_FAIL_TX()    ++lstm::detail::tls_record().user_failures
+    #define LSTM_LOG_SUCC_TX()         ++lstm::detail::tls_record().successes
+    #define LSTM_LOG_BLOOM_COLLISION() ++lstm::detail::tls_record().bloom_collisions
+    #define LSTM_LOG_BLOOM_SUCCESS()   ++lstm::detail::tls_record().bloom_successes
     #define LSTM_LOG_READ_AND_WRITE_SET_SIZE(read_size, write_size)                                \
         lstm::detail::tls_record().bump_read_write(read_size, write_size)                          \
     /**/
@@ -31,7 +31,7 @@
         #define LSTM_LOG_DUMP() (std::cout << lstm::detail::transaction_log::get().results())
     #endif /* LSTM_LOG_DUMP */
 #else
-    #define LSTM_LOG_INTERNAL_FAIL_TX()                             /**/
+    #define LSTM_LOG_FAIL_TX()                                      /**/
     #define LSTM_LOG_USER_FAIL_TX()                                 /**/
     #define LSTM_LOG_SUCC_TX()                                      /**/
     #define LSTM_LOG_BLOOM_COLLISION()                              /**/
@@ -51,7 +51,7 @@ LSTM_DETAIL_BEGIN
     struct thread_record
     {
         std::size_t user_failures{0};
-        std::size_t internal_failures{0};
+        std::size_t failures{0};
         std::size_t successes{0};
         std::size_t bloom_collisions{0};
         std::size_t bloom_successes{0};
@@ -65,57 +65,60 @@ LSTM_DETAIL_BEGIN
         inline void
         bump_read_write(const std::size_t in_read_size, const std::size_t in_write_size) noexcept
         {
-            LSTM_ASSERT(total_transactions() > 0);
-
             max_read_size  = std::max(max_read_size, in_read_size);
             max_write_size = std::max(max_write_size, in_write_size);
-            avg_read_size  = avg_read_size + (in_read_size - avg_read_size) / total_transactions();
+            avg_read_size
+                = avg_read_size + (in_read_size - avg_read_size) / (total_transactions() + 1);
             avg_write_size
-                = avg_write_size + (in_write_size - avg_write_size) / total_transactions();
+                = avg_write_size + (in_write_size - avg_write_size) / (total_transactions() + 1);
         }
 
-        inline constexpr std::size_t total_failures() const noexcept
+        inline std::size_t internal_failures() const noexcept
         {
-            return user_failures + internal_failures;
+            LSTM_ASSERT(user_failures <= failures);
+            return failures - user_failures;
         }
 
-        inline constexpr std::size_t total_transactions() const noexcept
-        {
-            return total_failures() + successes;
-        }
+        inline std::size_t total_transactions() const noexcept { return failures + successes; }
 
-        inline constexpr float success_rate() const noexcept
+        inline float success_rate() const noexcept
         {
+            LSTM_ASSERT(successes <= total_transactions());
             return successes / float(total_transactions());
         }
 
-        inline constexpr float failure_rate() const noexcept
+        inline float failure_rate() const noexcept
         {
-            return total_failures() / float(total_transactions());
+            LSTM_ASSERT(failures <= total_transactions());
+            return failures / float(total_transactions());
         }
 
-        inline constexpr float internal_failure_rate() const noexcept
+        inline float internal_failure_rate() const noexcept
         {
-            return internal_failures / float(total_transactions());
+            LSTM_ASSERT(internal_failures() <= total_transactions());
+            return internal_failures() / float(total_transactions());
         }
 
-        inline constexpr float user_failure_rate() const noexcept
+        inline float user_failure_rate() const noexcept
         {
+            LSTM_ASSERT(user_failures <= total_transactions());
             return user_failures / float(total_transactions());
         }
 
-        inline constexpr std::size_t total_bloom_checks() const noexcept
+        inline std::size_t total_bloom_checks() const noexcept
         {
             return bloom_collisions + bloom_successes;
         }
 
-        inline constexpr float bloom_success_rate() const noexcept
+        inline float bloom_success_rate() const noexcept
         {
+            LSTM_ASSERT(bloom_successes <= total_bloom_checks());
             return bloom_successes / float(total_bloom_checks());
         }
 
-        inline constexpr float bloom_collision_rate() const noexcept
+        inline float bloom_collision_rate() const noexcept
         {
+            LSTM_ASSERT(bloom_collisions <= total_bloom_checks());
             return bloom_collisions / float(total_bloom_checks());
         }
 
@@ -124,8 +127,8 @@ LSTM_DETAIL_BEGIN
             std::ostringstream ostr;
             ostr << "    Total Transactions:     " << total_transactions() << '\n'
                  << "    Total Successes:        " << successes << '\n'
-                 << "    Total Failures:         " << total_failures() << '\n'
-                 << "    Internal Failures:      " << internal_failures << '\n'
+                 << "    Total Failures:         " << failures << '\n'
+                 << "    Internal Failures:      " << internal_failures() << '\n'
                  << "    User Failures:          " << user_failures << '\n'
                  << "    Success Rate:           " << success_rate() << '\n'
                  << "    Failure Rate:           " << failure_rate() << '\n'
@@ -191,7 +194,7 @@ LSTM_DETAIL_BEGIN
 
         std::size_t total_failures() const noexcept
         {
-            return total_count(&thread_record::internal_failures);
+            return total_count(&thread_record::failures);
         }
 
         std::size_t total_successes() const noexcept
