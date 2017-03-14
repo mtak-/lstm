@@ -93,7 +93,7 @@ LSTM_DETAIL_BEGIN
                 unlock_as_version(write_set_value.dest_var(), write_version);
         }
 
-        static gp_t commit_slower_path(const transaction tx, transaction_domain& domain) noexcept
+        static gp_t commit_slower_path(const transaction tx) noexcept
         {
             // last check
             if (!commit_validate_reads(tx))
@@ -103,7 +103,7 @@ LSTM_DETAIL_BEGIN
 
             commit_write(write_set);
 
-            const gp_t sync_version = domain.fetch_and_bump_clock();
+            const gp_t sync_version = default_domain().fetch_and_bump_clock();
             LSTM_ASSERT(tx.version() <= sync_version);
 
             commit_publish(write_set, sync_version + transaction_domain::bump_size());
@@ -111,23 +111,23 @@ LSTM_DETAIL_BEGIN
             return sync_version;
         }
 
-        static gp_t commit_slow_path(const transaction tx, transaction_domain& domain) noexcept
+        static gp_t commit_slow_path(const transaction tx) noexcept
         {
             if (!commit_lock_writes(tx))
                 return commit_failed;
-            return commit_slower_path(tx, domain);
+            return commit_slower_path(tx);
         }
 
     public:
-        static gp_t try_commit(const transaction tx, transaction_domain& domain) noexcept
+        static gp_t try_commit(const transaction tx) noexcept
         {
-            LSTM_ASSERT(tx.version() <= domain.get_clock());
+            LSTM_ASSERT(tx.version() <= default_domain().get_clock());
 
             const thread_data& tls_td = tx.get_thread_data();
             if (tls_td.write_set.empty())
                 return 0; // synchronize on the earliest grace period
 
-            return commit_slow_path(tx, domain);
+            return commit_slow_path(tx);
         }
     };
 LSTM_DETAIL_END

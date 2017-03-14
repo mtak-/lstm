@@ -14,10 +14,9 @@ LSTM_DETAIL_BEGIN
                  typename... Args,
                  LSTM_REQUIRES_(!is_void_transact_function<Func&, transaction, Args&&...>()),
                  typename Result = transact_result<Func, transaction, Args&&...>>
-        static Result
-        slow_path(thread_data& tls_td, transaction_domain& domain, Func func, Args&&... args)
+        static Result slow_path(thread_data& tls_td, Func func, Args&&... args)
         {
-            transaction tx{tls_td, tx_start<tx_kind::read_write>(tls_td, domain)};
+            transaction tx{tls_td, tx_start<tx_kind::read_write>(tls_td)};
 
             while (true) {
                 try {
@@ -27,7 +26,7 @@ LSTM_DETAIL_BEGIN
 
                     // commit does not throw
                     gp_t sync_version;
-                    if ((sync_version = detail::commit_algorithm::try_commit(tx, domain))
+                    if ((sync_version = detail::commit_algorithm::try_commit(tx))
                         != commit_failed) {
                         tx_success<tx_kind::read_write>(tls_td, sync_version);
                         LSTM_ASSERT(valid_start_state(tls_td));
@@ -43,7 +42,7 @@ LSTM_DETAIL_BEGIN
                 } catch (...) {
                     unhandled_exception<tx_kind::read_write>(tls_td);
                 }
-                tx.reset_version(tx_restart<tx_kind::read_write>(tls_td, domain));
+                tx.reset_version(tx_restart<tx_kind::read_write>(tls_td));
 
                 // TODO: add backoff here?
             }
@@ -52,10 +51,9 @@ LSTM_DETAIL_BEGIN
         template<typename Func,
                  typename... Args,
                  LSTM_REQUIRES_(is_void_transact_function<Func&, transaction, Args&&...>())>
-        static void
-        slow_path(thread_data& tls_td, transaction_domain& domain, Func func, Args&&... args)
+        static void slow_path(thread_data& tls_td, Func func, Args&&... args)
         {
-            transaction tx{tls_td, tx_start<tx_kind::read_write>(tls_td, domain)};
+            transaction tx{tls_td, tx_start<tx_kind::read_write>(tls_td)};
 
             while (true) {
                 try {
@@ -65,7 +63,7 @@ LSTM_DETAIL_BEGIN
 
                     // commit does not throw
                     gp_t sync_version;
-                    if ((sync_version = detail::commit_algorithm::try_commit(tx, domain))
+                    if ((sync_version = detail::commit_algorithm::try_commit(tx))
                         != commit_failed) {
                         tx_success<tx_kind::read_write>(tls_td, sync_version);
                         LSTM_ASSERT(valid_start_state(tls_td));
@@ -78,7 +76,7 @@ LSTM_DETAIL_BEGIN
                 } catch (...) {
                     unhandled_exception<tx_kind::read_write>(tls_td);
                 }
-                tx.reset_version(tx_restart<tx_kind::read_write>(tls_td, domain));
+                tx.reset_version(tx_restart<tx_kind::read_write>(tls_td));
 
                 // TODO: add backoff here?
             }
@@ -88,10 +86,8 @@ LSTM_DETAIL_BEGIN
         template<typename Func,
                  typename... Args,
                  LSTM_REQUIRES_(is_transact_function<Func&&, transaction, Args&&...>())>
-        transact_result<Func, transaction, Args&&...> operator()(thread_data& tls_td,
-                                                                 transaction_domain& domain,
-                                                                 Func&&              func,
-                                                                 Args&&... args) const
+        transact_result<Func, transaction, Args&&...>
+        operator()(thread_data& tls_td, Func&& func, Args&&... args) const
         {
             LSTM_ASSERT(!tls_td.in_transaction() || tls_td.in_read_write_transaction());
             if (tls_td.in_transaction())
@@ -99,25 +95,7 @@ LSTM_DETAIL_BEGIN
                                             transaction{tls_td, tls_td.gp()},
                                             (Args &&) args...);
 
-            return read_write_fn::slow_path(tls_td, domain, (Func &&) func, (Args &&) args...);
-        }
-
-        template<typename Func,
-                 typename... Args,
-                 LSTM_REQUIRES_(is_transact_function<Func&&, transaction, Args&&...>())>
-        transact_result<Func, transaction, Args&&...>
-        operator()(thread_data& tls_td, Func&& func, Args&&... args) const
-        {
-            return (*this)(tls_td, default_domain(), (Func &&) func, (Args &&) args...);
-        }
-
-        template<typename Func,
-                 typename... Args,
-                 LSTM_REQUIRES_(is_transact_function<Func&&, transaction, Args&&...>())>
-        transact_result<Func, transaction, Args&&...>
-        operator()(transaction_domain& domain, Func&& func, Args&&... args) const
-        {
-            return (*this)(tls_thread_data(), domain, (Func &&) func, (Args &&) args...);
+            return read_write_fn::slow_path(tls_td, (Func &&) func, (Args &&) args...);
         }
 
         template<typename Func,
@@ -125,7 +103,7 @@ LSTM_DETAIL_BEGIN
                  LSTM_REQUIRES_(is_transact_function<Func&&, transaction, Args&&...>())>
         transact_result<Func, transaction, Args&&...> operator()(Func&& func, Args&&... args) const
         {
-            return (*this)(tls_thread_data(), default_domain(), (Func &&) func, (Args &&) args...);
+            return (*this)(tls_thread_data(), (Func &&) func, (Args &&) args...);
         }
 
 #ifndef LSTM_MAKE_SFINAE_FRIENDLY
@@ -133,41 +111,7 @@ LSTM_DETAIL_BEGIN
                  typename... Args,
                  LSTM_REQUIRES_(!is_transact_function<Func&&, transaction, Args&&...>())>
         transact_result<Func, transaction, Args&&...>
-        operator()(thread_data&, transaction_domain&, Func&&, Args&&...) const
-        {
-            static_assert(is_transact_function_<Func&&, transaction, Args&&...>()
-                              && is_transact_function_<uncvref<Func>&, transaction, Args&&...>(),
-                          "functions passed to lstm::read_write must either take no parameters, "
-                          "or take a `lstm::transaction` either by value or `const&`");
-            static_assert(!is_nothrow_transact_function<Func&&, transaction, Args&&...>()
-                              && !is_nothrow_transact_function<uncvref<Func>&,
-                                                               transaction,
-                                                               Args&&...>(),
-                          "functions passed to lstm::read_write must not be marked noexcept");
-        }
-
-        template<typename Func,
-                 typename... Args,
-                 LSTM_REQUIRES_(!is_transact_function<Func&&, transaction, Args&&...>())>
-        transact_result<Func, transaction, Args&&...>
         operator()(thread_data&, Func&&, Args&&...) const
-        {
-            static_assert(is_transact_function_<Func&&, transaction, Args&&...>()
-                              && is_transact_function_<uncvref<Func>&, transaction, Args&&...>(),
-                          "functions passed to lstm::read_write must either take no parameters, "
-                          "or take a `lstm::transaction` either by value or `const&`");
-            static_assert(!is_nothrow_transact_function<Func&&, transaction, Args&&...>()
-                              && !is_nothrow_transact_function<uncvref<Func>&,
-                                                               transaction,
-                                                               Args&&...>(),
-                          "functions passed to lstm::read_write must not be marked noexcept");
-        }
-
-        template<typename Func,
-                 typename... Args,
-                 LSTM_REQUIRES_(!is_transact_function<Func&&, transaction, Args&&...>())>
-        transact_result<Func, transaction, Args&&...>
-        operator()(transaction_domain&, Func&&, Args&&...) const
         {
             static_assert(is_transact_function_<Func&&, transaction, Args&&...>()
                               && is_transact_function_<uncvref<Func>&, transaction, Args&&...>(),

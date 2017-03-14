@@ -13,8 +13,7 @@ LSTM_DETAIL_BEGIN
                  typename... Args,
                  LSTM_REQUIRES_(!is_void_transact_function<Func&, critical_section, Args&&...>()),
                  typename Result = transact_result<Func, critical_section, Args&&...>>
-        static Result
-        slow_path(thread_data& tls_td, transaction_domain& domain, Func func, Args&&... args)
+        static Result slow_path(thread_data& tls_td, Func func, Args&&... args)
         {
             LSTM_ASSERT(!tls_td.in_transaction());
             LSTM_ASSERT(valid_start_state(tls_td));
@@ -40,8 +39,7 @@ LSTM_DETAIL_BEGIN
         template<typename Func,
                  typename... Args,
                  LSTM_REQUIRES_(is_void_transact_function<Func&, critical_section, Args&&...>())>
-        static void
-        slow_path(thread_data& tls_td, transaction_domain& domain, Func func, Args&&... args)
+        static void slow_path(thread_data& tls_td, domain, Func func, Args&&... args)
         {
             LSTM_ASSERT(!tls_td.in_transaction());
             LSTM_ASSERT(valid_start_state(tls_td));
@@ -63,32 +61,12 @@ LSTM_DETAIL_BEGIN
         template<typename Func,
                  typename... Args,
                  LSTM_REQUIRES_(is_transact_function<Func&&, critical_section, Args&&...>())>
-        transact_result<Func, critical_section, Args&&...> operator()(thread_data& tls_td,
-                                                                      transaction_domain& domain,
-                                                                      Func&&              func,
-                                                                      Args&&... args) const
+        transact_result<Func, critical_section, Args&&...>
+        operator()(thread_data& tls_td, Func&& func, Args&&... args) const
         {
             if (tls_td.in_critical_section())
                 return atomic_base_fn::call(func, critical_section{}, (Args &&) args...);
             return relative_fn::slow_path(tls_td, domain, (Func &&) func, (Args &&) args...);
-        }
-
-        template<typename Func,
-                 typename... Args,
-                 LSTM_REQUIRES_(is_transact_function<Func&&, critical_section, Args&&...>())>
-        transact_result<Func, critical_section, Args&&...>
-        operator()(thread_data& tls_td, Func&& func, Args&&... args) const
-        {
-            return (*this)(tls_td, default_domain(), (Func &&) func, (Args &&) args...);
-        }
-
-        template<typename Func,
-                 typename... Args,
-                 LSTM_REQUIRES_(is_transact_function<Func&&, critical_section, Args&&...>())>
-        transact_result<Func, critical_section, Args&&...>
-        operator()(transaction_domain& domain, Func&& func, Args&&... args) const
-        {
-            return (*this)(tls_thread_data(), domain, (Func &&) func, (Args &&) args...);
         }
 
         template<typename Func,
@@ -101,34 +79,6 @@ LSTM_DETAIL_BEGIN
         }
 
 #ifndef LSTM_MAKE_SFINAE_FRIENDLY
-        template<typename Func,
-                 typename... Args,
-                 LSTM_REQUIRES_(!is_transact_function<Func&&, critical_section, Args&&...>())>
-        transact_result<Func, critical_section, Args&&...>
-        operator()(thread_data&, transaction_domain&, Func&&, Args&&...) const
-        {
-            static_assert(is_transact_function_<Func&&, critical_section, Args&&...>()
-                              && is_transact_function_<uncvref<Func>&,
-                                                       critical_section,
-                                                       Args&&...>(),
-                          "functions passed to lstm::relative must either take no parameters, "
-                          "or take a `lstm::critical_section` either by value or `const&`");
-        }
-
-        template<typename Func,
-                 typename... Args,
-                 LSTM_REQUIRES_(!is_transact_function<Func&&, critical_section, Args&&...>())>
-        transact_result<Func, critical_section, Args&&...>
-        operator()(transaction_domain&, Func&&, Args&&...) const
-        {
-            static_assert(is_transact_function_<Func&&, critical_section, Args&&...>()
-                              && is_transact_function_<uncvref<Func>&,
-                                                       critical_section,
-                                                       Args&&...>(),
-                          "functions passed to lstm::relative must either take no parameters, "
-                          "or take a `lstm::critical_section` either by value or `const&`");
-        }
-
         template<typename Func,
                  typename... Args,
                  LSTM_REQUIRES_(!is_transact_function<Func&&, critical_section, Args&&...>())>
