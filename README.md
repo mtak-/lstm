@@ -4,14 +4,23 @@
 
 `lstm` is a header only implementation of Software Transactional Memory (STM) designed to be simple to use, and flexible. It's only been tested on Apple Clang so YMMV.
 
-Techniques used include:
-- The Transactional Locking II Per Object model was the inspiration for the commit algorithm used.
-- a heavily URCU inspired algorithm is used for resource reclamation
-- `thread_local` is used to automatically track threads (no need to register them)
-- nested transactions are fully supported by merging them into the root most transaction
-- custom allocators are also supported
-- transactions are automatically aborted and retried, when a consistent state of shared memory no longer exists
-- transactions are aborted in a C++ friendly way by utilizing exceptions to unwind the stack
+## Features
+
+- It's header only! Simply `#include <lstm/lstm.hpp>` and you're off.
+- Custom allocators are fully supported.
+- C++14 implementation.
+- `lstm` shares _objects_ not memory. Polymorphic, and non-POD types are safe to use.*
+- Type traits are used to create user friendly `static_assert` error messages.
+- If you want the library to be SFINAE friendly, simply `#define LSTM_MAKE_SFINAE_FRIENDLY`.
+- The library heavily uses `<atomic>` to provide low overhead reads and writes.
+- Nested transactions automatically merge into the rootmost transaction.
+- Read only transactions are supported, providing a performance boost.
+- Aborted transactions unwind the stack, so all of your destructors will be run.
+- Lower level operations, while not the default, are exposed if you need some extra performance.
+- `thread_local` means there's no need to register threads manually.
+- Per thread cache's results in very little overhead in maintaining a read and write set.
+
+_*_ non-POD types are work as long as the following hold. 1) You don't care if an objects destructor is called later than you expect, and 2) it's ok if writing to a variable creates a new instance of that type and the old one is destroyed after the transaction completes. 1) and 2) are true for _most_ types, but not all types.
 
 ## Usage
 
@@ -40,7 +49,7 @@ $ make -j8 && make test
 
 ## Getting Started
 
-Simply wrap shared data up in a `var`, and then start a `read_write` transaction as follows.
+Simply wrap shared data up in a `var`, and then start a transaction as follows.
 
 ```cpp
 // declare your shared variables, and initialize them as though they weren't wrapped by an lstm::var
@@ -48,203 +57,23 @@ static lstm::var<std::vector<int>> buffer{0, 1, 2, 3, 4, 5, 6};
 static lstm::var<std::vector<int>> active;
 
 std::size_t publish_buffer() {
-    
-    // this line either gets access to the current transaction,
-    // or creates a transaction if the thread isn't currently in a critical section
-    return lstm::read_write([&](lstm::transaction& tx) {
-        
-        // shared data can be read by calling tx.read(src)
-        // if the read fails, no code below this line will be executed
-        // the stack will be unwound to the point of the rootmost read_write block,
-        // and the transaction will be retried
-        std::vector<int> tmp = tx.read(buffer);
+    return lstm::atomic([&](const lstm::transaction tx) {
+        std::vector<int> tmp = buffer.get(tx);
         const auto amount_published = tmp.size();
+        active.set(tx, std::move(tmp));
         
-        // shared data can be written by calling tx.write(dest, data)
-        // a failed write behaves the same as a failed read
-        // because the stack is unwound, tmp's destructor will free any memory it holds
-        tx.write(buffer, tx.read(active));
-        tx.write(active, std::move(tmp));
-        
-        // returns the size of the shared data that was published
         return amount_published;
-    }); // if this was the rootmost transaction:
-            // at this point, all the writes are made visible atomically
-            // if that is not possible due to another write transaction on another thread
-            // the same steps as a failed read/write are taken
-        // if this is not the rootmost transaction:
-            // the writes are not visible to other threads until the rootmost transaction completes
-            // however, the writes are always visible from within a read_write block on this thread
-}
-```
-
-There's some (poorly explained) details in the comments, but basically, transactions work as you'd expect them to work. That's the point of STM.
-
-## var
-
-`lstm` takes an implicitly private, explicitly shared approach to STM. To let `lstm` know that a variable is shared, use the `var` template.
-
-```cpp
-template<typename T, typename Alloc = std::allocator<T>>
-struct var;
-```
-
-### var special member functions
-
-`var`'s detect constructors in a similar fashion to `std::optional`, except `var`'s cannot be `null`, so there's no need to pass in a `std::in_place_t` into the constructor.
-
-```cpp
-var<int> x{0};
-var<std::vector<int>> y{1, 2, 3, 4, 5, 6, 7, 8};
-var<std::string> z{"hello world"};
-var<std::string> w(3, '!');
-```
-
-Since `var` might have the need to allocate memory, an optional Allocator argument may be supplied to the constructor by using the tag `std::allocator_arg`.
-
-```cpp
-custom_alloc<int> int_alloc;
-custom_alloc<std::vector<int>> vec_alloc;
-custom_alloc<std::string> string_alloc;
-
-var<int, custom_alloc<int>> x{std::allocator_arg, int_alloc, 0};
-var<std::vector<int>, custom_alloc<std::vector<int>>> y{std::allocator_arg,
-                                                        vec_alloc,
-                                                        {1, 2, 3, 4, 5, 6, 7, 8}};
-var<std::string, custom_alloc<std::string>> z{std::allocator_arg, string_alloc, "hello world"};
-var<std::string, custom_alloc<std::string>> w(std::allocator_arg, string_alloc, 3, '!');
-```
-
-`var`'s are not copy/move constructible or assignable. These operations require accessing shared data, so it must be done from within a transaction context. See the section on [`easy_var`](#easy_var).
-
-### var member functions
-
-```cpp
-Alloc get_allocator() const noexcept;
-```
-`some_var.get_allocator()` returns a copy of the allocator used by `some_var`.
-
--
-
-```cpp
-T unsafe_read() const noexcept;
-```
-`some_var.unsafe_read()` returns the value contained in `var`. This function is usually not safe to call while transactions that might write to `some_var` are executing in any thread, or while `unsafe_write` might be executing in another thread. *Note: There are ways to make concurrent `unsafe_read`'s and transactions work using `thread_data`'s interface.*
-
--
-
-```cpp
-void unsafe_write(const T& t) noexcept;
-void unsafe_write(T&& t) noexcept;
-```
-
-`some_var.unsafe_write(x)` writes the value `x` into `var`. This function is not safe to call while transactions that might read or write to `some_var` are executing in any thread; or while `unsafe_read` or `unsafe_write` might be executing in another thread.
-
-## read_write
-
-In order to safely read or write to shared data, a transaction context is required. Currently `read_write` is the only mechanism for obtaining a transaction context.
-
-`read_write` is a function object of an empty and pod type providing only the callable operator.
-
-```cpp
-template<typename Func>
-transact_result<Func> operator()(Func&& func,
-                                 transaction_domain& domain = default_domain(),
-                                 thread_data& tls_td = tls_thread_data()) const;
-```
-
-### read_write parameters
-
-- `Func&& func`: `func` must be callable with either no arguments, or a `transaction&` argument (preferred in the case `func` is callable under both circumstances).
-- `transaction_domain& domain = default_domain()`: An lvalue reference to the global version clock to use (optional).
-- `thread_data& tls_td = tls_thread_data()`: An lvalue reference to the current thread's `thread_data` instance (optional). This is provided in case accessing a `thread_local` is slow on a target. Typical uses would be to start a thread, and immediately call `thread_data& tls_td = tls_thread_data();` then perform lots of small, performance critical transactions.
-
-### read_write return value
-
-`read_write` returns whatever `func` returns on transaction success.
-
-### read_write examples
-
-```cpp
-int x = read_write([&](transaction& tx) {
-    // reading/writing of shared variables here
-    return 5;
-});
-
-read_write([&] {
-    // reading/writing of shared variables here
-});
-```
-
-## easy_var
-
-`easy_var` is a wrapper template that is much easier to use than `var`. It allows reading/writing without having to create a `read_write` block (it does that for you). `easy_var` can easily lead to slower code if you're not careful, whereas `var` forces you to write faster code. On my machine, the `transfer_funds` (write heavy, small transactions) is about 30% faster using either `var`'s or `easy_var::underlying` in place of the naive `easy_var` implementation.
-
-```cpp
-template<typename T, typename Alloc>
-struct easy_var;
-```
-
-### easy_var special member functions
-
-`easy_var` adds a copy constructor/assignment operators to `var`'s list of [special member functions](#var-special-member-functions).
-
-```cpp
-extern easy_var<int> x;
-void foo() {
-    easy_var<int> y{x};
-    
-    // ...
-    
-    y = x;
-    
-    // ...
-    
-    y = 5;
-}
-```
-
-### easy_var member functions
-
-`easy_var` adds to the member functions that [`var`](#var-member-functions) has with the following:
-
-```cpp
-T get() const;
-operator T() const;
-```
-`get` and `operator T` safely return whatever value a current transaction can see (via [`read_write`](#read_write)).
-
--
-
-```cpp
-lstm::var<T, Alloc>& underlying() & noexcept;
-lstm::var<T, Alloc>&& underlying() && noexcept;
-const lstm::var<T, Alloc>& underlying() const & noexcept;
-const lstm::var<T, Alloc>&& underlying() const && noexcept;
-```
-
-`underlying` returns the [`var<T, Alloc>`](#var) contained by `easy_var<T, Alloc>`. Using `underlying` can lead to code that is as efficient as if it had been written using `var`.
-
-### easy_var operators
-
-All the usual operators are overloaded for `Integral` and `Arithmetic` types.
-
-### easy_var example
-
-```cpp
-bool transfer_funds(int amount, lstm::easy_var<int>& fromAccount, lstm::easy_var<int>& toAccount) {
-    assert(amount > 0);
-    return lstm::read_write([&]{
-        if (fromAccount >= amount) {
-            fromAccount -= 20;
-            toAccount += 20;
-            return true;
-        } else {
-            return false;
-        }
     });
 }
 ```
+
+Transactional variables (shared variables) must be wrapped in the `var` template. `var`'s detect the constructors of the wrapped type, and have `var()` constructors to match.
+
+A transaction is started by calling `atomic` and passing in a callable that takes, by value or `const&`, either a `transaction` (read-write) or a `read_transaction` (read only). If the callable takes both (e.g. `[](auto tx) {}`) then the `transaction` overload is preferred.
+
+Getting values out of a `var` is as simple as calling the method `get` passing in the transaction object.
+
+Setting values is done by calling `some_var.set(tx, value_to_set_to)`.
 
 ## Performance
 `TODO:`
