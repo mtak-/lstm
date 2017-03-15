@@ -26,7 +26,7 @@ auto get_loop(philosopher& p, fork& f0, fork& f1)
 {
     return [&] {
         while (p.food != 0) {
-            atomic([&](const lstm::transaction tx) {
+            atomic([&](const auto tx) {
                 if (!f0.in_use.untracked_get(tx) && !f1.in_use.untracked_get(tx)) {
                     f0.in_use.set(tx, true);
                     f1.in_use.set(tx, true);

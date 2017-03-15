@@ -33,8 +33,8 @@ LSTM_DETAIL_BEGIN
          ************/
         template<typename Func,
                  typename... Args,
-                 LSTM_REQUIRES_(is_transact_function<Func&&, read_transaction, Args&&...>()
-                                && !is_transact_function<Func&&, transaction, Args&&...>())>
+                 LSTM_REQUIRES_(!is_transact_function<Func&&, transaction, Args&&...>()),
+                 LSTM_REQUIRES_(is_transact_function<Func&&, read_transaction, Args&&...>())>
         LSTM_ALWAYS_INLINE transact_result<Func, read_transaction, Args&&...>
         operator()(thread_data& tls_td, Func&& func, Args&&... args) const
         {
@@ -43,8 +43,8 @@ LSTM_DETAIL_BEGIN
 
         template<typename Func,
                  typename... Args,
-                 LSTM_REQUIRES_(is_transact_function<Func&&, read_transaction, Args&&...>()
-                                && !is_transact_function<Func&&, transaction, Args&&...>())>
+                 LSTM_REQUIRES_(!is_transact_function<Func&&, transaction, Args&&...>()),
+                 LSTM_REQUIRES_(is_transact_function<Func&&, read_transaction, Args&&...>())>
         LSTM_ALWAYS_INLINE transact_result<Func, read_transaction, Args&&...>
         operator()(Func&& func, Args&&... args) const
         {
@@ -54,8 +54,8 @@ LSTM_DETAIL_BEGIN
 #ifndef LSTM_MAKE_SFINAE_FRIENDLY
         template<typename Func,
                  typename... Args,
-                 LSTM_REQUIRES_(!is_transact_function<Func&&, transaction, Args&&...>()
-                                && !is_transact_function<Func&&, read_transaction, Args&&...>())>
+                 LSTM_REQUIRES_(!is_transact_function<Func&&, transaction, Args&&...>()),
+                 LSTM_REQUIRES_(!is_transact_function<Func&&, read_transaction, Args&&...>())>
         void operator()(thread_data&, Func&&, Args&&...) const
         {
             static_assert((is_transact_function_<Func&&, transaction, Args&&...>()
@@ -82,8 +82,8 @@ LSTM_DETAIL_BEGIN
 
         template<typename Func,
                  typename... Args,
-                 LSTM_REQUIRES_(!is_transact_function<Func&&, transaction, Args&&...>()
-                                && !is_transact_function<Func&&, read_transaction, Args&&...>())>
+                 LSTM_REQUIRES_(!is_transact_function<Func&&, transaction, Args&&...>()),
+                 LSTM_REQUIRES_(!is_transact_function<Func&&, read_transaction, Args&&...>())>
         void operator()(Func&&, Args&&...) const
         {
             static_assert((is_transact_function_<Func&&, transaction, Args&&...>()
