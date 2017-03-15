@@ -74,7 +74,3 @@ A transaction is started by calling `atomic` and passing in a callable that take
 Getting values out of a `var` is as simple as calling the method `get` passing in the transaction object.
 
 Setting values is done by calling `some_var.set(tx, value_to_set_to)`.
-
-## Performance
-`TODO:`
-A single threaded noop transaction which neither reads nor writes share data, has an overhead of around 6.2ns on a `2.4 GHz Intel Core i5`.
