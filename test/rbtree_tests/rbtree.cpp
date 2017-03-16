@@ -9,7 +9,7 @@
 using tree_t = lstm::rbtree<int, int, std::less<>, mallocator<std::pair<int, int>>>;
 
 static constexpr int   elem_count   = LSTM_TEST_INIT(65536, 65536);
-static constexpr int   iter_count   = LSTM_TEST_INIT(elem_count * 100, 1000000);
+static constexpr int   iter_count   = LSTM_TEST_INIT(elem_count * 100, elem_count * 100);
 static constexpr int   loop_count   = LSTM_TEST_INIT(1, 1);
 static constexpr int   thread_count = 8;
 static constexpr float update_rate  = 0.33f;

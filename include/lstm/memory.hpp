@@ -118,9 +118,8 @@ LSTM_BEGIN
     inline void construct(thread_data & tls_td, Alloc & alloc, T * t, Args && ... args)
     {
         AllocTraits::construct(alloc, t, (Args &&) args...);
-        if (tls_td.in_critical_section()) {
+        if (tls_td.in_critical_section())
             tls_td.after_fail([ alloc, t ]() mutable noexcept { AllocTraits::destroy(alloc, t); });
-        }
     }
 
     template<typename Alloc,

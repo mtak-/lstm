@@ -21,9 +21,9 @@ LSTM_BEGIN
 
         bool nested_in_rw() const noexcept { return can_write(); }
         gp_t version() const noexcept { return transaction_base::version(); }
-        void reset_version(const gp_t new_version) noexcept
+        void unsafe_reset_version(const gp_t new_version) noexcept
         {
-            transaction_base::reset_version(new_version);
+            transaction_base::unsafe_reset_version(new_version);
         }
 
         bool valid(const thread_data& td) const noexcept { return transaction_base::valid(&td); }

@@ -42,7 +42,7 @@ LSTM_DETAIL_BEGIN
                 } catch (...) {
                     unhandled_exception<tx_kind::read_write>(tls_td);
                 }
-                tx.reset_version(tx_restart<tx_kind::read_write>(tls_td));
+                tx.unsafe_reset_version(tx_restart<tx_kind::read_write>(tls_td));
 
                 // TODO: add backoff here?
             }
@@ -76,7 +76,7 @@ LSTM_DETAIL_BEGIN
                 } catch (...) {
                     unhandled_exception<tx_kind::read_write>(tls_td);
                 }
-                tx.reset_version(tx_restart<tx_kind::read_write>(tls_td));
+                tx.unsafe_reset_version(tx_restart<tx_kind::read_write>(tls_td));
 
                 // TODO: add backoff here?
             }

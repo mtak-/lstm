@@ -189,7 +189,7 @@ LSTM_DETAIL_BEGIN
         thread_data& get_thread_data() const noexcept { return *tls_td; }
         gp_t         version() const noexcept { return version_; }
 
-        void reset_version(const gp_t new_version) noexcept
+        void unsafe_reset_version(const gp_t new_version) noexcept
         {
             // TODO: could these asserts fail for correct code?
             if (tls_td) {
