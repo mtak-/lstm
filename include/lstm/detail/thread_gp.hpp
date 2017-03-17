@@ -97,6 +97,8 @@ LSTM_DETAIL_BEGIN
 
     public:
         thread_gp_node() noexcept
+            : mut()
+            , active(off_state)
         {
             LSTM_ASSERT(std::uintptr_t(this) % LSTM_CACHE_LINE_SIZE == CacheLineOffset);
             LSTM_ASSERT(std::uintptr_t(&next) % LSTM_CACHE_LINE_SIZE == 0);
