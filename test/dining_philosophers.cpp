@@ -22,7 +22,7 @@ struct fork
 
 static_assert(decltype(fork{}.in_use)::atomic == true, "");
 
-auto get_loop(philosopher& p, fork& f0, fork& f1)
+static auto get_loop(philosopher& p, fork& f0, fork& f1)
 {
     return [&] {
         while (p.food != 0) {
