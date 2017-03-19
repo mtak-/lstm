@@ -166,6 +166,7 @@ LSTM_BEGIN
 
         LSTM_NOINLINE ~thread_data() noexcept
         {
+            LSTM_ASSERT(!in_critical_section());
             LSTM_ASSERT(!in_transaction());
             LSTM_ASSERT(read_set.empty());
             LSTM_ASSERT(write_set.empty());

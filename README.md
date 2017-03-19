@@ -18,11 +18,11 @@
 - Aborted transactions unwind the stack, so all of your destructors will be run.
 - Lower level operations, while not the default, are exposed if you need some extra performance.
 - `thread_local` means there's no need to register threads manually.
-- Per thread cache's results in very little overhead in maintaining a read and write set.
+- Per thread caches result in very little overhead in maintaining a read and write set.
 - Relativistic programming serves as the backbone for resource reclamation.
 - The commit algorithm can be thought of as distributed `seqlock` which helps to reduce contention on cache lines.
 
-_*_ non-POD types are work as long as the following hold. 1) You don't care if an objects destructor is called later than you expect, and 2) it's ok if writing to a variable creates a new instance of that type and the old one is destroyed after the transaction completes. 1) and 2) are true for _most_ types, but not all types.
+_*_ non-POD types work as long as the following hold. 1) You don't care if an objects destructor is called later than you expect, and 2) it's ok if writing to a variable creates a new instance of that type and the old one is destroyed after the transaction completes. 1) and 2) are true for _most_ types, but not all types.
 
 ## Usage
 
