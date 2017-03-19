@@ -3,7 +3,15 @@
 
 #include <lstm/detail/lstm_fwd.hpp>
 
-#include <thread>
+// clang-format off
+#ifndef LSTM_USE_BOOST_FIBERS
+    #include <thread>
+    #define LSTM_YIELD std::this_thread::yield
+#else
+    #include <boost/fiber/operations.hpp>
+    #define LSTM_YIELD boost::this_fiber::yield
+#endif
+// clang-format on
 
 LSTM_DETAIL_BEGIN
     template<typename T, typename = void>
@@ -60,7 +68,7 @@ LSTM_DETAIL_BEGIN
     struct yield
     {
         // noinline, cause yield on libc++ is inline, and calls a non-noexcept func
-        LSTM_NOINLINE_LUKEWARM void operator()() const noexcept { std::this_thread::yield(); }
+        LSTM_NOINLINE_LUKEWARM void operator()() const noexcept { LSTM_YIELD(); }
         LSTM_ALWAYS_INLINE void     reset() const noexcept {}
     };
 

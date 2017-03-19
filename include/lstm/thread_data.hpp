@@ -9,6 +9,10 @@
 #include <lstm/detail/var_detail.hpp>
 #include <lstm/detail/write_set_value_type.hpp>
 
+#ifdef LSTM_USE_BOOST_FIBERS
+#include <boost/fiber/fss.hpp>
+#endif
+
 LSTM_BEGIN
     enum class tx_kind : char
     {
@@ -273,6 +277,7 @@ LSTM_BEGIN
     };
 LSTM_END
 
+#ifndef LSTM_USE_BOOST_FIBERS
 LSTM_DETAIL_BEGIN
     LSTM_INLINE_VAR LSTM_THREAD_LOCAL thread_data* tls_thread_data_ptr = nullptr;
 
@@ -293,5 +298,25 @@ LSTM_BEGIN
         return *LSTM_ACCESS_INLINE_VAR(detail::tls_thread_data_ptr);
     }
 LSTM_END
+#else
+LSTM_DETAIL_BEGIN
+    LSTM_NOINLINE inline void tls_data_init(
+        boost::fibers::fiber_specific_ptr<thread_data> & tls_td_ptr) noexcept
+    {
+        LSTM_ASSERT(tls_td_ptr.get() == nullptr);
+        tls_td_ptr.reset(::new thread_data());
+    }
+LSTM_DETAIL_END
+
+LSTM_BEGIN
+    LSTM_ALWAYS_INLINE thread_data& tls_thread_data() noexcept
+    {
+        static boost::fibers::fiber_specific_ptr<thread_data> tls_thread_data_ptr;
+        if (tls_thread_data_ptr.get() == nullptr)
+            detail::tls_data_init(tls_thread_data_ptr);
+        return *tls_thread_data_ptr;
+    }
+LSTM_END
+#endif /* LSTM_USE_BOOST_FIBERS */
 
 #endif /* LSTM_THREAD_DATA_HPP */

@@ -26,11 +26,19 @@ add_test(test.thread_data_synchronization thread_data_synchronization)
 add_executable(exception exception.cpp)
 add_test(test.exception exception)
 
-add_executable(destructor_transaction destructor_transaction.cpp)
-add_test(test.destructor_transaction destructor_transaction)
+# add_executable(destructor_transaction destructor_transaction.cpp)
+# add_test(test.destructor_transaction destructor_transaction)
 
 add_executable(delete_var_and_modify delete_var_and_modify.cpp)
 add_test(test.delete_var_and_modify delete_var_and_modify)
 
 add_executable(throwing_constructor throwing_constructor.cpp)
 add_test(test.throwing_constructor throwing_constructor)
+
+find_package(Boost 1.62.0 COMPONENTS context fiber)
+if(Boost_FOUND)
+  include_directories(${Boost_INCLUDE_DIRS})
+  add_executable(fiber_support fiber_support.cpp)
+  add_test(test.fiber_support fiber_support)
+  target_link_libraries(fiber_support ${Boost_LIBRARIES})
+endif()
