@@ -10,9 +10,9 @@ LSTM_DETAIL_BEGIN
     private:
         using uint_t = uword;
 
-        static constexpr const uint_t write_bit = uint_t(1) << (sizeof(uint_t) * 8 - 1);
-        static constexpr const uint_t read_mask = ~write_bit;
-        std::atomic<uint_t>           read_count;
+        static constexpr uint_t write_bit = uint_t(1) << (sizeof(uint_t) * 8 - 1);
+        static constexpr uint_t read_mask = ~write_bit;
+        std::atomic<uint_t>     read_count;
 
         static bool write_locked(const std::atomic<uint_t>& state) = delete;
         inline static constexpr bool write_locked(const uint_t state) noexcept
