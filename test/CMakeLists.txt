@@ -35,7 +35,7 @@ add_test(test.delete_var_and_modify delete_var_and_modify)
 add_executable(throwing_constructor throwing_constructor.cpp)
 add_test(test.throwing_constructor throwing_constructor)
 
-find_package(Boost 1.62.0 COMPONENTS context fiber)
+find_package(Boost 1.62.0 OPTIONAL_COMPONENTS context fiber)
 if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
   add_executable(fiber_support fiber_support.cpp)

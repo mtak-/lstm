@@ -6,12 +6,9 @@
 // clang-format off
 #ifndef LSTM_USE_BOOST_FIBERS
     #include <thread>
-    #define LSTM_SLEEP_FOR std::this_thread::sleep_for
     using thread_t = std::thread;
 #else
     #include <boost/fiber/fiber.hpp>
-    #include <boost/fiber/operations.hpp>
-    #define LSTM_SLEEP_FOR boost::this_fiber::sleep_for
     using thread_t = boost::fibers::fiber;
 #endif
 // clang-format on
@@ -33,7 +30,7 @@ public:
         threads.emplace_back([ this, f = (F &&) f ] {
             lstm::tls_thread_data(); // initialize the thread data
             while (!_run.load(LSTM_RELAXED))
-                LSTM_SLEEP_FOR(1ns);
+                LSTM_THIS_CONTEXT::sleep_for(1ns);
             f();
         });
     }
@@ -45,7 +42,7 @@ public:
         threads.emplace_back([ this, f = (F &&) f, n ] {
             lstm::tls_thread_data(); // initialize the thread data
             while (!_run.load(LSTM_RELAXED))
-                LSTM_SLEEP_FOR(1ns);
+                LSTM_THIS_CONTEXT::sleep_for(1ns);
 
             for (int i = 0; i < n; ++i)
                 f();

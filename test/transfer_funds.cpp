@@ -23,8 +23,9 @@ int main()
                     if (account1 >= 20) {
                         account0 += 20;
                         account1 -= 20;
-                    } else
+                    } else {
                         lstm::retry();
+                    }
                 });
             }
         });
@@ -35,8 +36,9 @@ int main()
                     if (account0 >= 30) {
                         account1 += 30;
                         account0 -= 30;
-                    } else
+                    } else {
                         lstm::retry();
+                    }
                 });
             }
         });

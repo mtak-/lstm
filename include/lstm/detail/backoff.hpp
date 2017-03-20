@@ -6,35 +6,25 @@
 // clang-format off
 #ifndef LSTM_USE_BOOST_FIBERS
     #include <thread>
-    #define LSTM_YIELD std::this_thread::yield
+    #define LSTM_THIS_CONTEXT std::this_thread
 #else
     #include <boost/fiber/operations.hpp>
-    #define LSTM_YIELD boost::this_fiber::yield
+    #define LSTM_THIS_CONTEXT boost::this_fiber
 #endif
 // clang-format on
 
 LSTM_DETAIL_BEGIN
-    template<typename T, typename = void>
-    struct has_reset : std::false_type
-    {
-    };
+    template<typename T>
+    using has_reset_ = decltype(std::declval<T&>().reset());
 
     template<typename T>
-    struct has_reset<T, void_<decltype(std::declval<T&>().reset())>>
-        : std::integral_constant<bool, noexcept(std::declval<T&>().reset())>
-    {
-    };
-
-    template<typename T, typename = void>
-    struct has_nullary_call_operator : std::false_type
-    {
-    };
+    using has_reset = supports<has_reset_, T>;
 
     template<typename T>
-    struct has_nullary_call_operator<T, void_<decltype(std::declval<T&>().operator()())>>
-        : std::integral_constant<bool, noexcept(std::declval<T&>().operator()())>
-    {
-    };
+    using has_nullary_call_operator_ = decltype(std::declval<T&>().operator()());
+
+    template<typename T>
+    using has_nullary_call_operator = supports<has_nullary_call_operator_, T>;
 
     template<typename T>
     using is_backoff_strategy = and_<std::is_trivially_copy_constructible<T>,
@@ -56,7 +46,7 @@ LSTM_DETAIL_BEGIN
     public:
         void operator()() noexcept
         {
-            std::this_thread::sleep_for(Interval(interval));
+            LSTM_THIS_CONTEXT::sleep_for(Interval(interval));
             interval <<= 1;
             if (interval > Max)
                 interval = Max;
@@ -68,7 +58,7 @@ LSTM_DETAIL_BEGIN
     struct yield
     {
         // noinline, cause yield on libc++ is inline, and calls a non-noexcept func
-        LSTM_NOINLINE_LUKEWARM void operator()() const noexcept { LSTM_YIELD(); }
+        LSTM_NOINLINE_LUKEWARM void operator()() const noexcept { LSTM_THIS_CONTEXT::yield(); }
         LSTM_ALWAYS_INLINE void     reset() const noexcept {}
     };
 
