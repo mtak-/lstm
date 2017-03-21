@@ -17,6 +17,11 @@ LSTM_DETAIL_BEGIN
         using write_set_t    = typename thread_data::write_set_t;
         using write_set_iter = typename thread_data::write_set_iter;
 
+        commit_algorithm()                        = delete;
+        commit_algorithm(const commit_algorithm&) = delete;
+        commit_algorithm& operator=(const commit_algorithm&) = delete;
+        ~commit_algorithm()                                  = delete;
+
         static inline bool lock(var_base& v, const transaction tx) noexcept
         {
             gp_t version_buf = v.version_lock.load(LSTM_RELAXED);
@@ -53,7 +58,7 @@ LSTM_DETAIL_BEGIN
                 unlock(begin->dest_var());
         }
 
-        static bool commit_lock_writes(const transaction tx) noexcept
+        static bool lock_writes(const transaction tx) noexcept
         {
             thread_data&         tls_td      = tx.get_thread_data();
             write_set_iter       write_begin = tls_td.write_set.begin();
@@ -69,7 +74,7 @@ LSTM_DETAIL_BEGIN
             return true;
         }
 
-        static bool commit_validate_reads(const transaction tx) noexcept
+        static bool validate_reads(const transaction tx) noexcept
         {
             thread_data& tls_td = tx.get_thread_data();
             for (read_set_value_type read_set_vaue : tls_td.read_set) {
@@ -81,42 +86,42 @@ LSTM_DETAIL_BEGIN
             return true;
         }
 
-        static void commit_write(const write_set_t& write_set) noexcept
+        static void do_writes(const write_set_t& write_set) noexcept
         {
             for (write_set_value_type write_set_value : write_set)
                 write_set_value.dest_var().storage.store(write_set_value.pending_write(),
                                                          LSTM_RELEASE);
         }
 
-        static void commit_publish(const write_set_t& write_set, const gp_t write_version) noexcept
+        static void publish(const write_set_t& write_set, const gp_t write_version) noexcept
         {
             for (write_set_value_type write_set_value : write_set)
                 unlock_as_version(write_set_value.dest_var(), write_version);
         }
 
-        static gp_t commit_slower_path(const transaction tx) noexcept
+        static gp_t slower_path(const transaction tx) noexcept
         {
             // last check
-            if (!commit_validate_reads(tx))
+            if (!validate_reads(tx))
                 return commit_failed;
 
             const write_set_t& write_set = tx.get_thread_data().write_set;
 
-            commit_write(write_set);
+            do_writes(write_set);
 
             const gp_t sync_version = default_domain().fetch_and_bump_clock();
             LSTM_ASSERT(tx.version() <= sync_version);
 
-            commit_publish(write_set, sync_version + transaction_domain::bump_size());
+            publish(write_set, sync_version + transaction_domain::bump_size());
 
             return sync_version;
         }
 
-        static gp_t commit_slow_path(const transaction tx) noexcept
+        static gp_t slow_path(const transaction tx) noexcept
         {
-            if (!commit_lock_writes(tx))
+            if (!lock_writes(tx))
                 return commit_failed;
-            return commit_slower_path(tx);
+            return slower_path(tx);
         }
 
     public:
@@ -128,7 +133,7 @@ LSTM_DETAIL_BEGIN
             if (tls_td.write_set.empty())
                 return 0; // synchronize on the earliest grace period
 
-            return commit_slow_path(tx);
+            return slow_path(tx);
         }
     };
 LSTM_DETAIL_END
