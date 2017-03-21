@@ -45,14 +45,14 @@ LSTM_DETAIL_BEGIN
 
         union
         {
-            thread_gp_node* next;
-            char            padding2_[LSTM_CACHE_LINE_SIZE];
+            std::atomic<gp_t> active;
+            char              padding3_[LSTM_CACHE_LINE_SIZE];
         };
 
         union
         {
-            std::atomic<gp_t> active;
-            char              padding3_[LSTM_CACHE_LINE_SIZE];
+            thread_gp_node* next;
+            char            padding2_[LSTM_CACHE_LINE_SIZE];
         };
 
         static void lock_all() noexcept
@@ -103,8 +103,6 @@ LSTM_DETAIL_BEGIN
             LSTM_ASSERT(std::uintptr_t(this) % LSTM_CACHE_LINE_SIZE == CacheLineOffset);
             LSTM_ASSERT(std::uintptr_t(&next) % LSTM_CACHE_LINE_SIZE == 0);
             LSTM_ASSERT(std::uintptr_t(&active) % LSTM_CACHE_LINE_SIZE == 0);
-
-            active.store(off_state, LSTM_RELEASE);
 
             mut.lock();
             lock_all(); // this->mut does not get locked here
