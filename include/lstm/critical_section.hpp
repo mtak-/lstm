@@ -6,9 +6,6 @@
 LSTM_BEGIN
     struct critical_section
     {
-        template<typename, typename>
-        friend struct ::lstm::var;
-
         bool valid(const thread_data& td) const noexcept
         {
             return td.in_critical_section() && !td.in_transaction();
