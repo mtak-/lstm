@@ -6,11 +6,7 @@
 #include <exception>
 
 LSTM_DETAIL_BEGIN
-    namespace
-    {
-        static constexpr auto exception_bit = lock_bit;
-    }
-
+    // TODO: make this type smaller
     template<typename T>
     struct privatized_future_data
     {
@@ -23,24 +19,43 @@ LSTM_DETAIL_BEGIN
 
         uninitialized<data_t> data;
         thread_data*          tls_td;
-        gp_t                  sync_version;
+        std::int8_t           reclaim_buffer_idx;
+        bool                  has_exception_;
+        bool                  is_ready_;
+        bool                  abandoned_;
 
-        data_t& underlying() { return reinterpret_cast<data_t&>(data); }
+        data_t& underlying() noexcept { return reinterpret_cast<data_t&>(data); }
 
         bool has_exception() const noexcept
         {
             LSTM_ASSERT(is_ready());
-            return sync_version == exception_bit;
+            return has_exception_;
         }
 
         void set_has_exception() noexcept
         {
             LSTM_ASSERT(!has_exception());
-            sync_version = exception_bit;
+            has_exception_ = true;
         }
 
+        void set_is_ready() noexcept
+        {
+            LSTM_ASSERT(!is_ready_);
+            is_ready_ = true;
+        }
+
+        privatized_future_data() noexcept = default;
+
     public:
-        privatized_future_data() noexcept                     = default;
+        privatized_future_data(thread_data* in_tls_td, std::int8_t in_reclaim_buffer_idx) noexcept
+            : tls_td(in_tls_td)
+            , reclaim_buffer_idx(in_reclaim_buffer_idx)
+            , has_exception_(false)
+            , is_ready_(false)
+            , abandoned_(false)
+        {
+        }
+
         privatized_future_data(const privatized_future_data&) = delete;
         privatized_future_data& operator=(const privatized_future_data&) = delete;
 
@@ -59,13 +74,11 @@ LSTM_DETAIL_BEGIN
         void wait() const noexcept
         {
             if (!is_ready())
-                tls_td->reclaim(sync_version);
+                tls_td->reclaim_at(reclaim_buffer_idx);
         }
 
         T& get()
         {
-            LSTM_ASSERT(!is_ready());
-
             wait();
 
             LSTM_ASSERT(is_ready());
@@ -76,20 +89,27 @@ LSTM_DETAIL_BEGIN
         }
 
         // called from privatized_future
-        bool is_ready() const noexcept { return tls_td == nullptr; }
-        void abandon() noexcept { tls_td = nullptr; }
+        bool is_ready() const noexcept { return is_ready_; }
+
+        void abandon() noexcept
+        {
+            LSTM_ASSERT(!is_ready());
+            LSTM_ASSERT(!abandoned());
+            abandoned_ = true;
+        }
 
         // called from gp_callback
-        bool abandoned() const noexcept { return tls_td == nullptr; }
+        bool abandoned() const noexcept { return abandoned_; }
         void set_exception(std::exception_ptr in_exc) noexcept(
             std::is_nothrow_move_constructible<std::exception_ptr>{})
         {
             LSTM_ASSERT(!abandoned());
             LSTM_ASSERT(!is_ready());
+            LSTM_ASSERT(!has_exception());
 
             underlying().exc = std::move(in_exc);
             set_has_exception();
-            tls_td = nullptr;
+            set_is_ready();
 
             LSTM_ASSERT(is_ready());
         }
@@ -98,9 +118,10 @@ LSTM_DETAIL_BEGIN
         {
             LSTM_ASSERT(!abandoned());
             LSTM_ASSERT(!is_ready());
+            LSTM_ASSERT(!has_exception());
 
             underlying().t = in_t;
-            tls_td         = nullptr;
+            set_is_ready();
 
             LSTM_ASSERT(is_ready());
         }
@@ -109,9 +130,10 @@ LSTM_DETAIL_BEGIN
         {
             LSTM_ASSERT(!abandoned());
             LSTM_ASSERT(!is_ready());
+            LSTM_ASSERT(!has_exception());
 
             underlying().t = std::move(in_t);
-            tls_td         = nullptr;
+            set_is_ready();
 
             LSTM_ASSERT(is_ready());
         }
@@ -125,6 +147,15 @@ LSTM_BEGIN
     private:
         using data_t = detail::privatized_future_data<T>;
         std::unique_ptr<data_t> data;
+
+        friend detail::gp_callback;
+
+        explicit privatized_future(data_t* in_data) noexcept
+            : data(in_data)
+        {
+            LSTM_ASSERT(valid());
+            LSTM_ASSERT(!is_ready());
+        }
 
     public:
         privatized_future() noexcept

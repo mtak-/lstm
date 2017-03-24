@@ -84,6 +84,9 @@ LSTM_BEGIN
     struct read_transaction;
     struct transaction_domain;
     struct thread_data;
+
+    template<typename T>
+    struct privatized_future;
 LSTM_END
 
 LSTM_DETAIL_BEGIN
@@ -102,6 +105,9 @@ LSTM_DETAIL_BEGIN
 
     template<std::size_t Padding>
     struct thread_gp_node;
+
+    template<typename T>
+    struct privatized_future_data;
 
     struct tx_retry
     {
