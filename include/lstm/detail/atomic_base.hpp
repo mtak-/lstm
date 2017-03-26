@@ -75,8 +75,12 @@ LSTM_DETAIL_BEGIN
             static_assert(kind != tx_kind::none);
 
             tx_failure<kind>(tls_td);
+
+            tls_td.access_unlock();
+            default_backoff{}();
             const gp_t new_version = default_domain().get_clock();
-            tls_td.access_relock(new_version);
+            tls_td.access_lock(new_version);
+
             return new_version;
         }
 
