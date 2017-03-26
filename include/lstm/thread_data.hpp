@@ -139,7 +139,7 @@ LSTM_BEGIN
             } while (!succ_callbacks.empty());
         }
 
-        LSTM_ALWAYS_INLINE void reclaim_all_possible(const gp_t min_gp) noexcept
+        LSTM_ALWAYS_INLINE void reclaim_all_possible(const epoch_t min_gp) noexcept
         {
             LSTM_ASSERT(!in_transaction());
             LSTM_ASSERT(!in_critical_section());
@@ -154,7 +154,7 @@ LSTM_BEGIN
             LSTM_ASSERT(!in_transaction());
             LSTM_ASSERT(!in_critical_section());
 
-            const gp_t min_gp = synchronize_min_gp(succ_callbacks.front().version);
+            const epoch_t min_gp = synchronize_min_gp(succ_callbacks.front().version);
             reclaim_all_possible(min_gp);
         }
 
@@ -203,27 +203,27 @@ LSTM_BEGIN
 
         LSTM_ALWAYS_INLINE tx_kind tx_kind() const noexcept { return tx_state; }
 
-        LSTM_ALWAYS_INLINE gp_t gp() const noexcept { return tgp_node.gp(); }
+        LSTM_ALWAYS_INLINE epoch_t gp() const noexcept { return tgp_node.gp(); }
 
-        LSTM_ALWAYS_INLINE void access_lock(const gp_t gp) noexcept
+        LSTM_ALWAYS_INLINE void access_lock(const epoch_t gp) noexcept
         {
             LSTM_ASSERT(!in_transaction());
             tgp_node.access_lock(gp);
         }
 
-        LSTM_ALWAYS_INLINE void access_relock(const gp_t gp) noexcept
+        LSTM_ALWAYS_INLINE void access_relock(const epoch_t gp) noexcept
         {
             tgp_node.access_relock(gp);
         }
 
         LSTM_ALWAYS_INLINE void access_unlock() noexcept { tgp_node.access_unlock(); }
 
-        LSTM_ALWAYS_INLINE bool not_in_grace_period(const gp_t gp) const noexcept
+        LSTM_ALWAYS_INLINE bool not_in_grace_period(const epoch_t gp) const noexcept
         {
             return tgp_node.not_in_grace_period(gp);
         }
 
-        LSTM_ALWAYS_INLINE gp_t synchronize_min_gp(const gp_t sync_version) const noexcept
+        LSTM_ALWAYS_INLINE epoch_t synchronize_min_gp(const epoch_t sync_version) const noexcept
         {
             LSTM_ASSERT(!in_transaction());
             return tgp_node.synchronize_min_gp(sync_version);
@@ -246,7 +246,7 @@ LSTM_BEGIN
             fail_callbacks.emplace_back((Func &&) func);
         }
 
-        void reclaim(const gp_t sync_version) noexcept
+        void reclaim(const epoch_t sync_version) noexcept
         {
             LSTM_ASSERT(!in_critical_section());
             LSTM_ASSERT(!in_transaction());

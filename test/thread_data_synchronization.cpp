@@ -11,8 +11,8 @@ using lstm::uword;
 
 int main()
 {
-    thread_manager          manager;
-    std::atomic<lstm::gp_t> gp{0};
+    thread_manager             manager;
+    std::atomic<lstm::epoch_t> gp{0};
 
     for (int j = 0; j < 5; ++j) {
         manager.queue_thread([&] {

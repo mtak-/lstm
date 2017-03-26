@@ -8,14 +8,14 @@ LSTM_DETAIL_BEGIN
 
     namespace
     {
-        static_assert(std::is_unsigned<gp_t>{}, "");
+        static_assert(std::is_unsigned<epoch_t>{}, "");
 
-        static constexpr gp_t lock_bit  = gp_t(1) << (sizeof(gp_t) * 8 - 1);
-        static constexpr gp_t off_state = ~gp_t(0);
+        static constexpr epoch_t lock_bit  = epoch_t(1) << (sizeof(epoch_t) * 8 - 1);
+        static constexpr epoch_t off_state = ~epoch_t(0);
     }
 
-    inline bool locked(const gp_t version) noexcept { return version & lock_bit; }
-    inline gp_t as_locked(const gp_t version) noexcept { return version | lock_bit; }
+    inline bool locked(const epoch_t version) noexcept { return version & lock_bit; }
+    inline epoch_t as_locked(const epoch_t version) noexcept { return version | lock_bit; }
 
     template<std::size_t CacheLineOffset>
     struct thread_gp_list
@@ -45,8 +45,8 @@ LSTM_DETAIL_BEGIN
 
         union
         {
-            std::atomic<gp_t> active;
-            char              padding3_[LSTM_CACHE_LINE_SIZE];
+            std::atomic<epoch_t> active;
+            char                 padding3_[LSTM_CACHE_LINE_SIZE];
         };
 
         union
@@ -77,7 +77,7 @@ LSTM_DETAIL_BEGIN
             global_tgp_list<CacheLineOffset>.mut.unlock();
         }
 
-        LSTM_NOINLINE_LUKEWARM static void wait_on_gp(const gp_t gp, thread_gp_node* q) noexcept
+        LSTM_NOINLINE_LUKEWARM static void wait_on_gp(const epoch_t gp, thread_gp_node* q) noexcept
         {
             default_backoff backoff;
             do {
@@ -85,11 +85,11 @@ LSTM_DETAIL_BEGIN
             } while (q->not_in_grace_period(gp));
         }
 
-        static gp_t wait_min_gp(const gp_t gp) noexcept
+        static epoch_t wait_min_gp(const epoch_t gp) noexcept
         {
-            gp_t result = off_state;
+            epoch_t result = off_state;
             for (thread_gp_node* q = global_tgp_list<CacheLineOffset>.root; q; q = q->next) {
-                const gp_t td_gp = q->active.load(LSTM_ACQUIRE);
+                const epoch_t td_gp = q->active.load(LSTM_ACQUIRE);
                 if (LSTM_UNLIKELY(td_gp <= gp)) {
                     wait_on_gp(gp, q);
                 } else if (td_gp < result) {
@@ -140,14 +140,14 @@ LSTM_DETAIL_BEGIN
             mut.unlock();
         }
 
-        inline gp_t gp() const noexcept { return active.load(LSTM_RELAXED); }
+        inline epoch_t gp() const noexcept { return active.load(LSTM_RELAXED); }
 
         inline bool in_critical_section() const noexcept
         {
             return active.load(LSTM_RELAXED) != off_state;
         }
 
-        inline void access_lock(const gp_t gp) noexcept
+        inline void access_lock(const epoch_t gp) noexcept
         {
             LSTM_ASSERT(!in_critical_section());
             LSTM_ASSERT(gp != off_state);
@@ -156,7 +156,7 @@ LSTM_DETAIL_BEGIN
             std::atomic_thread_fence(LSTM_ACQUIRE);
         }
 
-        inline void access_relock(const gp_t gp) noexcept
+        inline void access_relock(const epoch_t gp) noexcept
         {
             LSTM_ASSERT(in_critical_section());
             LSTM_ASSERT(gp != off_state);
@@ -172,19 +172,19 @@ LSTM_DETAIL_BEGIN
             active.store(off_state, LSTM_RELEASE);
         }
 
-        bool not_in_grace_period(const gp_t gp) const noexcept
+        bool not_in_grace_period(const epoch_t gp) const noexcept
         {
             // TODO: acquire seems unneeded
             return active.load(LSTM_ACQUIRE) <= gp;
         }
 
         // TODO: allow specifying a backoff strategy
-        gp_t synchronize_min_gp(const gp_t gp) const noexcept
+        epoch_t synchronize_min_gp(const epoch_t gp) const noexcept
         {
             LSTM_ASSERT(!in_critical_section());
             LSTM_ASSERT(gp != off_state);
 
-            gp_t result;
+            epoch_t result;
 
             mut.lock_shared();
             {

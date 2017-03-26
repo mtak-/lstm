@@ -8,7 +8,7 @@
 LSTM_DETAIL_BEGIN
     struct succ_callback_t
     {
-        gp_t                    version;
+        epoch_t                 version;
         pod_vector<gp_callback> callbacks;
     };
 
@@ -25,7 +25,7 @@ LSTM_DETAIL_BEGIN
         succ_callback_t& front() noexcept { return callbacks[start]; }
         succ_callback_t& back() noexcept { return callbacks[(end - 1 + StackCount) % StackCount]; }
 
-        bool push_is_full(const gp_t version) noexcept
+        bool push_is_full(const epoch_t version) noexcept
         {
             LSTM_ASSERT(!active().callbacks.empty());
             active().version = version;

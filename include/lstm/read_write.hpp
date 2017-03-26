@@ -25,7 +25,7 @@ LSTM_DETAIL_BEGIN
                     Result result = atomic_base_fn::call(func, tx, (Args &&) args...);
 
                     // commit does not throw
-                    gp_t sync_version;
+                    epoch_t sync_version;
                     if ((sync_version = detail::commit_algorithm::try_commit(tx))
                         != commit_failed) {
                         tx_success<tx_kind::read_write>(tls_td, sync_version);
@@ -62,7 +62,7 @@ LSTM_DETAIL_BEGIN
                     atomic_base_fn::call(func, tx, (Args &&) args...);
 
                     // commit does not throw
-                    gp_t sync_version;
+                    epoch_t sync_version;
                     if ((sync_version = detail::commit_algorithm::try_commit(tx))
                         != commit_failed) {
                         tx_success<tx_kind::read_write>(tls_td, sync_version);

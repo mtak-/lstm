@@ -12,7 +12,7 @@ LSTM_DETAIL_BEGIN
         using write_set_const_iter = thread_data::write_set_t::const_iterator;
 
         thread_data* tls_td;
-        gp_t         version_;
+        epoch_t      version_;
 
         /*************************/
         /* read write operations */
@@ -177,7 +177,7 @@ LSTM_DETAIL_BEGIN
         }
 
     public:
-        inline transaction_base(thread_data* const in_tls_td, const gp_t in_version) noexcept
+        inline transaction_base(thread_data* const in_tls_td, const epoch_t in_version) noexcept
             : tls_td(in_tls_td)
             , version_(in_version)
         {
@@ -187,9 +187,9 @@ LSTM_DETAIL_BEGIN
         }
 
         thread_data& get_thread_data() const noexcept { return *tls_td; }
-        gp_t         version() const noexcept { return version_; }
+        epoch_t      version() const noexcept { return version_; }
 
-        void unsafe_reset_version(const gp_t new_version) noexcept
+        void unsafe_reset_version(const epoch_t new_version) noexcept
         {
             // TODO: could these asserts fail for correct code?
             if (tls_td) {
@@ -222,7 +222,7 @@ LSTM_DETAIL_BEGIN
                 return tls_td == nullptr;
         }
 
-        bool rw_valid(const gp_t version) const noexcept { return version <= version_; }
+        bool rw_valid(const epoch_t version) const noexcept { return version <= version_; }
         bool rw_valid(const var_base& v) const noexcept
         {
             return rw_valid(v.version_lock.load(LSTM_RELAXED));

@@ -8,7 +8,7 @@
 LSTM_DETAIL_BEGIN
     namespace
     {
-        static constexpr gp_t commit_failed = off_state;
+        static constexpr epoch_t commit_failed = off_state;
     }
 
     struct commit_algorithm
@@ -24,7 +24,7 @@ LSTM_DETAIL_BEGIN
 
         static inline bool lock(var_base& v, const transaction tx) noexcept
         {
-            gp_t version_buf = v.version_lock.load(LSTM_RELAXED);
+            epoch_t version_buf = v.version_lock.load(LSTM_RELAXED);
             return tx.read_write_valid(version_buf)
                    && v.version_lock.compare_exchange_strong(version_buf,
                                                              as_locked(version_buf),
@@ -33,7 +33,7 @@ LSTM_DETAIL_BEGIN
         }
 
         // x86_64: likely compiles to mov
-        static inline void unlock_as_version(var_base& v, const gp_t version_to_set) noexcept
+        static inline void unlock_as_version(var_base& v, const epoch_t version_to_set) noexcept
         {
             LSTM_ASSERT(locked(v.version_lock.load(LSTM_RELAXED)));
             LSTM_ASSERT(!locked(version_to_set));
@@ -44,7 +44,7 @@ LSTM_DETAIL_BEGIN
         // x86: likely compiles to xor
         static inline void unlock(var_base& v) noexcept
         {
-            const gp_t locked_version = v.version_lock.load(LSTM_RELAXED);
+            const epoch_t locked_version = v.version_lock.load(LSTM_RELAXED);
 
             LSTM_ASSERT(locked(locked_version));
 
@@ -93,13 +93,13 @@ LSTM_DETAIL_BEGIN
                                                          LSTM_RELEASE);
         }
 
-        static void publish(const write_set_t& write_set, const gp_t write_version) noexcept
+        static void publish(const write_set_t& write_set, const epoch_t write_version) noexcept
         {
             for (write_set_value_type write_set_value : write_set)
                 unlock_as_version(write_set_value.dest_var(), write_version);
         }
 
-        static gp_t slower_path(const transaction tx) noexcept
+        static epoch_t slower_path(const transaction tx) noexcept
         {
             // last check
             if (!validate_reads(tx))
@@ -109,7 +109,7 @@ LSTM_DETAIL_BEGIN
 
             do_writes(write_set);
 
-            const gp_t sync_version = default_domain().fetch_and_bump_clock();
+            const epoch_t sync_version = default_domain().fetch_and_bump_clock();
             LSTM_ASSERT(tx.version() <= sync_version);
 
             publish(write_set, sync_version + transaction_domain::bump_size());
@@ -117,7 +117,7 @@ LSTM_DETAIL_BEGIN
             return sync_version;
         }
 
-        static gp_t slow_path(const transaction tx) noexcept
+        static epoch_t slow_path(const transaction tx) noexcept
         {
             if (!lock_writes(tx))
                 return commit_failed;
@@ -125,7 +125,7 @@ LSTM_DETAIL_BEGIN
         }
 
     public:
-        static gp_t try_commit(const transaction tx) noexcept
+        static epoch_t try_commit(const transaction tx) noexcept
         {
             LSTM_ASSERT(tx.version() <= default_domain().get_clock());
 

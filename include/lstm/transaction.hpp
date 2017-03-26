@@ -9,7 +9,7 @@ LSTM_BEGIN
         template<typename, typename>
         friend struct ::lstm::var;
 
-        inline transaction(thread_data& in_tls_td, const gp_t in_version) noexcept
+        inline transaction(thread_data& in_tls_td, const epoch_t in_version) noexcept
             : transaction_base(&in_tls_td, in_version)
         {
         }
@@ -37,17 +37,17 @@ LSTM_BEGIN
             return transaction_base::get_thread_data();
         }
 
-        gp_t version() const noexcept { return transaction_base::version(); }
+        epoch_t version() const noexcept { return transaction_base::version(); }
 
-        void unsafe_reset_version(const gp_t new_version) noexcept
+        void unsafe_reset_version(const epoch_t new_version) noexcept
         {
             transaction_base::unsafe_reset_version(new_version);
         }
 
         bool valid(const thread_data& td) const noexcept { return transaction_base::valid(&td); }
-        bool read_write_valid(const gp_t version) const noexcept { return rw_valid(version); }
+        bool read_write_valid(const epoch_t version) const noexcept { return rw_valid(version); }
         bool read_write_valid(const detail::var_base& v) const noexcept { return rw_valid(v); }
-        bool read_valid(const gp_t version) const noexcept { return rw_valid(version); }
+        bool read_valid(const epoch_t version) const noexcept { return rw_valid(version); }
         bool read_valid(const detail::var_base& v) const noexcept { return rw_valid(v); }
 
         template<typename Func,

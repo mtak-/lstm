@@ -27,11 +27,11 @@ LSTM_DETAIL_BEGIN
         }
 
         template<tx_kind kind>
-        static gp_t tx_start(thread_data& tls_td) noexcept
+        static epoch_t tx_start(thread_data& tls_td) noexcept
         {
             static_assert(kind != tx_kind::none);
 
-            const gp_t version = default_domain().get_clock();
+            const epoch_t version = default_domain().get_clock();
             tls_td.access_lock(version);
             tls_td.tx_state = kind;
             return version;
@@ -69,8 +69,8 @@ LSTM_DETAIL_BEGIN
             throw;
         }
 
-        template<tx_kind               kind>
-        LSTM_ALWAYS_INLINE static gp_t tx_restart(thread_data& tls_td) noexcept
+        template<tx_kind                  kind>
+        LSTM_ALWAYS_INLINE static epoch_t tx_restart(thread_data& tls_td) noexcept
         {
             static_assert(kind != tx_kind::none);
 
@@ -78,14 +78,14 @@ LSTM_DETAIL_BEGIN
 
             tls_td.access_unlock();
             default_backoff{}();
-            const gp_t new_version = default_domain().get_clock();
+            const epoch_t new_version = default_domain().get_clock();
             tls_td.access_lock(new_version);
 
             return new_version;
         }
 
         template<tx_kind kind>
-        static void tx_success(thread_data& tls_td, const gp_t sync_version) noexcept
+        static void tx_success(thread_data& tls_td, const epoch_t sync_version) noexcept
         {
             static_assert(kind != tx_kind::none);
 

@@ -72,7 +72,7 @@ LSTM_BEGIN
     using word  = LSTM_SIGNED_LOCKFREE_WORD;
     using uword = std::make_unsigned_t<word>;
 
-    using gp_t = uword;
+    using epoch_t = uword;
 
     static_assert(std::is_integral<word>{}, "type chosen for word must be an integral type");
     static_assert(std::is_signed<word>{}, "type chosen for word must be signed");

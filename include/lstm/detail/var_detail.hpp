@@ -16,14 +16,14 @@ LSTM_END
 LSTM_DETAIL_BEGIN
     struct var_aligner
     {
-        std::atomic<gp_t>        _dummy0;
+        std::atomic<epoch_t>     _dummy0;
         std::atomic<var_storage> _dummy1;
     };
 
     struct alignas(alignof(var_aligner) << 1) var_base
     {
     protected:
-        std::atomic<gp_t>        version_lock;
+        std::atomic<epoch_t>     version_lock;
         std::atomic<var_storage> storage;
 
         explicit var_base(const var_storage in_storage) noexcept
