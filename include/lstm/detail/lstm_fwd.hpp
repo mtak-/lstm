@@ -104,7 +104,7 @@ LSTM_DETAIL_BEGIN
     struct atomic_base_fn;
 
     template<std::size_t Padding>
-    struct thread_gp_node;
+    struct thread_synchronization_node;
 
     template<typename T>
     struct privatized_future_data;

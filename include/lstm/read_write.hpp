@@ -25,10 +25,9 @@ LSTM_DETAIL_BEGIN
                     Result result = atomic_base_fn::call(func, tx, (Args &&) args...);
 
                     // commit does not throw
-                    epoch_t sync_version;
-                    if ((sync_version = detail::commit_algorithm::try_commit(tx))
-                        != commit_failed) {
-                        tx_success<tx_kind::read_write>(tls_td, sync_version);
+                    epoch_t sync_epoch;
+                    if ((sync_epoch = detail::commit_algorithm::try_commit(tx)) != commit_failed) {
+                        tx_success<tx_kind::read_write>(tls_td, sync_epoch);
                         LSTM_ASSERT(valid_start_state(tls_td));
                         LSTM_ASSERT(!tls_td.in_critical_section());
 
@@ -62,10 +61,9 @@ LSTM_DETAIL_BEGIN
                     atomic_base_fn::call(func, tx, (Args &&) args...);
 
                     // commit does not throw
-                    epoch_t sync_version;
-                    if ((sync_version = detail::commit_algorithm::try_commit(tx))
-                        != commit_failed) {
-                        tx_success<tx_kind::read_write>(tls_td, sync_version);
+                    epoch_t sync_epoch;
+                    if ((sync_epoch = detail::commit_algorithm::try_commit(tx)) != commit_failed) {
+                        tx_success<tx_kind::read_write>(tls_td, sync_epoch);
                         LSTM_ASSERT(valid_start_state(tls_td));
                         LSTM_ASSERT(!tls_td.in_critical_section());
 
@@ -92,7 +90,7 @@ LSTM_DETAIL_BEGIN
             LSTM_ASSERT(!tls_td.in_transaction() || tls_td.in_read_write_transaction());
             if (tls_td.in_transaction())
                 return atomic_base_fn::call((Func &&) func,
-                                            transaction{tls_td, tls_td.gp()},
+                                            transaction{tls_td, tls_td.epoch()},
                                             (Args &&) args...);
 
             return read_write_fn::slow_path(tls_td, (Func &&) func, (Args &&) args...);

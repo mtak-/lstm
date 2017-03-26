@@ -217,7 +217,7 @@ LSTM_DETAIL_BEGIN
                 return ((!tls_td && td->tx_state != tx_kind::read_write)
                         || ((td == tls_td && td->tx_state != tx_kind::read_only)
                             || td->write_set.empty()))
-                       && td->gp() == version_ && td->in_transaction();
+                       && td->epoch() == version_ && td->in_transaction();
             else
                 return tls_td == nullptr;
         }

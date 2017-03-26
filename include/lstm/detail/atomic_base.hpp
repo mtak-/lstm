@@ -85,7 +85,7 @@ LSTM_DETAIL_BEGIN
         }
 
         template<tx_kind kind>
-        static void tx_success(thread_data& tls_td, const epoch_t sync_version) noexcept
+        static void tx_success(thread_data& tls_td, const epoch_t sync_epoch) noexcept
         {
             static_assert(kind != tx_kind::none);
 
@@ -100,7 +100,7 @@ LSTM_DETAIL_BEGIN
 
             if (kind != tx_kind::read_only) {
                 tls_td.fail_callbacks.clear();
-                tls_td.reclaim(sync_version);
+                tls_td.reclaim(sync_epoch);
             } else {
                 LSTM_ASSERT(tls_td.succ_callbacks.active().callbacks.empty());
                 LSTM_ASSERT(tls_td.fail_callbacks.empty());

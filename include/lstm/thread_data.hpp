@@ -5,7 +5,7 @@
 #include <lstm/detail/pod_hash_set.hpp>
 #include <lstm/detail/read_set_value_type.hpp>
 #include <lstm/detail/reclaim_buffer.hpp>
-#include <lstm/detail/thread_gp.hpp>
+#include <lstm/detail/thread_synchronization.hpp>
 #include <lstm/detail/var_detail.hpp>
 #include <lstm/detail/write_set_value_type.hpp>
 
@@ -45,15 +45,15 @@ LSTM_BEGIN
             tx_kind                     e;
             void*                       desired;
         };
-        static constexpr std::size_t tgp_cache_line_offset
+        static constexpr std::size_t synchronization_cache_line_offset
             = offsetof(_cache_line_offset_calculation, desired) % LSTM_CACHE_LINE_SIZE;
 
-        read_set_t                                    read_set;
-        write_set_t                                   write_set;
-        callbacks_t                                   fail_callbacks;
-        detail::succ_callbacks_t<4>                   succ_callbacks;
-        tx_kind                                       tx_state;
-        detail::thread_gp_node<tgp_cache_line_offset> tgp_node;
+        read_set_t                                                             read_set;
+        write_set_t                                                            write_set;
+        callbacks_t                                                            fail_callbacks;
+        detail::succ_callbacks_t<4>                                            succ_callbacks;
+        tx_kind                                                                tx_state;
+        detail::thread_synchronization_node<synchronization_cache_line_offset> synchronization_node;
 
         void remove_read_set(const detail::var_base& src_var) noexcept
         {
@@ -133,20 +133,20 @@ LSTM_BEGIN
             LSTM_ASSERT(!in_transaction());
             LSTM_ASSERT(!in_critical_section());
 
-            synchronize_min_gp(succ_callbacks.back().version);
+            synchronize_min_epoch(succ_callbacks.back().version);
             do {
                 do_succ_callbacks_front();
             } while (!succ_callbacks.empty());
         }
 
-        LSTM_ALWAYS_INLINE void reclaim_all_possible(const epoch_t min_gp) noexcept
+        LSTM_ALWAYS_INLINE void reclaim_all_possible(const epoch_t min_epoch) noexcept
         {
             LSTM_ASSERT(!in_transaction());
             LSTM_ASSERT(!in_critical_section());
 
             do {
                 do_succ_callbacks_front();
-            } while (!succ_callbacks.empty() && succ_callbacks.front().version < min_gp);
+            } while (!succ_callbacks.empty() && succ_callbacks.front().version < min_epoch);
         }
 
         LSTM_NOINLINE_LUKEWARM void reclaim_slow_path() noexcept
@@ -154,8 +154,8 @@ LSTM_BEGIN
             LSTM_ASSERT(!in_transaction());
             LSTM_ASSERT(!in_critical_section());
 
-            const epoch_t min_gp = synchronize_min_gp(succ_callbacks.front().version);
-            reclaim_all_possible(min_gp);
+            const epoch_t min_epoch = synchronize_min_epoch(succ_callbacks.front().version);
+            reclaim_all_possible(min_epoch);
         }
 
     public:
@@ -198,35 +198,35 @@ LSTM_BEGIN
 
         LSTM_ALWAYS_INLINE bool in_critical_section() const noexcept
         {
-            return tgp_node.in_critical_section();
+            return synchronization_node.in_critical_section();
         }
 
         LSTM_ALWAYS_INLINE tx_kind tx_kind() const noexcept { return tx_state; }
 
-        LSTM_ALWAYS_INLINE epoch_t gp() const noexcept { return tgp_node.gp(); }
+        LSTM_ALWAYS_INLINE epoch_t epoch() const noexcept { return synchronization_node.epoch(); }
 
-        LSTM_ALWAYS_INLINE void access_lock(const epoch_t gp) noexcept
+        LSTM_ALWAYS_INLINE void access_lock(const epoch_t epoch) noexcept
         {
             LSTM_ASSERT(!in_transaction());
-            tgp_node.access_lock(gp);
+            synchronization_node.access_lock(epoch);
         }
 
-        LSTM_ALWAYS_INLINE void access_relock(const epoch_t gp) noexcept
+        LSTM_ALWAYS_INLINE void access_relock(const epoch_t epoch) noexcept
         {
-            tgp_node.access_relock(gp);
+            synchronization_node.access_relock(epoch);
         }
 
-        LSTM_ALWAYS_INLINE void access_unlock() noexcept { tgp_node.access_unlock(); }
+        LSTM_ALWAYS_INLINE void access_unlock() noexcept { synchronization_node.access_unlock(); }
 
-        LSTM_ALWAYS_INLINE bool not_in_grace_period(const epoch_t gp) const noexcept
+        LSTM_ALWAYS_INLINE bool epoch_less_equal_to(const epoch_t epoch) const noexcept
         {
-            return tgp_node.not_in_grace_period(gp);
+            return synchronization_node.epoch_less_equal_to(epoch);
         }
 
-        LSTM_ALWAYS_INLINE epoch_t synchronize_min_gp(const epoch_t sync_version) const noexcept
+        LSTM_ALWAYS_INLINE epoch_t synchronize_min_epoch(const epoch_t sync_epoch) const noexcept
         {
             LSTM_ASSERT(!in_transaction());
-            return tgp_node.synchronize_min_gp(sync_version);
+            return synchronization_node.synchronize_min_epoch(sync_epoch);
         }
 
         template<typename Func,
@@ -246,18 +246,18 @@ LSTM_BEGIN
             fail_callbacks.emplace_back((Func &&) func);
         }
 
-        void reclaim(const epoch_t sync_version) noexcept
+        void reclaim(const epoch_t sync_epoch) noexcept
         {
             LSTM_ASSERT(!in_critical_section());
             LSTM_ASSERT(!in_transaction());
-            LSTM_ASSERT(sync_version != detail::off_state);
-            LSTM_ASSERT(!detail::locked(sync_version));
+            LSTM_ASSERT(sync_epoch != detail::off_state);
+            LSTM_ASSERT(!detail::locked(sync_epoch));
 
             detail::succ_callback_t& active_buf = succ_callbacks.active();
             if (active_buf.callbacks.empty())
                 return;
 
-            if (LSTM_UNLIKELY(succ_callbacks.push_is_full(sync_version)))
+            if (LSTM_UNLIKELY(succ_callbacks.push_is_full(sync_epoch)))
                 reclaim_slow_path();
         }
 

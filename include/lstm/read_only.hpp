@@ -83,11 +83,11 @@ LSTM_DETAIL_BEGIN
             switch (tls_td.tx_kind()) {
             case tx_kind::read_only:
                 return atomic_base_fn::call((Func &&) func,
-                                            read_transaction{tls_td.gp()},
+                                            read_transaction{tls_td.epoch()},
                                             (Args &&) args...);
             case tx_kind::read_write:
                 return atomic_base_fn::call((Func &&) func,
-                                            read_transaction{tls_td, tls_td.gp()},
+                                            read_transaction{tls_td, tls_td.epoch()},
                                             (Args &&) args...);
             case tx_kind::none:
                 return read_only_fn::slow_path(tls_td, (Func &&) func, (Args &&) args...);

@@ -1,5 +1,5 @@
-#ifndef LSTM_DETAIL_THREAD_GP_NODE_HPP
-#define LSTM_DETAIL_THREAD_GP_NODE_HPP
+#ifndef LSTM_DETAIL_THREAD_SYNCHRONIZATION_HPP
+#define LSTM_DETAIL_THREAD_SYNCHRONIZATION_HPP
 
 #include <lstm/detail/fast_rw_mutex.hpp>
 
@@ -8,6 +8,7 @@ LSTM_DETAIL_BEGIN
 
     namespace
     {
+        static_assert(std::is_integral<epoch_t>{}, "");
         static_assert(std::is_unsigned<epoch_t>{}, "");
 
         static constexpr epoch_t lock_bit  = epoch_t(1) << (sizeof(epoch_t) * 8 - 1);
@@ -18,17 +19,17 @@ LSTM_DETAIL_BEGIN
     inline epoch_t as_locked(const epoch_t version) noexcept { return version | lock_bit; }
 
     template<std::size_t CacheLineOffset>
-    struct thread_gp_list
+    struct thread_synchronization_list
     {
-        LSTM_CACHE_ALIGNED mutex_type    mut{};
-        thread_gp_node<CacheLineOffset>* root{nullptr};
+        LSTM_CACHE_ALIGNED mutex_type                 mut{};
+        thread_synchronization_node<CacheLineOffset>* root{nullptr};
     };
 
-    template<std::size_t            CacheLineOffset>
-    thread_gp_list<CacheLineOffset> global_tgp_list{};
+    template<std::size_t                         CacheLineOffset>
+    thread_synchronization_list<CacheLineOffset> global_synchronization_list{};
 
     template<std::size_t CacheLineOffset>
-    struct thread_gp_node
+    struct thread_synchronization_node
     {
     private:
         static_assert(CacheLineOffset < LSTM_CACHE_LINE_SIZE, "");
@@ -51,15 +52,16 @@ LSTM_DETAIL_BEGIN
 
         union
         {
-            thread_gp_node* next;
-            char            padding2_[LSTM_CACHE_LINE_SIZE];
+            thread_synchronization_node* next;
+            char                         padding2_[LSTM_CACHE_LINE_SIZE];
         };
 
         static void lock_all() noexcept
         {
-            global_tgp_list<CacheLineOffset>.mut.lock();
+            global_synchronization_list<CacheLineOffset>.mut.lock();
 
-            thread_gp_node* current = global_tgp_list<CacheLineOffset>.root;
+            thread_synchronization_node* current
+                = global_synchronization_list<CacheLineOffset>.root;
             while (current) {
                 current->mut.lock();
                 current = current->next;
@@ -68,39 +70,43 @@ LSTM_DETAIL_BEGIN
 
         static void unlock_all() noexcept
         {
-            thread_gp_node* current = global_tgp_list<CacheLineOffset>.root;
+            thread_synchronization_node* current
+                = global_synchronization_list<CacheLineOffset>.root;
             while (current) {
                 current->mut.unlock();
                 current = current->next;
             }
 
-            global_tgp_list<CacheLineOffset>.mut.unlock();
+            global_synchronization_list<CacheLineOffset>.mut.unlock();
         }
 
-        LSTM_NOINLINE_LUKEWARM static void wait_on_gp(const epoch_t gp, thread_gp_node* q) noexcept
+        LSTM_NOINLINE_LUKEWARM static void
+        wait_on_epoch(const epoch_t epoch, thread_synchronization_node* q) noexcept
         {
             default_backoff backoff;
             do {
                 backoff();
-            } while (q->not_in_grace_period(gp));
+            } while (q->epoch_less_equal_to(epoch));
         }
 
-        static epoch_t wait_min_gp(const epoch_t gp) noexcept
+        static epoch_t wait_min_epoch(const epoch_t epoch) noexcept
         {
             epoch_t result = off_state;
-            for (thread_gp_node* q = global_tgp_list<CacheLineOffset>.root; q; q = q->next) {
-                const epoch_t td_gp = q->active.load(LSTM_ACQUIRE);
-                if (LSTM_UNLIKELY(td_gp <= gp)) {
-                    wait_on_gp(gp, q);
-                } else if (td_gp < result) {
-                    result = td_gp;
+            for (thread_synchronization_node* q = global_synchronization_list<CacheLineOffset>.root;
+                 q != nullptr;
+                 q = q->next) {
+                const epoch_t td_epoch = q->active.load(LSTM_ACQUIRE);
+                if (LSTM_UNLIKELY(td_epoch <= epoch)) {
+                    wait_on_epoch(epoch, q);
+                } else if (td_epoch < result) {
+                    result = td_epoch;
                 }
             }
             return result;
         }
 
     public:
-        thread_gp_node() noexcept
+        thread_synchronization_node() noexcept
             : mut()
             , active(off_state)
         {
@@ -111,22 +117,23 @@ LSTM_DETAIL_BEGIN
             mut.lock();
             lock_all(); // this->mut does not get locked here
             {
-                next                                  = global_tgp_list<CacheLineOffset>.root;
-                global_tgp_list<CacheLineOffset>.root = this;
+                next = global_synchronization_list<CacheLineOffset>.root;
+                global_synchronization_list<CacheLineOffset>.root = this;
             }
             unlock_all(); // this->mut gets unlocked here
         }
 
-        thread_gp_node(const thread_gp_node&) = delete;
-        thread_gp_node& operator=(const thread_gp_node&) = delete;
+        thread_synchronization_node(const thread_synchronization_node&) = delete;
+        thread_synchronization_node& operator=(const thread_synchronization_node&) = delete;
 
-        ~thread_gp_node() noexcept
+        ~thread_synchronization_node() noexcept
         {
             LSTM_ASSERT(!in_critical_section());
 
             lock_all(); // this->mut gets locked here
             {
-                thread_gp_node** indirect = &global_tgp_list<CacheLineOffset>.root;
+                thread_synchronization_node** indirect
+                    = &global_synchronization_list<CacheLineOffset>.root;
                 LSTM_ASSERT(*indirect);
                 while (*indirect != this) {
                     indirect = &(*indirect)->next;
@@ -140,29 +147,29 @@ LSTM_DETAIL_BEGIN
             mut.unlock();
         }
 
-        inline epoch_t gp() const noexcept { return active.load(LSTM_RELAXED); }
+        inline epoch_t epoch() const noexcept { return active.load(LSTM_RELAXED); }
 
         inline bool in_critical_section() const noexcept
         {
             return active.load(LSTM_RELAXED) != off_state;
         }
 
-        inline void access_lock(const epoch_t gp) noexcept
+        inline void access_lock(const epoch_t epoch) noexcept
         {
             LSTM_ASSERT(!in_critical_section());
-            LSTM_ASSERT(gp != off_state);
+            LSTM_ASSERT(epoch != off_state);
 
-            active.store(gp, LSTM_RELEASE);
+            active.store(epoch, LSTM_RELEASE);
             std::atomic_thread_fence(LSTM_ACQUIRE);
         }
 
-        inline void access_relock(const epoch_t gp) noexcept
+        inline void access_relock(const epoch_t epoch) noexcept
         {
             LSTM_ASSERT(in_critical_section());
-            LSTM_ASSERT(gp != off_state);
-            LSTM_ASSERT(active.load(LSTM_RELAXED) <= gp);
+            LSTM_ASSERT(epoch != off_state);
+            LSTM_ASSERT(active.load(LSTM_RELAXED) <= epoch);
 
-            active.store(gp, LSTM_RELEASE);
+            active.store(epoch, LSTM_RELEASE);
             std::atomic_thread_fence(LSTM_ACQUIRE);
         }
 
@@ -172,23 +179,23 @@ LSTM_DETAIL_BEGIN
             active.store(off_state, LSTM_RELEASE);
         }
 
-        bool not_in_grace_period(const epoch_t gp) const noexcept
+        bool epoch_less_equal_to(const epoch_t epoch) const noexcept
         {
             // TODO: acquire seems unneeded
-            return active.load(LSTM_ACQUIRE) <= gp;
+            return active.load(LSTM_ACQUIRE) <= epoch;
         }
 
         // TODO: allow specifying a backoff strategy
-        epoch_t synchronize_min_gp(const epoch_t gp) const noexcept
+        epoch_t synchronize_min_epoch(const epoch_t epoch) const noexcept
         {
             LSTM_ASSERT(!in_critical_section());
-            LSTM_ASSERT(gp != off_state);
+            LSTM_ASSERT(epoch != off_state);
 
             epoch_t result;
 
             mut.lock_shared();
             {
-                result = wait_min_gp(gp);
+                result = wait_min_epoch(epoch);
             }
             mut.unlock_shared();
 
@@ -197,4 +204,4 @@ LSTM_DETAIL_BEGIN
     };
 LSTM_DETAIL_END
 
-#endif /* LSTM_DETAIL_THREAD_GP_HPP */
+#endif /* LSTM_DETAIL_THREAD_SYNCHRONIZATION_HPP */

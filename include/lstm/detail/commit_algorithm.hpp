@@ -109,12 +109,12 @@ LSTM_DETAIL_BEGIN
 
             do_writes(write_set);
 
-            const epoch_t sync_version = default_domain().fetch_and_bump_clock();
-            LSTM_ASSERT(tx.version() <= sync_version);
+            const epoch_t sync_epoch = default_domain().fetch_and_bump_clock();
+            LSTM_ASSERT(tx.version() <= sync_epoch);
 
-            publish(write_set, sync_version + transaction_domain::bump_size());
+            publish(write_set, sync_epoch + transaction_domain::bump_size());
 
-            return sync_version;
+            return sync_epoch;
         }
 
         static epoch_t slow_path(const transaction tx) noexcept
@@ -131,7 +131,7 @@ LSTM_DETAIL_BEGIN
 
             const thread_data& tls_td = tx.get_thread_data();
             if (tls_td.write_set.empty())
-                return 0; // synchronize on the earliest grace period
+                return std::numeric_limits<epoch_t>::lowest(); // synchronize on the earliest epoch
 
             return slow_path(tx);
         }
