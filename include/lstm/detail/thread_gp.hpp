@@ -77,19 +77,23 @@ LSTM_DETAIL_BEGIN
             global_tgp_list<CacheLineOffset>.mut.unlock();
         }
 
+        LSTM_NOINLINE_LUKEWARM static void wait_on_gp(const gp_t gp, thread_gp_node* q) noexcept
+        {
+            default_backoff backoff;
+            do {
+                backoff();
+            } while (q->not_in_grace_period(gp));
+        }
+
         static gp_t wait_min_gp(const gp_t gp) noexcept
         {
             gp_t result = off_state;
-            for (thread_gp_node* q = global_tgp_list<CacheLineOffset>.root; q != nullptr;
-                 q                 = q->next) {
-                default_backoff backoff;
-                const gp_t      td_gp = q->active.load(LSTM_ACQUIRE);
-                if (td_gp <= gp) {
-                    do {
-                        backoff();
-                    } while (q->not_in_grace_period(gp));
-                } else if (gp < result) {
-                    result = gp;
+            for (thread_gp_node* q = global_tgp_list<CacheLineOffset>.root; q; q = q->next) {
+                const gp_t td_gp = q->active.load(LSTM_ACQUIRE);
+                if (LSTM_UNLIKELY(td_gp <= gp)) {
+                    wait_on_gp(gp, q);
+                } else if (td_gp < result) {
+                    result = td_gp;
                 }
             }
             return result;
