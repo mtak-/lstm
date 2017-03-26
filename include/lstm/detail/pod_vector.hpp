@@ -125,6 +125,8 @@ LSTM_DETAIL_BEGIN
         iterator       end() noexcept { return end_; }
         const_iterator begin() const noexcept { return begin_; }
         const_iterator end() const noexcept { return end_; }
+
+        reference back() noexcept { return end_[-1]; }
     };
 LSTM_DETAIL_END
 
