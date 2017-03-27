@@ -207,7 +207,6 @@ LSTM_BEGIN
 
         LSTM_ALWAYS_INLINE void access_lock(const epoch_t epoch) noexcept
         {
-            LSTM_ASSERT(!in_transaction());
             synchronization_node.access_lock(epoch);
         }
 

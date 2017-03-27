@@ -81,7 +81,7 @@ LSTM_DETAIL_BEGIN
         }
 
         LSTM_NOINLINE_LUKEWARM static void
-        wait_on_epoch(const epoch_t epoch, thread_synchronization_node* q) noexcept
+        wait_on_epoch(const epoch_t epoch, const thread_synchronization_node* const q) noexcept
         {
             default_backoff backoff;
             do {
@@ -92,7 +92,8 @@ LSTM_DETAIL_BEGIN
         static epoch_t wait_min_epoch(const epoch_t epoch) noexcept
         {
             epoch_t result = off_state;
-            for (thread_synchronization_node* q = global_synchronization_list<CacheLineOffset>.root;
+            for (const thread_synchronization_node* q
+                 = global_synchronization_list<CacheLineOffset>.root;
                  q != nullptr;
                  q = q->next) {
                 const epoch_t td_epoch = q->active.load(LSTM_ACQUIRE);
