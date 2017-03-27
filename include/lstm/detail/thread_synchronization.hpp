@@ -96,11 +96,11 @@ LSTM_DETAIL_BEGIN
                  q != nullptr;
                  q = q->next) {
                 const epoch_t td_epoch = q->active.load(LSTM_ACQUIRE);
-                if (LSTM_UNLIKELY(td_epoch <= epoch)) {
+
+                if (LSTM_UNLIKELY(td_epoch <= epoch))
                     wait_on_epoch(epoch, q);
-                } else if (td_epoch < result) {
+                else if (td_epoch < result)
                     result = td_epoch;
-                }
             }
             return result;
         }

@@ -3,8 +3,8 @@
 
 #include <lstm/detail/gp_callback.hpp>
 #include <lstm/detail/pod_hash_set.hpp>
+#include <lstm/detail/quiescence_buffer.hpp>
 #include <lstm/detail/read_set_value_type.hpp>
-#include <lstm/detail/reclaim_buffer.hpp>
 #include <lstm/detail/thread_synchronization.hpp>
 #include <lstm/detail/var_detail.hpp>
 #include <lstm/detail/write_set_value_type.hpp>
@@ -38,12 +38,12 @@ LSTM_BEGIN
         // TODO: optimize this layout
         struct _cache_line_offset_calculation
         {
-            read_set_t                  a;
-            write_set_t                 b;
-            callbacks_t                 c;
-            detail::succ_callbacks_t<4> d;
-            tx_kind                     e;
-            void*                       desired;
+            read_set_t                   a;
+            write_set_t                  b;
+            callbacks_t                  c;
+            detail::quiescence_buffer<4> d;
+            tx_kind                      e;
+            void*                        desired;
         };
         static constexpr std::size_t synchronization_cache_line_offset
             = offsetof(_cache_line_offset_calculation, desired) % LSTM_CACHE_LINE_SIZE;
@@ -51,7 +51,7 @@ LSTM_BEGIN
         read_set_t                                                             read_set;
         write_set_t                                                            write_set;
         callbacks_t                                                            fail_callbacks;
-        detail::succ_callbacks_t<4>                                            succ_callbacks;
+        detail::quiescence_buffer<4>                                           succ_callbacks;
         tx_kind                                                                tx_state;
         detail::thread_synchronization_node<synchronization_cache_line_offset> synchronization_node;
 
@@ -133,7 +133,7 @@ LSTM_BEGIN
             LSTM_ASSERT(!in_transaction());
             LSTM_ASSERT(!in_critical_section());
 
-            synchronize_min_epoch(succ_callbacks.back().version);
+            synchronize_min_epoch(succ_callbacks.back().epoch);
             do {
                 do_succ_callbacks_front();
             } while (!succ_callbacks.empty());
@@ -146,7 +146,7 @@ LSTM_BEGIN
 
             do {
                 do_succ_callbacks_front();
-            } while (!succ_callbacks.empty() && succ_callbacks.front().version < min_epoch);
+            } while (!succ_callbacks.empty() && succ_callbacks.front().epoch < min_epoch);
         }
 
         LSTM_NOINLINE_LUKEWARM void reclaim_slow_path() noexcept
@@ -154,7 +154,7 @@ LSTM_BEGIN
             LSTM_ASSERT(!in_transaction());
             LSTM_ASSERT(!in_critical_section());
 
-            const epoch_t min_epoch = synchronize_min_epoch(succ_callbacks.front().version);
+            const epoch_t min_epoch = synchronize_min_epoch(succ_callbacks.front().epoch);
             reclaim_all_possible(min_epoch);
         }
 
@@ -253,7 +253,7 @@ LSTM_BEGIN
             LSTM_ASSERT(sync_epoch != detail::off_state);
             LSTM_ASSERT(!detail::locked(sync_epoch));
 
-            detail::succ_callback_t& active_buf = succ_callbacks.active();
+            detail::quiescence_callback& active_buf = succ_callbacks.active();
             if (active_buf.callbacks.empty())
                 return;
 
