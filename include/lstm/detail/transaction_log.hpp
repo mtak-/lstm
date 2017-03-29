@@ -16,6 +16,7 @@
     #define LSTM_LOG_SUCC_TX()         ++lstm::detail::tls_record().successes
     #define LSTM_LOG_BLOOM_COLLISION() ++lstm::detail::tls_record().bloom_collisions
     #define LSTM_LOG_BLOOM_SUCCESS()   ++lstm::detail::tls_record().bloom_successes
+    #define LSTM_LOG_QUIESCENCE()      ++lstm::detail::tls_record().quiesce
     #define LSTM_LOG_READ_AND_WRITE_SET_SIZE(read_size, write_size)                                \
         lstm::detail::tls_record().bump_read_write(read_size, write_size)                          \
     /**/
@@ -36,6 +37,7 @@
     #define LSTM_LOG_SUCC_TX()                                      /**/
     #define LSTM_LOG_BLOOM_COLLISION()                              /**/
     #define LSTM_LOG_BLOOM_SUCCESS()                                /**/
+    #define LSTM_LOG_QUIESCENCE()                                   /**/
     #define LSTM_LOG_READ_AND_WRITE_SET_SIZE(read_size, write_size) /**/
     #define LSTM_LOG_PUBLISH_RECORD()                               /**/
     #define LSTM_LOG_CLEAR()                                        /**/
@@ -55,6 +57,7 @@ LSTM_DETAIL_BEGIN
         std::size_t successes{0};
         std::size_t bloom_collisions{0};
         std::size_t bloom_successes{0};
+        std::size_t quiesce{0};
         std::size_t max_write_size{0};
         std::size_t max_read_size{0};
         double      avg_read_size{0.};
@@ -122,6 +125,12 @@ LSTM_DETAIL_BEGIN
             return bloom_collisions / float(total_bloom_checks());
         }
 
+        inline float quiesce_rate() const noexcept
+        {
+            LSTM_ASSERT(quiesce <= total_transactions());
+            return quiesce / float(total_transactions());
+        }
+
         std::string results() const
         {
             std::ostringstream ostr;
@@ -139,6 +148,8 @@ LSTM_DETAIL_BEGIN
                  << "    Bloom Successes:        " << bloom_successes << '\n'
                  << "    Bloom Collision Rate:   " << bloom_collision_rate() << '\n'
                  << "    Bloom Success Rate:     " << bloom_success_rate() << '\n'
+                 << "    Quiesce Count:          " << quiesce << '\n'
+                 << "    Quiesce Rate:           " << quiesce_rate() << '\n'
                  << "    Max Read Set Size:      " << max_read_size << '\n'
                  << "    Max Write Set Size:     " << max_write_size << '\n'
                  << "    Average Read Set Size:  " << avg_read_size << '\n'
@@ -227,6 +238,8 @@ LSTM_DETAIL_BEGIN
             return total_count(&thread_record::total_bloom_checks);
         }
 
+        std::size_t total_quiesces() const noexcept { return total_count(&thread_record::quiesce); }
+
         inline float success_rate() const noexcept
         {
             return total_successes() / float(total_transactions());
@@ -255,6 +268,11 @@ LSTM_DETAIL_BEGIN
         inline float bloom_collision_rate() const noexcept
         {
             return total_bloom_collisions() / float(total_bloom_checks());
+        }
+
+        inline float quiesce_rate() const noexcept
+        {
+            return total_quiesces() / float(total_transactions());
         }
 
         inline std::size_t max_read_size() const noexcept
@@ -314,6 +332,8 @@ LSTM_DETAIL_BEGIN
                  << "Bloom Successes:         " << total_bloom_successes() << '\n'
                  << "Bloom Collision Rate:    " << bloom_collision_rate() << '\n'
                  << "Bloom Success Rate:      " << bloom_success_rate() << '\n'
+                 << "Quiesce Count:           " << total_quiesces() << '\n'
+                 << "Quiesce Rate:            " << quiesce_rate() << '\n'
                  << "Max Read Set Size:       " << max_read_size() << '\n'
                  << "Max Write Set Size:      " << max_write_size() << '\n'
                  << "Average Read Set Size:   " << avg_read_size() << '\n'

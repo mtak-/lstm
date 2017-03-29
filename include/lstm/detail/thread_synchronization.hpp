@@ -103,6 +103,9 @@ LSTM_DETAIL_BEGIN
                 else if (td_epoch < result)
                     result = td_epoch;
             }
+
+            LSTM_LOG_QUIESCENCE();
+
             return result;
         }
 

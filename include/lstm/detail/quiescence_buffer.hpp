@@ -42,6 +42,8 @@ LSTM_DETAIL_BEGIN
     private:
         static_assert(std::is_pod<value_type>{}, "only works with POD types");
         static_assert(std::is_same<value_type, typename allocator_type::value_type>{}, "");
+        static_assert(is_power_of_two(ReclaimLimit), "");
+        static_assert(ReclaimLimit > 1, "");
         static constexpr bool has_noexcept_alloc
             = noexcept(std::declval<Alloc&>().allocate(std::declval<uword>()));
 
@@ -110,8 +112,6 @@ LSTM_DETAIL_BEGIN
             , buffer(epoch_begin_)
             , capacity_(ReclaimLimit * 2)
         {
-            LSTM_ASSERT(is_power_of_two(buffer_initial_size));
-            LSTM_ASSERT(buffer_initial_size > 1);
             initialize_header(epoch_begin_, 0);
             epoch_size_ = 1;
         }
