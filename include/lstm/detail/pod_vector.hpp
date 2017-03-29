@@ -54,8 +54,8 @@ LSTM_DETAIL_BEGIN
     public:
         pod_vector(const allocator_type& alloc = {}) noexcept(has_noexcept_alloc)
             : allocator_type(alloc)
-            , begin_(this->alloc().allocate(1))
-            , last_valid_address_(begin_)
+            , begin_(this->alloc().allocate(1024))
+            , last_valid_address_(begin_ + 1024 - 1)
         {
             end_ = begin_;
         }
