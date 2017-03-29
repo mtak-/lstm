@@ -196,7 +196,7 @@ LSTM_DETAIL_BEGIN
                 LSTM_ASSERT(tls_td->write_set.empty());
                 LSTM_ASSERT(tls_td->read_set.empty());
                 LSTM_ASSERT(tls_td->fail_callbacks.empty());
-                LSTM_ASSERT(tls_td->succ_callbacks.active().callbacks.empty());
+                LSTM_ASSERT(tls_td->succ_callbacks.working_epoch_empty());
             }
 
             LSTM_ASSERT(version_ <= new_version);
@@ -265,7 +265,7 @@ LSTM_DETAIL_BEGIN
             if (LSTM_UNLIKELY(tls_td->write_set.allocates_on_next_push()
                               || (tls_td->write_set.filter() & hash)
                               || tls_td->fail_callbacks.allocates_on_next_push()
-                              || tls_td->succ_callbacks.active().callbacks.allocates_on_next_push()
+                              || tls_td->succ_callbacks.allocates_on_next_push()
                               || !rw_valid(dest_var))) {
                 rw_write_slow_path(dest_var, (U &&) u);
             } else {
@@ -276,7 +276,7 @@ LSTM_DETAIL_BEGIN
                     [ alloc = dest_var.alloc(), new_storage ]() mutable noexcept {
                         var<T, Alloc>::destroy_deallocate(alloc, new_storage);
                     });
-                tls_td->succ_callbacks.active().callbacks.unchecked_emplace_back(
+                tls_td->succ_callbacks.unchecked_emplace_back(
                     [ alloc = dest_var.alloc(), cur_storage ]() mutable noexcept {
                         var<T, Alloc>::destroy_deallocate(alloc, cur_storage);
                     });

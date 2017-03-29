@@ -49,10 +49,10 @@ LSTM_DETAIL_BEGIN
                 tls_td.clear_read_write_sets();
 
             if (kind != tx_kind::read_only) {
-                tls_td.succ_callbacks.active().callbacks.clear();
+                tls_td.succ_callbacks.clear_working_epoch();
                 tls_td.do_fail_callbacks();
             } else {
-                LSTM_ASSERT(tls_td.succ_callbacks.active().callbacks.empty());
+                LSTM_ASSERT(tls_td.succ_callbacks.working_epoch_empty());
                 LSTM_ASSERT(tls_td.fail_callbacks.empty());
                 LSTM_ASSERT(tls_td.read_set.empty());
                 LSTM_ASSERT(tls_td.write_set.empty());
@@ -102,7 +102,7 @@ LSTM_DETAIL_BEGIN
                 tls_td.fail_callbacks.clear();
                 tls_td.reclaim(sync_epoch);
             } else {
-                LSTM_ASSERT(tls_td.succ_callbacks.active().callbacks.empty());
+                LSTM_ASSERT(tls_td.succ_callbacks.working_epoch_empty());
                 LSTM_ASSERT(tls_td.fail_callbacks.empty());
                 LSTM_ASSERT(tls_td.read_set.empty());
                 LSTM_ASSERT(tls_td.write_set.empty());
@@ -112,8 +112,7 @@ LSTM_DETAIL_BEGIN
         static bool valid_start_state(thread_data& tls_td) noexcept
         {
             return tls_td.read_set.empty() && tls_td.write_set.empty()
-                   && tls_td.fail_callbacks.empty()
-                   && tls_td.succ_callbacks.active().callbacks.empty();
+                   && tls_td.fail_callbacks.empty() && tls_td.succ_callbacks.working_epoch_empty();
         }
     };
 LSTM_DETAIL_END

@@ -38,12 +38,12 @@ LSTM_BEGIN
         // TODO: optimize this layout
         struct _cache_line_offset_calculation
         {
-            read_set_t                   a;
-            write_set_t                  b;
-            callbacks_t                  c;
-            detail::quiescence_buffer<4> d;
-            tx_kind                      e;
-            void*                        desired;
+            read_set_t                  a;
+            write_set_t                 b;
+            callbacks_t                 c;
+            detail::quiescence_buffer<> d;
+            tx_kind                     e;
+            void*                       desired;
         };
         static constexpr std::size_t synchronization_cache_line_offset
             = offsetof(_cache_line_offset_calculation, desired) % LSTM_CACHE_LINE_SIZE;
@@ -51,7 +51,7 @@ LSTM_BEGIN
         read_set_t                                                             read_set;
         write_set_t                                                            write_set;
         callbacks_t                                                            fail_callbacks;
-        detail::quiescence_buffer<4>                                           succ_callbacks;
+        detail::quiescence_buffer<>                                            succ_callbacks;
         tx_kind                                                                tx_state;
         detail::thread_synchronization_node<synchronization_cache_line_offset> synchronization_node;
 
@@ -105,11 +105,7 @@ LSTM_BEGIN
             LSTM_ASSERT(!in_transaction());
             LSTM_ASSERT(!in_critical_section());
 
-            callbacks_t& callbacks = succ_callbacks.front().callbacks;
-            succ_callbacks.pop_front();
-            for (detail::gp_callback& callback : callbacks)
-                callback();
-            callbacks.clear();
+            succ_callbacks.do_first_epoch_callbacks();
         }
 
         void do_fail_callbacks() noexcept
@@ -132,8 +128,9 @@ LSTM_BEGIN
         {
             LSTM_ASSERT(!in_transaction());
             LSTM_ASSERT(!in_critical_section());
+            LSTM_ASSERT(!succ_callbacks.empty());
 
-            synchronize_min_epoch(succ_callbacks.back().epoch);
+            synchronize_min_epoch(succ_callbacks.back_epoch());
             do {
                 do_succ_callbacks_front();
             } while (!succ_callbacks.empty());
@@ -143,10 +140,11 @@ LSTM_BEGIN
         {
             LSTM_ASSERT(!in_transaction());
             LSTM_ASSERT(!in_critical_section());
+            LSTM_ASSERT(!succ_callbacks.empty());
 
             do {
                 do_succ_callbacks_front();
-            } while (!succ_callbacks.empty() && succ_callbacks.front().epoch < min_epoch);
+            } while (!succ_callbacks.empty() && succ_callbacks.front_epoch() < min_epoch);
         }
 
         LSTM_NOINLINE_LUKEWARM void reclaim_slow_path() noexcept
@@ -154,7 +152,7 @@ LSTM_BEGIN
             LSTM_ASSERT(!in_transaction());
             LSTM_ASSERT(!in_critical_section());
 
-            const epoch_t min_epoch = synchronize_min_epoch(succ_callbacks.front().epoch);
+            const epoch_t min_epoch = synchronize_min_epoch(succ_callbacks.front_epoch());
             reclaim_all_possible(min_epoch);
         }
 
@@ -175,7 +173,7 @@ LSTM_BEGIN
             LSTM_ASSERT(read_set.empty());
             LSTM_ASSERT(write_set.empty());
             LSTM_ASSERT(fail_callbacks.empty());
-            LSTM_ASSERT(succ_callbacks.active().callbacks.empty());
+            LSTM_ASSERT(succ_callbacks.working_epoch_empty());
 
             if (!succ_callbacks.empty())
                 reclaim_all();
@@ -231,10 +229,10 @@ LSTM_BEGIN
         template<typename Func,
                  LSTM_REQUIRES_(std::is_constructible<detail::gp_callback, Func&&>{})>
         void sometime_synchronized_after(Func&& func) noexcept(
-            noexcept(succ_callbacks.active().callbacks.emplace_back((Func &&) func)))
+            noexcept(succ_callbacks.emplace_back((Func &&) func)))
         {
             LSTM_ASSERT(in_transaction());
-            succ_callbacks.active().callbacks.emplace_back((Func &&) func);
+            succ_callbacks.emplace_back((Func &&) func);
         }
 
         template<typename Func,
@@ -252,11 +250,7 @@ LSTM_BEGIN
             LSTM_ASSERT(sync_epoch != detail::off_state);
             LSTM_ASSERT(!detail::locked(sync_epoch));
 
-            detail::quiescence_callback& active_buf = succ_callbacks.active();
-            if (active_buf.callbacks.empty())
-                return;
-
-            if (LSTM_UNLIKELY(succ_callbacks.push_is_full(sync_epoch)))
+            if (LSTM_UNLIKELY(succ_callbacks.finalize_epoch(sync_epoch)))
                 reclaim_slow_path();
         }
 
