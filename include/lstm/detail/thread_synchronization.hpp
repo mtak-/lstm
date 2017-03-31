@@ -104,7 +104,7 @@ LSTM_DETAIL_BEGIN
                     result = td_epoch;
             }
 
-            LSTM_LOG_QUIESCENCE();
+            LSTM_LOG_QUIESCES();
 
             return result;
         }

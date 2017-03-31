@@ -24,9 +24,9 @@ LSTM_DETAIL_BEGIN
         return u && (u & (u - 1)) == 0;
     }
 
-    // this class never calls construct/destroy... there's no need for POD types
-    // if an allocator "requires" construct/destroy to be called, it will be in for
-    // a surprise
+    // TODO: needs some optimization - probly store offsets not pointers
+    // TODO: investigate merging small epoch chunks together (taking the max epoch) to reduce
+    // memory overhead from quiescence_headers
     template<uword ReclaimLimit = 1024, typename Alloc = pod_mallocator<quiescence_buf_elem>>
     struct quiescence_buffer : private Alloc
     {
@@ -187,17 +187,16 @@ LSTM_DETAIL_BEGIN
         {
             LSTM_ASSERT(working_epoch_empty());
             LSTM_ASSERT(ring_size > 1);
+            LSTM_ASSERT(ring_begin->header.size > 1);
+            LSTM_ASSERT(ring_size > ring_begin->header.size);
 
             iterator    iter     = ring_begin;
             const uword cur_size = iter->header.size;
-            LSTM_ASSERT(cur_size > 1);
 
             const iterator end = bump_iterator(iter, cur_size);
             for (iter = bump_iterator(iter); iter != end; iter = bump_iterator(iter))
                 iter->callback();
             ring_begin = iter;
-
-            LSTM_ASSERT(ring_size > cur_size);
             ring_size -= cur_size;
 
             LSTM_ASSERT(ring_begin->header.prev_size == cur_size);
