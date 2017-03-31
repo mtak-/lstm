@@ -68,15 +68,21 @@ LSTM_DETAIL_BEGIN
         std::uint64_t bloom_successes{0};
 
         thread_record() noexcept = default;
-        
+
         auto internal_failures() const noexcept { return failures - user_failures; }
         auto transactions() const noexcept { return failures + successes; }
         auto success_rate() const noexcept { return successes / float(transactions()); }
         auto failure_rate() const noexcept { return failures / float(transactions()); }
-        auto internal_failure_rate() const noexcept { return internal_failures() / float(transactions()); }
+        auto internal_failure_rate() const noexcept
+        {
+            return internal_failures() / float(transactions());
+        }
         auto user_failure_rate() const noexcept { return user_failures / float(transactions()); }
         auto bloom_checks() const noexcept { return bloom_successes + bloom_collisions; }
-        auto bloom_collision_rate() const noexcept { return bloom_collisions / float(bloom_checks()); }
+        auto bloom_collision_rate() const noexcept
+        {
+            return bloom_collisions / float(bloom_checks());
+        }
         auto quiesce_rate() const noexcept { return quiesces / float(transactions()); }
         auto average_read_size() const noexcept { return reads / float(transactions()); }
         auto average_write_size() const noexcept { return writes / float(transactions()); }
@@ -84,28 +90,27 @@ LSTM_DETAIL_BEGIN
         std::string results() const
         {
             std::ostringstream ostr;
-            ostr
-                << "    Transactions:          " << transactions()           << '\n'
-                << "    Success Rate:          " << success_rate()           << '\n'
-                << "    Failure Rate:          " << failure_rate()           << '\n'
-                << "    Quiesce Rate:          " << quiesce_rate()           << '\n'
-                << "    Average Write Size:    " << average_write_size()     << '\n'
-                << "    Average Read Size:     " << average_read_size()      << '\n'
-                << "    Max Write Size:        " << max_write_size           << '\n'
-                << "    Max Read Size:         " << max_read_size            << '\n'
-                << "    Bloom Collision Rate:  " << bloom_collision_rate()   << '\n'
-                << "    Reads:                 " << reads                    << '\n'
-                << "    Writes:                " << writes                   << '\n'
-                << "    Quiesces:              " << quiesces                 << '\n'
-                << "    Successes:             " << successes                << '\n'
-                << "    Failures:              " << failures                 << '\n'
-                << "    Internal Failure Rate: " << internal_failure_rate()  << '\n'
-                << "    User Failure Rate:     " << user_failure_rate()      << '\n'
-                << "    Internal Failures:     " << internal_failures()      << '\n'
-                << "    User Failures:         " << user_failures            << '\n'
-                << "    Bloom Collisions:      " << bloom_collisions         << '\n'
-                << "    Bloom Successes:       " << bloom_successes          << '\n'
-                << "    Bloom Checks:          " << bloom_checks()           << '\n';
+            ostr << "    Transactions:          " << transactions() << '\n'
+                 << "    Success Rate:          " << success_rate() << '\n'
+                 << "    Failure Rate:          " << failure_rate() << '\n'
+                 << "    Quiesce Rate:          " << quiesce_rate() << '\n'
+                 << "    Average Write Size:    " << average_write_size() << '\n'
+                 << "    Average Read Size:     " << average_read_size() << '\n'
+                 << "    Max Write Size:        " << max_write_size << '\n'
+                 << "    Max Read Size:         " << max_read_size << '\n'
+                 << "    Bloom Collision Rate:  " << bloom_collision_rate() << '\n'
+                 << "    Reads:                 " << reads << '\n'
+                 << "    Writes:                " << writes << '\n'
+                 << "    Quiesces:              " << quiesces << '\n'
+                 << "    Successes:             " << successes << '\n'
+                 << "    Failures:              " << failures << '\n'
+                 << "    Internal Failure Rate: " << internal_failure_rate() << '\n'
+                 << "    User Failure Rate:     " << user_failure_rate() << '\n'
+                 << "    Internal Failures:     " << internal_failures() << '\n'
+                 << "    User Failures:         " << user_failures << '\n'
+                 << "    Bloom Collisions:      " << bloom_collisions << '\n'
+                 << "    Bloom Successes:       " << bloom_successes << '\n'
+                 << "    Bloom Checks:          " << bloom_checks() << '\n';
             return ostr.str();
         }
     };
@@ -138,8 +143,7 @@ LSTM_DETAIL_BEGIN
             return result;
         }
 
-        std::uint64_t
-        max(std::function<std::size_t(const thread_record*)> accessor) const noexcept
+        std::uint64_t max(std::function<std::size_t(const thread_record*)> accessor) const noexcept
         {
             std::size_t result = 0;
             for (auto& tid_record : records_)
@@ -167,16 +171,28 @@ LSTM_DETAIL_BEGIN
         auto user_failures() const noexcept { return total_count(&thread_record::user_failures); }
         auto failures() const noexcept { return total_count(&thread_record::failures); }
         auto successes() const noexcept { return total_count(&thread_record::successes); }
-        auto bloom_collisions() const noexcept { return total_count(&thread_record::bloom_collisions); }
-        auto bloom_successes() const noexcept { return total_count(&thread_record::bloom_successes); }
+        auto bloom_collisions() const noexcept
+        {
+            return total_count(&thread_record::bloom_collisions);
+        }
+        auto bloom_successes() const noexcept
+        {
+            return total_count(&thread_record::bloom_successes);
+        }
         auto internal_failures() const noexcept { return failures() - user_failures(); }
         auto transactions() const noexcept { return failures() + successes(); }
         auto success_rate() const noexcept { return successes() / float(transactions()); }
         auto failure_rate() const noexcept { return failures() / float(transactions()); }
-        auto internal_failure_rate() const noexcept { return internal_failures() / float(transactions()); }
+        auto internal_failure_rate() const noexcept
+        {
+            return internal_failures() / float(transactions());
+        }
         auto user_failure_rate() const noexcept { return user_failures() / float(transactions()); }
         auto bloom_checks() const noexcept { return bloom_successes() + bloom_collisions(); }
-        auto bloom_collision_rate() const noexcept { return bloom_collisions() / float(bloom_checks()); }
+        auto bloom_collision_rate() const noexcept
+        {
+            return bloom_collisions() / float(bloom_checks());
+        }
         auto quiesce_rate() const noexcept { return quiesces() / float(transactions()); }
         auto average_read_size() const noexcept { return reads() / float(transactions()); }
         auto average_write_size() const noexcept { return writes() / float(transactions()); }
@@ -190,28 +206,27 @@ LSTM_DETAIL_BEGIN
         std::string results(bool per_thread = true) const
         {
             std::ostringstream ostr;
-            ostr
-                << "Transactions:          " << transactions()           << '\n'
-                << "Success Rate:          " << success_rate()           << '\n'
-                << "Failure Rate:          " << failure_rate()           << '\n'
-                << "Quiesce Rate:          " << quiesce_rate()           << '\n'
-                << "Average Write Size:    " << average_write_size()     << '\n'
-                << "Average Read Size:     " << average_read_size()      << '\n'
-                << "Max Write Size:        " << max_write_size()         << '\n'
-                << "Max Read Size:         " << max_read_size()          << '\n'
-                << "Bloom Collision Rate:  " << bloom_collision_rate()   << '\n'
-                << "Reads:                 " << reads()                  << '\n'
-                << "Writes:                " << writes()                 << '\n'
-                << "Quiesces:              " << quiesces()               << '\n'
-                << "Successes:             " << successes()              << '\n'
-                << "Failures:              " << failures()               << '\n'
-                << "Internal Failure Rate: " << internal_failure_rate()  << '\n'
-                << "User Failure Rate:     " << user_failure_rate()      << '\n'
-                << "Internal Failures:     " << internal_failures()      << '\n'
-                << "User Failures:         " << user_failures()          << '\n'
-                << "Bloom Collisions:      " << bloom_collisions()       << '\n'
-                << "Bloom Successes:       " << bloom_successes()        << '\n'
-                << "Bloom Checks:          " << bloom_checks()           << '\n';
+            ostr << "Transactions:          " << transactions() << '\n'
+                 << "Success Rate:          " << success_rate() << '\n'
+                 << "Failure Rate:          " << failure_rate() << '\n'
+                 << "Quiesce Rate:          " << quiesce_rate() << '\n'
+                 << "Average Write Size:    " << average_write_size() << '\n'
+                 << "Average Read Size:     " << average_read_size() << '\n'
+                 << "Max Write Size:        " << max_write_size() << '\n'
+                 << "Max Read Size:         " << max_read_size() << '\n'
+                 << "Bloom Collision Rate:  " << bloom_collision_rate() << '\n'
+                 << "Reads:                 " << reads() << '\n'
+                 << "Writes:                " << writes() << '\n'
+                 << "Quiesces:              " << quiesces() << '\n'
+                 << "Successes:             " << successes() << '\n'
+                 << "Failures:              " << failures() << '\n'
+                 << "Internal Failure Rate: " << internal_failure_rate() << '\n'
+                 << "User Failure Rate:     " << user_failure_rate() << '\n'
+                 << "Internal Failures:     " << internal_failures() << '\n'
+                 << "User Failures:         " << user_failures() << '\n'
+                 << "Bloom Collisions:      " << bloom_collisions() << '\n'
+                 << "Bloom Successes:       " << bloom_successes() << '\n'
+                 << "Bloom Checks:          " << bloom_checks() << '\n';
 
             if (per_thread) {
                 std::size_t i = 0;
