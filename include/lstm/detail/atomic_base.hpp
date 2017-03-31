@@ -42,11 +42,11 @@ LSTM_DETAIL_BEGIN
         {
             static_assert(kind != tx_kind::none);
 
-            LSTM_LOG_FAILURES();
-            LSTM_LOG_READS(tls_td.read_set.size());
-            LSTM_LOG_MAX_READ_SIZE(tls_td.read_set.size());
-            LSTM_LOG_WRITES(tls_td.write_set.size());
-            LSTM_LOG_MAX_WRITE_SIZE(tls_td.write_set.size());
+            LSTM_PERF_STATS_FAILURES();
+            LSTM_PERF_STATS_READS(tls_td.read_set.size());
+            LSTM_PERF_STATS_MAX_READ_SIZE(tls_td.read_set.size());
+            LSTM_PERF_STATS_WRITES(tls_td.write_set.size());
+            LSTM_PERF_STATS_MAX_WRITE_SIZE(tls_td.write_set.size());
 
             if (kind != tx_kind::read_only)
                 tls_td.clear_read_write_sets();
@@ -95,11 +95,11 @@ LSTM_DETAIL_BEGIN
             tls_td.access_unlock();
             tls_td.tx_state = tx_kind::none;
 
-            LSTM_LOG_SUCCESSES();
-            LSTM_LOG_READS(tls_td.read_set.size());
-            LSTM_LOG_MAX_READ_SIZE(tls_td.read_set.size());
-            LSTM_LOG_WRITES(tls_td.write_set.size());
-            LSTM_LOG_MAX_WRITE_SIZE(tls_td.write_set.size());
+            LSTM_PERF_STATS_SUCCESSES();
+            LSTM_PERF_STATS_READS(tls_td.read_set.size());
+            LSTM_PERF_STATS_MAX_READ_SIZE(tls_td.read_set.size());
+            LSTM_PERF_STATS_WRITES(tls_td.write_set.size());
+            LSTM_PERF_STATS_MAX_WRITE_SIZE(tls_td.write_set.size());
 
             if (kind != tx_kind::read_only)
                 tls_td.clear_read_write_sets();

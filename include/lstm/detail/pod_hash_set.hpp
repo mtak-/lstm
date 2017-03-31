@@ -62,9 +62,9 @@ LSTM_DETAIL_BEGIN
             const const_iterator iter = const_cast<pod_hash_set&>(*this).find_impl(dest_var);
 
             if (iter != end())
-                LSTM_LOG_BLOOM_SUCCESSES();
+                LSTM_PERF_STATS_BLOOM_SUCCESSES();
             else
-                LSTM_LOG_BLOOM_COLLISIONS();
+                LSTM_PERF_STATS_BLOOM_COLLISIONS();
 
             return iter;
         }
@@ -75,11 +75,11 @@ LSTM_DETAIL_BEGIN
             const iterator iter = find_impl(dest_var);
 
             if (iter != end()) {
-                LSTM_LOG_BLOOM_SUCCESSES();
+                LSTM_PERF_STATS_BLOOM_SUCCESSES();
 
                 return write_set_lookup{&iter->pending_write()};
             } else {
-                LSTM_LOG_BLOOM_COLLISIONS();
+                LSTM_PERF_STATS_BLOOM_COLLISIONS();
 
                 return write_set_lookup{hash};
             }
@@ -154,7 +154,7 @@ LSTM_DETAIL_BEGIN
         {
             if (LSTM_LIKELY(!(filter_ & dumb_reference_hash(dest_var)))) {
                 if (!empty())
-                    LSTM_LOG_BLOOM_SUCCESSES();
+                    LSTM_PERF_STATS_BLOOM_SUCCESSES();
 
                 return end();
             }
@@ -167,7 +167,7 @@ LSTM_DETAIL_BEGIN
             const hash_t hash = dumb_reference_hash(dest_var);
             if (LSTM_LIKELY(!(filter_ & hash))) {
                 if (!empty())
-                    LSTM_LOG_BLOOM_SUCCESSES();
+                    LSTM_PERF_STATS_BLOOM_SUCCESSES();
 
                 return write_set_lookup{hash};
             }

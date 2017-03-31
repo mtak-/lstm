@@ -8,6 +8,7 @@
 //  file LICENSE_1_0.txt or copy at
 //  http://www.boost.org/LICENSE_1_0.txt)
 
+// clang-format off
 #ifndef LSTM_TEST_SIMPLE_TEST_HPP
 #define LSTM_TEST_SIMPLE_TEST_HPP
 
@@ -198,9 +199,6 @@ inline void sleep_ms(int ms) { std::this_thread::sleep_for(std::chrono::millisec
 
 #if __has_feature(thread_sanitizer)
     #define LSTM_TEST_INIT(val, tsan_val) tsan_val
-    #ifdef LSTM_LOG_TRANSACTIONS
-        #error "LSTM_LOG_TRANSACTIONS will interfere with tsan results"
-    #endif
     #ifndef NDEBUG
         #error "Not defining NDEBUG will interfere with tsan results"
     #endif
@@ -211,3 +209,4 @@ inline void sleep_ms(int ms) { std::this_thread::sleep_for(std::chrono::millisec
 #endif
 
 #endif
+// clang-format on

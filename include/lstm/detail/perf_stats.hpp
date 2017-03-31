@@ -1,8 +1,8 @@
-#ifndef LSTM_DETAIL_TRANSACTION_LOG_HPP
-#define LSTM_DETAIL_TRANSACTION_LOG_HPP
+#ifndef LSTM_DETAIL_PERF_STATS_HPP
+#define LSTM_DETAIL_PERF_STATS_HPP
 
 // clang-format off
-#ifdef LSTM_LOG_ON
+#ifdef LSTM_PERF_STATS_ON
     #include <lstm/detail/compiler.hpp>
     #include <lstm/detail/namespace_macros.hpp>
 
@@ -11,50 +11,50 @@
     #include <string>
     #include <vector>
     
-    #define LSTM_LOG_READS(amt)          lstm::detail::tls_record().reads += amt
-    #define LSTM_LOG_WRITES(amt)         lstm::detail::tls_record().writes += amt
-    #define LSTM_LOG_MAX_READ_SIZE(amt)  lstm::detail::tls_record().max_read_size = std::max(lstm::detail::tls_record().max_read_size, static_cast<std::uint64_t>(amt))
-    #define LSTM_LOG_MAX_WRITE_SIZE(amt) lstm::detail::tls_record().max_write_size = std::max(lstm::detail::tls_record().max_write_size, static_cast<std::uint64_t>(amt))
-    #define LSTM_LOG_QUIESCES()          ++lstm::detail::tls_record().quiesces
-    #define LSTM_LOG_USER_FAILURES()     ++lstm::detail::tls_record().user_failures
-    #define LSTM_LOG_FAILURES()          ++lstm::detail::tls_record().failures
-    #define LSTM_LOG_SUCCESSES()         ++lstm::detail::tls_record().successes
-    #define LSTM_LOG_BLOOM_COLLISIONS()  ++lstm::detail::tls_record().bloom_collisions
-    #define LSTM_LOG_BLOOM_SUCCESSES()   ++lstm::detail::tls_record().bloom_successes
-    #define LSTM_LOG_PUBLISH_RECORD()                                                              \
+    #define LSTM_PERF_STATS_READS(amt)          lstm::detail::tls_record().reads += amt
+    #define LSTM_PERF_STATS_WRITES(amt)         lstm::detail::tls_record().writes += amt
+    #define LSTM_PERF_STATS_MAX_READ_SIZE(amt)  lstm::detail::tls_record().max_read_size = std::max(lstm::detail::tls_record().max_read_size, static_cast<std::uint64_t>(amt))
+    #define LSTM_PERF_STATS_MAX_WRITE_SIZE(amt) lstm::detail::tls_record().max_write_size = std::max(lstm::detail::tls_record().max_write_size, static_cast<std::uint64_t>(amt))
+    #define LSTM_PERF_STATS_QUIESCES()          ++lstm::detail::tls_record().quiesces
+    #define LSTM_PERF_STATS_USER_FAILURES()     ++lstm::detail::tls_record().user_failures
+    #define LSTM_PERF_STATS_FAILURES()          ++lstm::detail::tls_record().failures
+    #define LSTM_PERF_STATS_SUCCESSES()         ++lstm::detail::tls_record().successes
+    #define LSTM_PERF_STATS_BLOOM_COLLISIONS()  ++lstm::detail::tls_record().bloom_collisions
+    #define LSTM_PERF_STATS_BLOOM_SUCCESSES()   ++lstm::detail::tls_record().bloom_successes
+    #define LSTM_PERF_STATS_PUBLISH_RECORD()                                                              \
         do {                                                                                       \
-            lstm::detail::transaction_log::get().publish(lstm::detail::tls_record());              \
+            lstm::detail::perf_stats::get().publish(lstm::detail::tls_record());              \
             lstm::detail::tls_record() = {};                                                       \
         } while(0)
     /**/
-    #define LSTM_LOG_CLEAR() lstm::detail::transaction_log::get().clear()
-    #ifndef LSTM_LOG_DUMP
+    #define LSTM_PERF_STATS_CLEAR() lstm::detail::perf_stats::get().clear()
+    #ifndef LSTM_PERF_STATS_DUMP
         #include <iostream>
-        #define LSTM_LOG_DUMP() (std::cout << lstm::detail::transaction_log::get().results())
-    #endif /* LSTM_LOG_DUMP */
+        #define LSTM_PERF_STATS_DUMP() (std::cout << lstm::detail::perf_stats::get().results())
+    #endif /* LSTM_PERF_STATS_DUMP */
 #else
-    #define LSTM_LOG_READS(amt)          /**/
-    #define LSTM_LOG_WRITES(amt)         /**/
-    #define LSTM_LOG_MAX_READ_SIZE(amt)  /**/
-    #define LSTM_LOG_MAX_WRITE_SIZE(amt) /**/
-    #define LSTM_LOG_QUIESCES()          /**/
-    #define LSTM_LOG_USER_FAILURES()     /**/
-    #define LSTM_LOG_FAILURES()          /**/
-    #define LSTM_LOG_SUCCESSES()         /**/
-    #define LSTM_LOG_BLOOM_COLLISIONS()  /**/
-    #define LSTM_LOG_BLOOM_SUCCESSES()   /**/
-    #define LSTM_LOG_PUBLISH_RECORD()                               /**/
-    #define LSTM_LOG_CLEAR()                                        /**/
-    #ifndef LSTM_LOG_DUMP
-        #define LSTM_LOG_DUMP()                                     /**/
-    #endif /* LSTM_LOG_DUMP */
-#endif /* LSTM_LOG_ON */
+    #define LSTM_PERF_STATS_READS(amt)          /**/
+    #define LSTM_PERF_STATS_WRITES(amt)         /**/
+    #define LSTM_PERF_STATS_MAX_READ_SIZE(amt)  /**/
+    #define LSTM_PERF_STATS_MAX_WRITE_SIZE(amt) /**/
+    #define LSTM_PERF_STATS_QUIESCES()          /**/
+    #define LSTM_PERF_STATS_USER_FAILURES()     /**/
+    #define LSTM_PERF_STATS_FAILURES()          /**/
+    #define LSTM_PERF_STATS_SUCCESSES()         /**/
+    #define LSTM_PERF_STATS_BLOOM_COLLISIONS()  /**/
+    #define LSTM_PERF_STATS_BLOOM_SUCCESSES()   /**/
+    #define LSTM_PERF_STATS_PUBLISH_RECORD()                               /**/
+    #define LSTM_PERF_STATS_CLEAR()                                        /**/
+    #ifndef LSTM_PERF_STATS_DUMP
+        #define LSTM_PERF_STATS_DUMP()                                     /**/
+    #endif /* LSTM_PERF_STATS_DUMP */
+#endif /* LSTM_PERF_STATS_ON */
 // clang-format on
 
-#ifdef LSTM_LOG_ON
+#ifdef LSTM_PERF_STATS_ON
 
 LSTM_DETAIL_BEGIN
-    struct transaction_log_tls_record
+    struct perf_stats_tls_record
     {
         std::uint64_t reads{0};
         std::uint64_t writes{0};
@@ -67,7 +67,7 @@ LSTM_DETAIL_BEGIN
         std::uint64_t bloom_collisions{0};
         std::uint64_t bloom_successes{0};
 
-        transaction_log_tls_record() noexcept = default;
+        perf_stats_tls_record() noexcept = default;
 
         auto internal_failures() const noexcept { return failures - user_failures; }
         auto transactions() const noexcept { return failures + successes; }
@@ -115,27 +115,27 @@ LSTM_DETAIL_BEGIN
         }
     };
 
-    inline transaction_log_tls_record& tls_record() noexcept
+    inline perf_stats_tls_record& tls_record() noexcept
     {
-        static LSTM_THREAD_LOCAL transaction_log_tls_record record{};
+        static LSTM_THREAD_LOCAL perf_stats_tls_record record{};
         return record;
     }
 
-    struct transaction_log
+    struct perf_stats
     {
     private:
-        using records_t          = std::vector<transaction_log_tls_record>;
+        using records_t          = std::vector<perf_stats_tls_record>;
         using records_iter       = typename records_t::iterator;
         using records_value_type = typename records_t::value_type;
 
         records_t records_;
 
-        transaction_log()                       = default;
-        transaction_log(const transaction_log&) = delete;
-        transaction_log& operator=(const transaction_log&) = delete;
+        perf_stats()                  = default;
+        perf_stats(const perf_stats&) = delete;
+        perf_stats& operator=(const perf_stats&) = delete;
 
         std::uint64_t
-        total_count(std::function<std::size_t(const transaction_log_tls_record*)> accessor) const
+        total_count(std::function<std::size_t(const perf_stats_tls_record*)> accessor) const
             noexcept
         {
             std::size_t result = 0;
@@ -145,7 +145,7 @@ LSTM_DETAIL_BEGIN
         }
 
         std::uint64_t
-        max(std::function<std::size_t(const transaction_log_tls_record*)> accessor) const noexcept
+        max(std::function<std::size_t(const perf_stats_tls_record*)> accessor) const noexcept
         {
             std::size_t result = 0;
             for (auto& tid_record : records_)
@@ -154,50 +154,41 @@ LSTM_DETAIL_BEGIN
         }
 
     public:
-        static transaction_log& get() noexcept
+        static perf_stats& get() noexcept
         {
-            static transaction_log singleton;
+            static perf_stats singleton;
             return singleton;
         }
 
-        inline void publish(transaction_log_tls_record record) noexcept
+        inline void publish(perf_stats_tls_record record) noexcept
         {
             records_.emplace_back(std::move(record));
         }
 
-        auto reads() const noexcept { return total_count(&transaction_log_tls_record::reads); }
-        auto writes() const noexcept { return total_count(&transaction_log_tls_record::writes); }
+        auto reads() const noexcept { return total_count(&perf_stats_tls_record::reads); }
+        auto writes() const noexcept { return total_count(&perf_stats_tls_record::writes); }
         auto max_read_size() const noexcept
         {
-            return this->max(&transaction_log_tls_record::max_read_size);
+            return this->max(&perf_stats_tls_record::max_read_size);
         }
         auto max_write_size() const noexcept
         {
-            return this->max(&transaction_log_tls_record::max_write_size);
+            return this->max(&perf_stats_tls_record::max_write_size);
         }
-        auto quiesces() const noexcept
-        {
-            return total_count(&transaction_log_tls_record::quiesces);
-        }
+        auto quiesces() const noexcept { return total_count(&perf_stats_tls_record::quiesces); }
         auto user_failures() const noexcept
         {
-            return total_count(&transaction_log_tls_record::user_failures);
+            return total_count(&perf_stats_tls_record::user_failures);
         }
-        auto failures() const noexcept
-        {
-            return total_count(&transaction_log_tls_record::failures);
-        }
-        auto successes() const noexcept
-        {
-            return total_count(&transaction_log_tls_record::successes);
-        }
+        auto failures() const noexcept { return total_count(&perf_stats_tls_record::failures); }
+        auto successes() const noexcept { return total_count(&perf_stats_tls_record::successes); }
         auto bloom_collisions() const noexcept
         {
-            return total_count(&transaction_log_tls_record::bloom_collisions);
+            return total_count(&perf_stats_tls_record::bloom_collisions);
         }
         auto bloom_successes() const noexcept
         {
-            return total_count(&transaction_log_tls_record::bloom_successes);
+            return total_count(&perf_stats_tls_record::bloom_successes);
         }
         auto internal_failures() const noexcept { return failures() - user_failures(); }
         auto transactions() const noexcept { return failures() + successes(); }
@@ -260,6 +251,6 @@ LSTM_DETAIL_BEGIN
     };
 LSTM_DETAIL_END
 
-#endif /* LSTM_LOG_ON */
+#endif /* LSTM_PERF_STATS_ON */
 
-#endif /* LSTM_DETAIL_TRANSACTION_LOG_HPP */
+#endif /* LSTM_DETAIL_PERF_STATS_HPP */

@@ -78,16 +78,16 @@ stat_output_ordering = [
     'bloom checks',
 ]
 
-include_guard = 'LSTM_DETAIL_TRANSACTION_LOG_HPP'
+include_guard = 'LSTM_DETAIL_PERF_STATS_HPP'
 
 def main():
-    p = os.path.realpath(os.path.join(os.path.dirname(__file__), '../include/lstm/detail/transaction_log.hpp'))
+    p = os.path.realpath(os.path.join(os.path.dirname(__file__), '../include/lstm/detail/perf_stats.hpp'))
     f = open(p, 'w')
     f.write(sgl.gen_stats(
         stats,
         include_guard,
-        class_name = 'transaction_log',
-        macro_prefix = 'LSTM_LOG_',
+        class_name = 'perf_stats',
+        macro_prefix = 'LSTM_PERF_STATS_',
         namespace_access = 'lstm::detail::',
         namespace_begin = 'LSTM_DETAIL_BEGIN',
         namespace_end = 'LSTM_DETAIL_END',

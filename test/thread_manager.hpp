@@ -77,8 +77,8 @@ public:
 
     ~thread_manager()
     {
-        LSTM_LOG_DUMP();
-        LSTM_LOG_CLEAR();
+        LSTM_PERF_STATS_DUMP();
+        LSTM_PERF_STATS_CLEAR();
     }
 };
 

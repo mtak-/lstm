@@ -6,7 +6,7 @@
 LSTM_BEGIN
     [[noreturn]] LSTM_NOINLINE_LUKEWARM inline void retry()
     {
-        LSTM_LOG_USER_FAILURES();
+        LSTM_PERF_STATS_USER_FAILURES();
         throw detail::tx_retry{};
     }
 LSTM_END

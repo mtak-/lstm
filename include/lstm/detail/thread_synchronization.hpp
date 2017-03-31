@@ -104,7 +104,7 @@ LSTM_DETAIL_BEGIN
                     result = td_epoch;
             }
 
-            LSTM_LOG_QUIESCES();
+            LSTM_PERF_STATS_QUIESCES();
 
             return result;
         }
@@ -145,7 +145,7 @@ LSTM_DETAIL_BEGIN
                 }
                 *indirect = next;
 
-                LSTM_LOG_PUBLISH_RECORD();
+                LSTM_PERF_STATS_PUBLISH_RECORD();
             }
             unlock_all(); // this->mut does not get unlocked here
             mut.unlock();
