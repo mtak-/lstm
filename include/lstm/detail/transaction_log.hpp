@@ -2,7 +2,7 @@
 #define LSTM_DETAIL_TRANSACTION_LOG_HPP
 
 // clang-format off
-#ifdef LSTM_LOG_TRANSACTIONS
+#ifdef LSTM_LOG_ON
     #include <lstm/detail/compiler.hpp>
     #include <lstm/detail/namespace_macros.hpp>
 
@@ -48,10 +48,10 @@
     #ifndef LSTM_LOG_DUMP
         #define LSTM_LOG_DUMP()                                     /**/
     #endif /* LSTM_LOG_DUMP */
-#endif /* LSTM_LOG_TRANSACTIONS */
+#endif /* LSTM_LOG_ON */
 // clang-format on
 
-#ifdef LSTM_LOG_TRANSACTIONS
+#ifdef LSTM_LOG_ON
 
 LSTM_DETAIL_BEGIN
     struct thread_record
@@ -240,6 +240,6 @@ LSTM_DETAIL_BEGIN
     };
 LSTM_DETAIL_END
 
-#endif /* LSTM_LOG_TRANSACTIONS */
+#endif /* LSTM_LOG_ON */
 
 #endif /* LSTM_DETAIL_TRANSACTION_LOG_HPP */
