@@ -17,14 +17,14 @@ _STATS_TEMPLATE = '''#ifndef {INCLUDE_GUARD}
 {MACROS_ON}
     #define {MACRO_PREFIX}PUBLISH_RECORD()                                                              \\
         do {{                                                                                       \\
-            {NS_ACCESS}transaction_log::get().publish({NS_ACCESS}tls_record());              \\
+            {NS_ACCESS}{CLASS_NAME}::get().publish({NS_ACCESS}tls_record());              \\
             {NS_ACCESS}tls_record() = {{}};                                                       \\
         }} while(0)
     /**/
-    #define {MACRO_PREFIX}CLEAR() {NS_ACCESS}transaction_log::get().clear()
+    #define {MACRO_PREFIX}CLEAR() {NS_ACCESS}{CLASS_NAME}::get().clear()
     #ifndef {MACRO_PREFIX}DUMP
         #include <iostream>
-        #define {MACRO_PREFIX}DUMP() (std::cout << {NS_ACCESS}transaction_log::get().results())
+        #define {MACRO_PREFIX}DUMP() (std::cout << {NS_ACCESS}{CLASS_NAME}::get().results())
     #endif /* {MACRO_PREFIX}DUMP */
 #else
 {MACROS_OFF}
@@ -39,11 +39,11 @@ _STATS_TEMPLATE = '''#ifndef {INCLUDE_GUARD}
 #ifdef {MACRO_PREFIX}ON
 
 {NAMESPACE_BEGIN}
-    struct thread_record
+    struct {CLASS_NAME}_tls_record
     {{
 {THREAD_RECORD_MEMBERS}
 
-        thread_record() noexcept = default;
+        {CLASS_NAME}_tls_record() noexcept = default;
         
 {THREAD_RECORD_MEMBER_FUNCTIONS}
 
@@ -56,27 +56,27 @@ _STATS_TEMPLATE = '''#ifndef {INCLUDE_GUARD}
         }}
     }};
 
-    inline thread_record& tls_record() noexcept
+    inline {CLASS_NAME}_tls_record& tls_record() noexcept
     {{
-        static LSTM_THREAD_LOCAL thread_record record{{}};
+        static LSTM_THREAD_LOCAL {CLASS_NAME}_tls_record record{{}};
         return record;
     }}
 
-    struct transaction_log
+    struct {CLASS_NAME}
     {{
     private:
-        using records_t          = std::vector<thread_record>;
+        using records_t          = std::vector<{CLASS_NAME}_tls_record>;
         using records_iter       = typename records_t::iterator;
         using records_value_type = typename records_t::value_type;
 
         records_t records_;
 
-        transaction_log()                       = default;
-        transaction_log(const transaction_log&) = delete;
-        transaction_log& operator=(const transaction_log&) = delete;
+        {CLASS_NAME}()                       = default;
+        {CLASS_NAME}(const {CLASS_NAME}&) = delete;
+        {CLASS_NAME}& operator=(const {CLASS_NAME}&) = delete;
 
         std::uint64_t
-        total_count(std::function<std::size_t(const thread_record*)> accessor) const noexcept
+        total_count(std::function<std::size_t(const {CLASS_NAME}_tls_record*)> accessor) const noexcept
         {{
             std::size_t result = 0;
             for (auto& tid_record : records_)
@@ -85,7 +85,7 @@ _STATS_TEMPLATE = '''#ifndef {INCLUDE_GUARD}
         }}
 
         std::uint64_t
-        max(std::function<std::size_t(const thread_record*)> accessor) const noexcept
+        max(std::function<std::size_t(const {CLASS_NAME}_tls_record*)> accessor) const noexcept
         {{
             std::size_t result = 0;
             for (auto& tid_record : records_)
@@ -94,13 +94,13 @@ _STATS_TEMPLATE = '''#ifndef {INCLUDE_GUARD}
         }}
 
     public:
-        static transaction_log& get() noexcept
+        static {CLASS_NAME}& get() noexcept
         {{
-            static transaction_log singleton;
+            static {CLASS_NAME} singleton;
             return singleton;
         }}
 
-        inline void publish(thread_record record) noexcept
+        inline void publish({CLASS_NAME}_tls_record record) noexcept
         {{
             records_.emplace_back(std::move(record));
         }}
@@ -269,12 +269,16 @@ def get_thread_record_stream_output(all_stats, stats, compound_stats):
     return '\n'.join(['<< "    ' + name + '" << ' + value + ' << \'\\n\''
                         for name, value in zip(names, values)])
                         
-def get_transaction_log_mem_fun_contents(stat, stats, stats_kinds, compound_stats_kinds):
+def get_singleton_class_mem_fun_contents(class_name,
+                                         stat,
+                                         stats,
+                                         stats_kinds,
+                                         compound_stats_kinds):
     if stat in stats:
         if stats_kinds[stat] == 'counter' or stats_kinds[stat] == 'sum':
-            return 'total_count(&thread_record::%s)' % get_mem_name(stat)
+            return 'total_count(&%s_tls_record::%s)' % (class_name, get_mem_name(stat))
         elif stats_kinds[stat] == 'max':
-            return 'this->max(&thread_record::%s)' % get_mem_name(stat)
+            return 'this->max(&%s_tls_record::%s)' % (class_name, get_mem_name(stat))
         else:
             assert(false)
     
@@ -285,29 +289,36 @@ def get_transaction_log_mem_fun_contents(stat, stats, stats_kinds, compound_stat
         operands[-1] = 'float(%s)' % operands[-1]
     return (' ' + op + ' ').join(operands)
 
-def get_transaction_log_mem_fun(stat, stats, stats_kinds, compound_stats_kinds):
+def get_singleton_class_mem_fun(class_name, stat, stats, stats_kinds, compound_stats_kinds):
     _FORMAT_STRING = '''auto {NAME} const noexcept {{ return {CONTENTS}; }}'''
     return _FORMAT_STRING.format(
         NAME     = get_mem_fun_for_stat(stat),
-        CONTENTS = get_transaction_log_mem_fun_contents(stat,
+        CONTENTS = get_singleton_class_mem_fun_contents(class_name,
+                                                        stat,
                                                         stats,
                                                         stats_kinds,
                                                         compound_stats_kinds),
     )
 
-def get_transaction_log_mem_funs(stats,
+def get_singleton_class_mem_funs(class_name,
+                                 stats,
                                  compound_stats,
                                  stats_kinds,
                                  compound_stats_kinds):
-    return '\n'.join([get_transaction_log_mem_fun(stat, stats, stats_kinds, compound_stats_kinds)
+    return '\n'.join([get_singleton_class_mem_fun(class_name,
+                                                  stat,
+                                                  stats,
+                                                  stats_kinds,
+                                                  compound_stats_kinds)
                       for stat in stats] +
-                     [get_transaction_log_mem_fun(compound_stat,
+                     [get_singleton_class_mem_fun(class_name,
+                                                  compound_stat,
                                                   stats,
                                                   stats_kinds,
                                                   compound_stats_kinds)
                       for compound_stat in compound_stats])
 
-def get_transaction_log_stream_output(all_stats):
+def get_singleton_class_stream_output(all_stats):
     names = add_trailing_whitespace([get_pretty_name(s) + ':' for s in all_stats])
     values = add_trailing_whitespace([get_mem_fun_for_stat(s)
                                       for s in all_stats])
@@ -345,6 +356,7 @@ all_stats_kinds = {
 def gen_stats(
     the_stats,
     include_guard,
+    class_name = 'perf_stats',
     macro_prefix = '',
     namespace_begin = '',
     namespace_end = '',
@@ -371,6 +383,7 @@ def gen_stats(
         INCLUDE_GUARD = include_guard,
         MACRO_PREFIX = macro_prefix,
         INCLUDES = get_includes(),
+        CLASS_NAME = class_name,
         NAMESPACE_BEGIN = namespace_begin,
         NAMESPACE_END = namespace_end,
         NS_ACCESS = namespace_access,
@@ -384,9 +397,10 @@ def gen_stats(
         THREAD_RECORD_STREAM_OUTPUT = indent(get_thread_record_stream_output(all_stats,
                                                                              stats,
                                                                              compound_stats), 4),
-        TRANSACTION_LOG_MEMBER_FUNCTIONS = indent(get_transaction_log_mem_funs(stats,
+        TRANSACTION_LOG_MEMBER_FUNCTIONS = indent(get_singleton_class_mem_funs(class_name,
+                                                                               stats,
                                                                                compound_stats,
                                                                                stats_kinds,
                                                                                compound_stats_kinds), 2),
-        TRANSACTION_LOG_STREAM_OUTPUT = indent(get_transaction_log_stream_output(all_stats), 4),
+        TRANSACTION_LOG_STREAM_OUTPUT = indent(get_singleton_class_stream_output(all_stats), 4),
     )

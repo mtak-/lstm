@@ -86,6 +86,7 @@ def main():
     f.write(sgl.gen_stats(
         stats,
         include_guard,
+        class_name = 'transaction_log',
         macro_prefix = 'LSTM_LOG_',
         namespace_access = 'lstm::detail::',
         namespace_begin = 'LSTM_DETAIL_BEGIN',

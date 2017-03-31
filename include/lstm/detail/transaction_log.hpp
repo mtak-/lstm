@@ -54,7 +54,7 @@
 #ifdef LSTM_LOG_ON
 
 LSTM_DETAIL_BEGIN
-    struct thread_record
+    struct transaction_log_tls_record
     {
         std::uint64_t reads{0};
         std::uint64_t writes{0};
@@ -67,7 +67,7 @@ LSTM_DETAIL_BEGIN
         std::uint64_t bloom_collisions{0};
         std::uint64_t bloom_successes{0};
 
-        thread_record() noexcept = default;
+        transaction_log_tls_record() noexcept = default;
 
         auto internal_failures() const noexcept { return failures - user_failures; }
         auto transactions() const noexcept { return failures + successes; }
@@ -115,16 +115,16 @@ LSTM_DETAIL_BEGIN
         }
     };
 
-    inline thread_record& tls_record() noexcept
+    inline transaction_log_tls_record& tls_record() noexcept
     {
-        static LSTM_THREAD_LOCAL thread_record record{};
+        static LSTM_THREAD_LOCAL transaction_log_tls_record record{};
         return record;
     }
 
     struct transaction_log
     {
     private:
-        using records_t          = std::vector<thread_record>;
+        using records_t          = std::vector<transaction_log_tls_record>;
         using records_iter       = typename records_t::iterator;
         using records_value_type = typename records_t::value_type;
 
@@ -135,7 +135,8 @@ LSTM_DETAIL_BEGIN
         transaction_log& operator=(const transaction_log&) = delete;
 
         std::uint64_t
-        total_count(std::function<std::size_t(const thread_record*)> accessor) const noexcept
+        total_count(std::function<std::size_t(const transaction_log_tls_record*)> accessor) const
+            noexcept
         {
             std::size_t result = 0;
             for (auto& tid_record : records_)
@@ -143,7 +144,8 @@ LSTM_DETAIL_BEGIN
             return result;
         }
 
-        std::uint64_t max(std::function<std::size_t(const thread_record*)> accessor) const noexcept
+        std::uint64_t
+        max(std::function<std::size_t(const transaction_log_tls_record*)> accessor) const noexcept
         {
             std::size_t result = 0;
             for (auto& tid_record : records_)
@@ -158,26 +160,44 @@ LSTM_DETAIL_BEGIN
             return singleton;
         }
 
-        inline void publish(thread_record record) noexcept
+        inline void publish(transaction_log_tls_record record) noexcept
         {
             records_.emplace_back(std::move(record));
         }
 
-        auto reads() const noexcept { return total_count(&thread_record::reads); }
-        auto writes() const noexcept { return total_count(&thread_record::writes); }
-        auto max_read_size() const noexcept { return this->max(&thread_record::max_read_size); }
-        auto max_write_size() const noexcept { return this->max(&thread_record::max_write_size); }
-        auto quiesces() const noexcept { return total_count(&thread_record::quiesces); }
-        auto user_failures() const noexcept { return total_count(&thread_record::user_failures); }
-        auto failures() const noexcept { return total_count(&thread_record::failures); }
-        auto successes() const noexcept { return total_count(&thread_record::successes); }
+        auto reads() const noexcept { return total_count(&transaction_log_tls_record::reads); }
+        auto writes() const noexcept { return total_count(&transaction_log_tls_record::writes); }
+        auto max_read_size() const noexcept
+        {
+            return this->max(&transaction_log_tls_record::max_read_size);
+        }
+        auto max_write_size() const noexcept
+        {
+            return this->max(&transaction_log_tls_record::max_write_size);
+        }
+        auto quiesces() const noexcept
+        {
+            return total_count(&transaction_log_tls_record::quiesces);
+        }
+        auto user_failures() const noexcept
+        {
+            return total_count(&transaction_log_tls_record::user_failures);
+        }
+        auto failures() const noexcept
+        {
+            return total_count(&transaction_log_tls_record::failures);
+        }
+        auto successes() const noexcept
+        {
+            return total_count(&transaction_log_tls_record::successes);
+        }
         auto bloom_collisions() const noexcept
         {
-            return total_count(&thread_record::bloom_collisions);
+            return total_count(&transaction_log_tls_record::bloom_collisions);
         }
         auto bloom_successes() const noexcept
         {
-            return total_count(&thread_record::bloom_successes);
+            return total_count(&transaction_log_tls_record::bloom_successes);
         }
         auto internal_failures() const noexcept { return failures() - user_failures(); }
         auto transactions() const noexcept { return failures() + successes(); }
