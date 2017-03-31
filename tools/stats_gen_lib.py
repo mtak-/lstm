@@ -13,13 +13,14 @@ _STATS_TEMPLATE = '''#ifndef {INCLUDE_GUARD}
     #include <sstream>
     #include <string>
     #include <vector>
-    
+
+    // comment out any stats you don't want, and things will be just dandy
 {MACROS_ON}
-    #define {MACRO_PREFIX}PUBLISH_RECORD()                                                              \\
+    #define {MACRO_PREFIX}PUBLISH_RECORD()                                                       \\
         do {{                                                                                       \\
-            {NS_ACCESS}{CLASS_NAME}::get().publish({NS_ACCESS}tls_record());              \\
+            {NS_ACCESS}{CLASS_NAME}::get().publish({NS_ACCESS}tls_record());                   \\
             {NS_ACCESS}tls_record() = {{}};                                                       \\
-        }} while(0)
+        }} while(0)                                                                                 \\
     /**/
     #define {MACRO_PREFIX}CLEAR() {NS_ACCESS}{CLASS_NAME}::get().clear()
     #ifndef {MACRO_PREFIX}DUMP
@@ -27,13 +28,15 @@ _STATS_TEMPLATE = '''#ifndef {INCLUDE_GUARD}
         #define {MACRO_PREFIX}DUMP() (std::cout << {NS_ACCESS}{CLASS_NAME}::get().results())
     #endif /* {MACRO_PREFIX}DUMP */
 #else
-{MACROS_OFF}
     #define {MACRO_PREFIX}PUBLISH_RECORD()                               /**/
     #define {MACRO_PREFIX}CLEAR()                                        /**/
     #ifndef {MACRO_PREFIX}DUMP
         #define {MACRO_PREFIX}DUMP()                                     /**/
     #endif /* {MACRO_PREFIX}DUMP */
 #endif /* {MACRO_PREFIX}ON */
+
+{MACROS_OFF}
+
 // clang-format on
 
 #ifdef {MACRO_PREFIX}ON
@@ -208,13 +211,17 @@ def get_macros_on(stats, stats_kinds, ns_access, macro_prefix):
                       for stat, define in zip(stats, defines)])
 
 def get_macros_off(stats, stats_kinds, macro_prefix):
-    param = {
-        'counter' : '++{MEM_NAME}',
-        'max'     : '{MEM_NAME} = std::max({MEM_NAME}, {PARAMS})',
-        'sum'     : '{MEM_NAME} += {PARAMS}',
-    }
-    return '\n'.join([define + '/**/'
-                      for define in get_macro_defines(stats, stats_kinds, macro_prefix)])
+    _FORMAT_STRING = '''#ifndef {MACRO_NAME}
+    {MACRO_DEFINE} /**/
+#endif'''
+
+    result = []
+    for stat in stats:
+        result.append(_FORMAT_STRING.format(
+            MACRO_NAME = get_macro_name(stat, macro_prefix),
+            MACRO_DEFINE = get_macro_define(stat, stats_kinds, macro_prefix),
+        ))
+    return '\n'.join(result)
 
 def get_thread_record_mems(stats, stats_kinds):
     initial_value = {
@@ -388,7 +395,7 @@ def gen_stats(
         NAMESPACE_END = namespace_end,
         NS_ACCESS = namespace_access,
         MACROS_ON = indent(get_macros_on(stats, stats_kinds, namespace_access, macro_prefix), 1),
-        MACROS_OFF = indent(get_macros_off(stats, stats_kinds, macro_prefix), 1),
+        MACROS_OFF = get_macros_off(stats, stats_kinds, macro_prefix),
         THREAD_RECORD_MEMBERS = indent(get_thread_record_mems(stats, stats_kinds), 2),
         THREAD_RECORD_MEMBER_FUNCTIONS = indent(get_thread_record_mem_funs(stats,
                                                                            compound_stats,
