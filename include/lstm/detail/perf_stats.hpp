@@ -22,6 +22,7 @@
     #define LSTM_PERF_STATS_SUCCESSES()         ++lstm::detail::tls_record().successes
     #define LSTM_PERF_STATS_BLOOM_COLLISIONS()  ++lstm::detail::tls_record().bloom_collisions
     #define LSTM_PERF_STATS_BLOOM_SUCCESSES()   ++lstm::detail::tls_record().bloom_successes
+    #define LSTM_PERF_STATS_BACKOFFS()          ++lstm::detail::tls_record().backoffs
     #define LSTM_PERF_STATS_PUBLISH_RECORD()                                                       \
         do {                                                                                       \
             lstm::detail::perf_stats::get().publish(lstm::detail::tls_record());                   \
@@ -71,6 +72,9 @@
 #ifndef LSTM_PERF_STATS_BLOOM_SUCCESSES
     #define LSTM_PERF_STATS_BLOOM_SUCCESSES() /**/
 #endif
+#ifndef LSTM_PERF_STATS_BACKOFFS
+    #define LSTM_PERF_STATS_BACKOFFS() /**/
+#endif
 
 // clang-format on
 
@@ -89,6 +93,7 @@ LSTM_DETAIL_BEGIN
         std::uint64_t successes{0};
         std::uint64_t bloom_collisions{0};
         std::uint64_t bloom_successes{0};
+        std::uint64_t backoffs{0};
 
         perf_stats_tls_record() noexcept = default;
 
@@ -109,6 +114,7 @@ LSTM_DETAIL_BEGIN
         auto quiesce_rate() const noexcept { return quiesces / float(transactions()); }
         auto average_read_size() const noexcept { return reads / float(transactions()); }
         auto average_write_size() const noexcept { return writes / float(transactions()); }
+        auto backoff_rate() const noexcept { return backoffs / float(transactions()); }
 
         std::string results() const
         {
@@ -117,6 +123,7 @@ LSTM_DETAIL_BEGIN
                  << "    Success Rate:          " << success_rate() << '\n'
                  << "    Failure Rate:          " << failure_rate() << '\n'
                  << "    Quiesce Rate:          " << quiesce_rate() << '\n'
+                 << "    Backoff Rate:          " << backoff_rate() << '\n'
                  << "    Average Write Size:    " << average_write_size() << '\n'
                  << "    Average Read Size:     " << average_read_size() << '\n'
                  << "    Max Write Size:        " << max_write_size << '\n'
@@ -125,6 +132,7 @@ LSTM_DETAIL_BEGIN
                  << "    Reads:                 " << reads << '\n'
                  << "    Writes:                " << writes << '\n'
                  << "    Quiesces:              " << quiesces << '\n'
+                 << "    Backoffs:              " << backoffs << '\n'
                  << "    Successes:             " << successes << '\n'
                  << "    Failures:              " << failures << '\n'
                  << "    Internal Failure Rate: " << internal_failure_rate() << '\n'
@@ -213,6 +221,7 @@ LSTM_DETAIL_BEGIN
         {
             return total_count(&perf_stats_tls_record::bloom_successes);
         }
+        auto backoffs() const noexcept { return total_count(&perf_stats_tls_record::backoffs); }
         auto internal_failures() const noexcept { return failures() - user_failures(); }
         auto transactions() const noexcept { return failures() + successes(); }
         auto success_rate() const noexcept { return successes() / float(transactions()); }
@@ -230,6 +239,7 @@ LSTM_DETAIL_BEGIN
         auto quiesce_rate() const noexcept { return quiesces() / float(transactions()); }
         auto average_read_size() const noexcept { return reads() / float(transactions()); }
         auto average_write_size() const noexcept { return writes() / float(transactions()); }
+        auto backoff_rate() const noexcept { return backoffs() / float(transactions()); }
 
         std::size_t thread_count() const noexcept { return records_.size(); }
 
@@ -244,6 +254,7 @@ LSTM_DETAIL_BEGIN
                  << "Success Rate:          " << success_rate() << '\n'
                  << "Failure Rate:          " << failure_rate() << '\n'
                  << "Quiesce Rate:          " << quiesce_rate() << '\n'
+                 << "Backoff Rate:          " << backoff_rate() << '\n'
                  << "Average Write Size:    " << average_write_size() << '\n'
                  << "Average Read Size:     " << average_read_size() << '\n'
                  << "Max Write Size:        " << max_write_size() << '\n'
@@ -252,6 +263,7 @@ LSTM_DETAIL_BEGIN
                  << "Reads:                 " << reads() << '\n'
                  << "Writes:                " << writes() << '\n'
                  << "Quiesces:              " << quiesces() << '\n'
+                 << "Backoffs:              " << backoffs() << '\n'
                  << "Successes:             " << successes() << '\n'
                  << "Failures:              " << failures() << '\n'
                  << "Internal Failure Rate: " << internal_failure_rate() << '\n'

@@ -46,6 +46,7 @@ LSTM_DETAIL_BEGIN
     public:
         void operator()() noexcept
         {
+            LSTM_PERF_STATS_BACKOFFS();
             LSTM_THIS_CONTEXT::sleep_for(Interval(interval));
             interval <<= 1;
             if (interval > Max)
@@ -58,8 +59,12 @@ LSTM_DETAIL_BEGIN
     struct yield
     {
         // noinline, cause yield on libc++ is inline, and calls a non-noexcept func
-        LSTM_NOINLINE_LUKEWARM void operator()() const noexcept { LSTM_THIS_CONTEXT::yield(); }
-        LSTM_ALWAYS_INLINE void     reset() const noexcept {}
+        LSTM_NOINLINE_LUKEWARM void operator()() const noexcept
+        {
+            LSTM_PERF_STATS_BACKOFFS();
+            LSTM_THIS_CONTEXT::yield();
+        }
+        LSTM_ALWAYS_INLINE void reset() const noexcept {}
     };
 
     using default_backoff = yield;
