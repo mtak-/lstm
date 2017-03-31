@@ -241,7 +241,9 @@ def get_assert(op, operands):
         return 'LSTM_ASSERT(%s);\n    ' % assert_kind[op].join(mems)
     return ''
 
-def get_contents(stats, compound_stats, op, operands):
+def get_contents(stats, compound_stats, stat_data):
+    op = stat_data['op']
+    operands = stat_data['operands']
     casted = map_get_mem_or_func_call(operands, stats, compound_stats)
     if op == '/':
         casted[-1] = 'float(%s)' % casted[-1]
@@ -251,7 +253,7 @@ def get_thread_record_mem_fun(compound_stat, stats, compound_stats, compound_sta
     _FORMAT_STRING = '''auto {NAME} const noexcept {{ return {CONTENTS}; }}'''
     return _FORMAT_STRING.format(
         NAME     = get_mem_fun_for_stat(compound_stat),
-        CONTENTS = get_contents(stats, compound_stats, *compound_stats_kinds[compound_stat]),
+        CONTENTS = get_contents(stats, compound_stats, compound_stats_kinds[compound_stat]),
     )
 
 def get_thread_record_mem_funs(stats, compound_stats, compound_stats_kinds):
@@ -276,8 +278,9 @@ def get_transaction_log_mem_fun_contents(stat, stats, stats_kinds, compound_stat
         else:
             assert(false)
     
-    op = compound_stats_kinds[stat][0]
-    operands = map(get_mem_fun_for_stat, compound_stats_kinds[stat][1])
+    stat_data = compound_stats_kinds[stat]
+    op = stat_data['op']
+    operands = map(get_mem_fun_for_stat, stat_data['operands'])
     if op == '/':
         operands[-1] = 'float(%s)' % operands[-1]
     return (' ' + op + ' ').join(operands)
@@ -315,99 +318,64 @@ def get_includes():
     return indent('''#include <lstm/detail/compiler.hpp>
 #include <lstm/detail/namespace_macros.hpp>''')
 
-def gen_stats():
-    stats_kinds = {
-        'user failures'    : 'counter',
-        'failures'         : 'counter',
-        'successes'        : 'counter',
-        'bloom collisions' : 'counter',
-        'bloom successes'  : 'counter',
-        'quiesces'         : 'counter',
-        'max write size'   : 'max',
-        'max read size'    : 'max',
-        'reads'            : 'sum',
-        'writes'           : 'sum',
-    }
+all_stats_kinds = {
+    'user failures'         : 'counter',
+    'failures'              : 'counter',
+    'successes'             : 'counter',
+    'bloom collisions'      : 'counter',
+    'bloom successes'       : 'counter',
+    'quiesces'              : 'counter',
+    'max write size'        : 'max',
+    'max read size'         : 'max',
+    'reads'                 : 'sum',
+    'writes'                : 'sum',
+    'transactions'          : {'op' : '+', 'operands': ['failures', 'successes']},
+    'internal failures'     : {'op' : '-', 'operands' : ['failures', 'user failures']},
+    'success rate'          : {'op' : '/', 'operands' : ['successes', 'transactions']},
+    'failure rate'          : {'op' : '/', 'operands' : ['failures', 'transactions']},
+    'internal failure rate' : {'op' : '/', 'operands' : ['internal failures', 'transactions']},
+    'user failure rate'     : {'op' : '/', 'operands' : ['user failures', 'transactions']},
+    'bloom checks'          : {'op' : '+', 'operands' : ['bloom successes', 'bloom collisions']},
+    'bloom collision rate'  : {'op' : '/', 'operands' : ['bloom collisions', 'bloom checks']},
+    'quiesce rate'          : {'op' : '/', 'operands' : ['quiesces', 'transactions']},
+    'average read size'     : {'op' : '/', 'operands' : ['reads', 'transactions']},
+    'average write size'    : {'op' : '/', 'operands' : ['writes', 'transactions']},
+}
 
-    stats = [
-        'reads',
-        'writes',
-        'max read size',
-        'max write size',
-        'quiesces',
-        'user failures',
-        'failures',
-        'successes',
-        'bloom collisions',
-        'bloom successes',
-    ]
-    assert(sorted(stats) == sorted(stats_kinds.keys()))
-
-    compound_stats_kinds = {
-        'transactions'          : ['+', ['failures', 'successes']],
-        'internal failures'     : ['-', ['failures', 'user failures']],
-        'success rate'          : ['/', ['successes', 'transactions']],
-        'failure rate'          : ['/', ['failures', 'transactions']],
-        'internal failure rate' : ['/', ['internal failures', 'transactions']],
-        'user failure rate'     : ['/', ['user failures', 'transactions']],
-        'bloom checks'          : ['+', ['bloom successes', 'bloom collisions']],
-        'bloom collision rate'  : ['/', ['bloom collisions', 'bloom checks']],
-        'quiesce rate'          : ['/', ['quiesces', 'transactions']],
-        'average read size'     : ['/', ['reads', 'transactions']],
-        'average write size'    : ['/', ['writes', 'transactions']],
-    }
-
-    compound_stats = [
-        'internal failures',
-        'transactions',
-        'success rate',
-        'failure rate',
-        'internal failure rate',
-        'user failure rate',
-        'bloom checks',
-        'bloom collision rate',
-        'quiesce rate',
-        'average read size',
-        'average write size',
-    ]
-    assert(sorted(compound_stats) == sorted(compound_stats_kinds.keys()))
-
-    all_stats = [
-        'transactions',
-        'success rate',
-        'failure rate',
-        'quiesce rate',
-        'average write size',
-        'average read size',
-        'max write size',
-        'max read size',
-        'bloom collision rate',
-        'reads',
-        'writes',
-        'quiesces',
-        'successes',
-        'failures',
-        'internal failure rate',
-        'user failure rate',
-        'internal failures',
-        'user failures',
-        'bloom collisions',
-        'bloom successes',
-        'bloom checks',
-    ]
+def gen_stats(
+    the_stats,
+    include_guard,
+    macro_prefix = '',
+    namespace_begin = '',
+    namespace_end = '',
+    namespace_access = '',
+    stat_output_ordering = [],
+    stats_member_ordering = [],
+    compound_stats_member_func_ordering = []
+    ):
+    stats = stats_member_ordering
+    stats += [k for k,v in the_stats.items() if type(v) == type('') and not k in stats]
+    compound_stats = compound_stats_member_func_ordering
+    compound_stats += [k for k,v in the_stats.items()
+                          if type(v) != type('') and not k in compound_stats]
+    
+    stats_kinds = {k:v for k,v in the_stats.items() if type(v) == type('')}
+    compound_stats_kinds = {k:v for k,v in the_stats.items() if type(v) != type('')}
+    
+    all_stats = stat_output_ordering
+    all_stats += [k for k in the_stats.keys() if not k in all_stats]
+    
     assert(sorted(all_stats) == sorted(compound_stats + stats))
-    _MACRO_PREFIX = 'LSTM_LOG_'
-    _NS_ACCESS = 'lstm::detail::'
 
-    print _STATS_TEMPLATE.format(
-        INCLUDE_GUARD = 'LSTM_DETAIL_TRANSACTION_LOG_HPP',
-        MACRO_PREFIX = _MACRO_PREFIX,
+    return _STATS_TEMPLATE.format(
+        INCLUDE_GUARD = include_guard,
+        MACRO_PREFIX = macro_prefix,
         INCLUDES = get_includes(),
-        NAMESPACE_BEGIN = 'LSTM_DETAIL_BEGIN',
-        NAMESPACE_END = 'LSTM_DETAIL_END',
-        NS_ACCESS = _NS_ACCESS,
-        MACROS_ON = indent(get_macros_on(stats, stats_kinds, _NS_ACCESS, _MACRO_PREFIX), 1),
-        MACROS_OFF = indent(get_macros_off(stats, stats_kinds, _MACRO_PREFIX), 1),
+        NAMESPACE_BEGIN = namespace_begin,
+        NAMESPACE_END = namespace_end,
+        NS_ACCESS = namespace_access,
+        MACROS_ON = indent(get_macros_on(stats, stats_kinds, namespace_access, macro_prefix), 1),
+        MACROS_OFF = indent(get_macros_off(stats, stats_kinds, macro_prefix), 1),
         THREAD_RECORD_MEMBERS = indent(get_thread_record_mems(stats, stats_kinds), 2),
         THREAD_RECORD_MEMBER_FUNCTIONS = indent(get_thread_record_mem_funs(stats,
                                                                            compound_stats,
@@ -422,9 +390,3 @@ def gen_stats():
                                                                                compound_stats_kinds), 2),
         TRANSACTION_LOG_STREAM_OUTPUT = indent(get_transaction_log_stream_output(all_stats), 4),
     )
-
-def main():
-    gen_stats()
-    
-if __name__ == '__main__':
-    main()
