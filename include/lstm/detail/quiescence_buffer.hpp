@@ -147,6 +147,7 @@ LSTM_DETAIL_BEGIN
 
         void shrink_to_fit() noexcept(has_noexcept_alloc) { throw "TODO"; }
 
+        // TODO: make this smaller
         bool finalize_epoch(const epoch_t epoch) noexcept(has_noexcept_alloc)
         {
             if (working_epoch_empty())
