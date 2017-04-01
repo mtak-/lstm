@@ -52,7 +52,7 @@ LSTM_DETAIL_BEGIN
         uword ring_begin;
 
         pointer buffer;
-        uword   capacity_;
+        uword   last_valid_index;
 
         using alloc_traits = std::allocator_traits<allocator_type>;
         static_assert(std::is_pointer<typename alloc_traits::pointer>{},
@@ -68,24 +68,24 @@ LSTM_DETAIL_BEGIN
 
         LSTM_NOINLINE void reserve_more() noexcept(has_noexcept_alloc)
         {
-            LSTM_ASSERT(is_power_of_two(capacity_));
+            LSTM_ASSERT(is_power_of_two(capacity()));
             LSTM_ASSERT((capacity() << 1) > capacity()); // zomg big transaction
             const pointer new_buffer = alloc().allocate(capacity() << 1);
             LSTM_ASSERT(new_buffer);
 
-            const uword first_chunk_size = capacity_ - ring_begin;
+            const uword first_chunk_size = capacity() - ring_begin;
             std::memcpy(new_buffer, buffer + ring_begin, sizeof(value_type) * first_chunk_size);
             std::memcpy(new_buffer + first_chunk_size, buffer, sizeof(value_type) * ring_begin);
 
             alloc().deallocate(buffer, capacity());
 
-            epoch_begin = wrap(epoch_begin - ring_begin);
-            write_pos   = capacity_;
-            capacity_ <<= 1;
-            ring_begin = 0;
-            buffer     = new_buffer;
+            epoch_begin      = wrap(epoch_begin - ring_begin);
+            write_pos        = capacity();
+            last_valid_index = (capacity() << 1) - 1;
+            ring_begin       = 0;
+            buffer           = new_buffer;
 
-            LSTM_ASSERT(is_power_of_two(capacity_));
+            LSTM_ASSERT(is_power_of_two(capacity()));
         }
 
         void initialize_header(const iterator iter, const uword prev_size) noexcept
@@ -102,7 +102,7 @@ LSTM_DETAIL_BEGIN
             , epoch_begin(0)
             , ring_begin(0)
             , buffer(this->alloc().allocate(ReclaimLimit * 2))
-            , capacity_(ReclaimLimit * 2)
+            , last_valid_index(ReclaimLimit * 2 - 1)
         {
             initialize_header(buffer, 0);
         }
@@ -117,10 +117,13 @@ LSTM_DETAIL_BEGIN
         }
 
         bool  empty() const noexcept { return size() == 1; }
-        uword capacity() const noexcept { return capacity_; }
-        bool  allocates_on_next_push() const noexcept { return size() + 1 == capacity(); }
-        bool  working_epoch_empty() const noexcept { return working_epoch_size() == 1; }
-        void  clear_working_epoch() noexcept
+        uword capacity() const noexcept { return last_valid_index + 1; }
+        bool  allocates_on_next_push() const noexcept
+        {
+            return wrap(write_pos - ring_begin) == last_valid_index;
+        }
+        bool working_epoch_empty() const noexcept { return working_epoch_size() == 1; }
+        void clear_working_epoch() noexcept
         {
             LSTM_ASSERT(size() >= working_epoch_size());
             write_pos = epoch_begin + 1;
@@ -136,7 +139,7 @@ LSTM_DETAIL_BEGIN
         }
 
         template<typename... Us>
-        void unchecked_emplace_back(Us&&... us) noexcept
+        LSTM_NOINLINE_LUKEWARM void unchecked_emplace_back(Us&&... us) noexcept
         {
             // if you hit this you probly forgot to check allocates_on_next_push
             LSTM_ASSERT(!allocates_on_next_push());
