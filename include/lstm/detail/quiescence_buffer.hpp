@@ -43,14 +43,13 @@ LSTM_DETAIL_BEGIN
         static_assert(std::is_pod<value_type>{}, "only works with POD types");
         static_assert(std::is_same<value_type, typename allocator_type::value_type>{}, "");
         static_assert(is_power_of_two(ReclaimLimit), "");
-        static_assert(ReclaimLimit > 1, "");
+        static_assert(ReclaimLimit > 2, "");
         static constexpr bool has_noexcept_alloc
             = noexcept(std::declval<Alloc&>().allocate(std::declval<uword>()));
 
-        uword    epoch_size_;
-        iterator epoch_begin_;
-        iterator ring_begin;
-        uword    ring_size;
+        uword write_pos;
+        uword epoch_begin;
+        uword ring_begin;
 
         pointer buffer;
         uword   capacity_;
@@ -62,26 +61,29 @@ LSTM_DETAIL_BEGIN
 
         inline allocator_type& alloc() noexcept { return *this; }
 
+        uword wrap(const uword index) const noexcept { return index & (capacity() - 1); }
+
+        uword size() const noexcept { return wrap(write_pos - ring_begin); }
+        uword working_epoch_size() const noexcept { return wrap(write_pos - epoch_begin); }
+
         LSTM_NOINLINE void reserve_more() noexcept(has_noexcept_alloc)
         {
             LSTM_ASSERT(is_power_of_two(capacity_));
-            LSTM_ASSERT(capacity() == size() + 1);
-            LSTM_ASSERT((capacity() << 1) > size()); // zomg big transaction
+            LSTM_ASSERT((capacity() << 1) > capacity()); // zomg big transaction
             const pointer new_buffer = alloc().allocate(capacity() << 1);
             LSTM_ASSERT(new_buffer);
 
-            const uword amount_to_copy = static_cast<uword>((buffer + capacity_) - ring_begin);
-            std::memcpy(new_buffer, ring_begin, sizeof(value_type) * amount_to_copy);
-            std::memcpy(new_buffer + amount_to_copy,
-                        buffer,
-                        sizeof(value_type) * (ring_size - amount_to_copy));
+            const uword first_chunk_size = capacity_ - ring_begin;
+            std::memcpy(new_buffer, buffer + ring_begin, sizeof(value_type) * first_chunk_size);
+            std::memcpy(new_buffer + first_chunk_size, buffer, sizeof(value_type) * ring_begin);
 
             alloc().deallocate(buffer, capacity());
 
+            epoch_begin = wrap(epoch_begin - ring_begin);
+            write_pos   = capacity_;
             capacity_ <<= 1;
-            ring_begin   = new_buffer;
-            buffer       = new_buffer;
-            epoch_begin_ = new_buffer + ring_size - epoch_size_;
+            ring_begin = 0;
+            buffer     = new_buffer;
 
             LSTM_ASSERT(is_power_of_two(capacity_));
         }
@@ -93,27 +95,16 @@ LSTM_DETAIL_BEGIN
             iter->header.size      = 1;
         }
 
-        iterator bump_iterator(const iterator iter) const noexcept
-        {
-            return buffer + (((iter + 1) - buffer) & (capacity() - 1));
-        }
-
-        iterator bump_iterator(const iterator iter, const int amount) const noexcept
-        {
-            return buffer + (((iter + amount) - buffer) & (capacity() - 1));
-        }
-
     public:
         quiescence_buffer(const allocator_type& alloc = {}) noexcept(has_noexcept_alloc)
             : allocator_type(alloc)
-            , epoch_begin_(this->alloc().allocate(ReclaimLimit * 2))
-            , ring_begin(epoch_begin_)
-            , ring_size(1)
-            , buffer(epoch_begin_)
+            , write_pos(1)
+            , epoch_begin(0)
+            , ring_begin(0)
+            , buffer(this->alloc().allocate(ReclaimLimit * 2))
             , capacity_(ReclaimLimit * 2)
         {
-            initialize_header(epoch_begin_, 0);
-            epoch_size_ = 1;
+            initialize_header(buffer, 0);
         }
 
         quiescence_buffer(const quiescence_buffer&) = delete;
@@ -125,26 +116,22 @@ LSTM_DETAIL_BEGIN
             alloc().deallocate(buffer, capacity());
         }
 
-        bool  empty() const noexcept { return ring_size == 1; }
-        uword size() const noexcept { return ring_size - 1; }
+        bool  empty() const noexcept { return size() == 1; }
         uword capacity() const noexcept { return capacity_; }
-        bool  allocates_on_next_push() const noexcept { return ring_size + 1 == capacity(); }
-        bool  working_epoch_empty() const noexcept { return epoch_size_ == 1; }
+        bool  allocates_on_next_push() const noexcept { return size() + 1 == capacity(); }
+        bool  working_epoch_empty() const noexcept { return working_epoch_size() == 1; }
         void  clear_working_epoch() noexcept
         {
-            LSTM_ASSERT(ring_size >= epoch_size_);
-            ring_size   = ring_size - epoch_size_ + 1;
-            epoch_size_ = 1;
+            LSTM_ASSERT(size() >= working_epoch_size());
+            write_pos = epoch_begin + 1;
         }
 
         template<typename... Us>
         void emplace_back(Us&&... us) noexcept(has_noexcept_alloc)
         {
-            const iterator cur = bump_iterator(epoch_begin_, epoch_size_);
+            const iterator cur = buffer + wrap(write_pos++);
             ::new (&cur->callback) gp_callback((Us &&) us...);
-            ++epoch_size_;
-            ++ring_size;
-            if (LSTM_UNLIKELY(ring_size == capacity()))
+            if (LSTM_UNLIKELY(wrap(write_pos) == ring_begin))
                 reserve_more();
         }
 
@@ -154,10 +141,8 @@ LSTM_DETAIL_BEGIN
             // if you hit this you probly forgot to check allocates_on_next_push
             LSTM_ASSERT(!allocates_on_next_push());
 
-            const iterator cur = bump_iterator(epoch_begin_, epoch_size_);
+            const iterator cur = buffer + wrap(write_pos++);
             ::new (&cur->callback) gp_callback((Us &&) us...);
-            ++epoch_size_;
-            ++ring_size;
         }
 
         void shrink_to_fit() noexcept(has_noexcept_alloc) { throw "TODO"; }
@@ -167,53 +152,52 @@ LSTM_DETAIL_BEGIN
             if (working_epoch_empty())
                 return false;
 
-            LSTM_ASSERT(epoch_size_ > 1);
+            LSTM_ASSERT(working_epoch_size() > 1);
 
-            epoch_begin_->header.epoch = epoch;
-            epoch_begin_->header.size  = epoch_size_;
+            const iterator epoch_begin_iter = buffer + epoch_begin;
+            epoch_begin_iter->header.epoch  = epoch;
+            epoch_begin_iter->header.size   = working_epoch_size();
 
-            const uword prev_size = epoch_size_;
-            epoch_begin_          = bump_iterator(epoch_begin_, epoch_size_);
-            initialize_header(epoch_begin_, prev_size);
-            epoch_size_ = 1;
-            ++ring_size;
-            if (LSTM_UNLIKELY(ring_size == capacity()))
+            const uword prev_size = working_epoch_size();
+            epoch_begin           = wrap(write_pos);
+            initialize_header(buffer + epoch_begin, prev_size);
+            ++write_pos;
+            if (LSTM_UNLIKELY(wrap(write_pos) == ring_begin))
                 reserve_more();
 
-            return ring_size >= ReclaimLimit;
+            return size() >= ReclaimLimit;
         }
 
         void do_first_epoch_callbacks() noexcept
         {
             LSTM_ASSERT(working_epoch_empty());
-            LSTM_ASSERT(ring_size > 1);
-            LSTM_ASSERT(ring_begin->header.size > 1);
-            LSTM_ASSERT(ring_size > ring_begin->header.size);
+            LSTM_ASSERT(size() > 1);
+            LSTM_ASSERT(buffer[ring_begin].header.size > 1);
+            LSTM_ASSERT(size() > buffer[ring_begin].header.size);
 
-            iterator    iter     = ring_begin;
-            const uword cur_size = iter->header.size;
+            uword       cur_idx  = ring_begin;
+            const uword cur_size = (buffer + cur_idx)->header.size;
 
-            const iterator end = bump_iterator(iter, cur_size);
-            for (iter = bump_iterator(iter); iter != end; iter = bump_iterator(iter))
-                iter->callback();
-            ring_begin = iter;
-            ring_size -= cur_size;
+            const uword end = cur_idx + cur_size;
+            for (++cur_idx; cur_idx != end; ++cur_idx)
+                (buffer + wrap(cur_idx))->callback();
+            ring_begin = wrap(cur_idx);
 
-            LSTM_ASSERT(ring_begin->header.prev_size == cur_size);
+            LSTM_ASSERT(buffer[ring_begin].header.prev_size == cur_size);
         }
 
         epoch_t back_epoch() const noexcept
         {
             LSTM_ASSERT(!empty());
             const const_iterator iter
-                = bump_iterator(epoch_begin_, -epoch_begin_->header.prev_size);
+                = buffer + wrap(epoch_begin - (buffer + epoch_begin)->header.prev_size);
             return iter->header.epoch;
         }
 
         epoch_t front_epoch() const noexcept
         {
             LSTM_ASSERT(!empty());
-            return ring_begin->header.epoch;
+            return (buffer + ring_begin)->header.epoch;
         }
     };
 LSTM_DETAIL_END
