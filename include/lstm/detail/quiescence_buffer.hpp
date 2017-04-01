@@ -1,9 +1,8 @@
 #ifndef LSTM_DETAIL_QUIESCENCE_BUFFER_HPP
 #define LSTM_DETAIL_QUIESCENCE_BUFFER_HPP
 
-#include <lstm/detail/backoff.hpp>
 #include <lstm/detail/gp_callback.hpp>
-#include <lstm/detail/pod_vector.hpp>
+#include <lstm/detail/pod_mallocator.hpp>
 
 LSTM_DETAIL_BEGIN
     struct quiescence_header

@@ -1,8 +1,8 @@
 #ifndef LSTM_THREAD_DATA_HPP
 #define LSTM_THREAD_DATA_HPP
 
-#include <lstm/detail/gp_callback.hpp>
 #include <lstm/detail/pod_hash_set.hpp>
+#include <lstm/detail/pod_vector.hpp>
 #include <lstm/detail/quiescence_buffer.hpp>
 #include <lstm/detail/read_set_value_type.hpp>
 #include <lstm/detail/thread_synchronization.hpp>
