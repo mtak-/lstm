@@ -44,11 +44,7 @@ LSTM_DETAIL_BEGIN
         // x86: likely compiles to xor
         static inline void unlock(var_base& v) noexcept
         {
-            const epoch_t locked_version = v.version_lock.load(LSTM_RELAXED);
-
-            LSTM_ASSERT(locked(locked_version));
-
-            v.version_lock.store(locked_version ^ lock_bit, LSTM_RELEASE);
+            unlock_as_version(v, v.version_lock.load(LSTM_RELAXED) ^ lock_bit);
         }
 
         LSTM_NOINLINE static void
