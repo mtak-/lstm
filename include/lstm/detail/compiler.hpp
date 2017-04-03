@@ -321,6 +321,16 @@
 #  endif
 /******************** end pure ********************/
 
+/******************** TSX/TLE *********************/
+#  ifndef LSTM_NO_HTM
+#    if defined(__GNUC__) && defined(__x86_64__)
+       /* GCC-compatible compiler, targeting x86/x86-64 */
+#      include <immintrin.h>
+#      define LSTM_HTM_ON
+#    endif
+#  endif
+/******************** TSX/TLE *********************/
+
 #endif
 // clang-format off
 
