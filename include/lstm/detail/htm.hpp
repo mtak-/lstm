@@ -95,7 +95,7 @@ LSTM_DETAIL_BEGIN
             return static_cast<bool>(ret);
         }
 
-        inline bool _cas_acquire(uint64_t* ptr, uint64_t oldVal, uint64_t newVal)
+        inline bool _cas_acquire(unsigned long* ptr, uint64_t oldVal, uint64_t newVal)
         {
             unsigned char ret;
             __asm__ __volatile__("  xacquire\n"
@@ -105,10 +105,10 @@ LSTM_DETAIL_BEGIN
                                  : "=q"(ret), "=m"(*ptr)
                                  : "r"(newVal), "m"(*ptr), "a"(oldVal)
                                  : "memory");
-            return static_cast<bool>(ret);
+            return !static_cast<bool>(ret);
         }
 
-        inline bool _cas_acquire(uint32_t* ptr, uint32_t oldVal, uint32_t newVal)
+        inline bool _cas_acquire(unsigned int* ptr, uint32_t oldVal, uint32_t newVal)
         {
             unsigned char ret;
             __asm__ __volatile__("  xacquire\n"
@@ -118,7 +118,7 @@ LSTM_DETAIL_BEGIN
                                  : "=q"(ret), "=m"(*ptr)
                                  : "r"(newVal), "m"(*ptr), "a"(oldVal)
                                  : "memory");
-            return static_cast<bool>(ret);
+            return !static_cast<bool>(ret);
         }
 #endif /* defined(__x86_64__) && defined(__GNUC__) */
 #endif /* LSTM_HTM_ON */
@@ -130,7 +130,7 @@ LSTM_DETAIL_BEGIN
                                            std::memory_order      m,
                                            std::memory_order      n) noexcept
         {
-#if defined(LSTM_TSX_ON) && defined(__x86_64__) && defined(__GNUC__)
+#if defined(LSTM_HTM_ON) && defined(__x86_64__) && defined(__GNUC__)
             (void)m;
             (void)n;
             if (sizeof(std::atomic<Integral>) == sizeof(Integral))
@@ -146,7 +146,7 @@ LSTM_DETAIL_BEGIN
                                            std::memory_order      m,
                                            std::memory_order      n) noexcept
         {
-#if defined(LSTM_TSX_ON) && defined(__x86_64__) && defined(__GNUC__)
+#if defined(LSTM_HTM_ON) && defined(__x86_64__) && defined(__GNUC__)
             (void)m;
             (void)n;
             if (sizeof(std::atomic<Integral>) == sizeof(Integral))
@@ -162,7 +162,7 @@ LSTM_DETAIL_BEGIN
                                          std::memory_order      m,
                                          std::memory_order      n) noexcept
         {
-#if defined(LSTM_TSX_ON) && defined(__x86_64__) && defined(__GNUC__)
+#if defined(LSTM_HTM_ON) && defined(__x86_64__) && defined(__GNUC__)
             (void)m;
             (void)n;
             if (sizeof(std::atomic<Integral>) == sizeof(Integral))
@@ -178,7 +178,7 @@ LSTM_DETAIL_BEGIN
                                          std::memory_order      m,
                                          std::memory_order      n) noexcept
         {
-#if defined(LSTM_TSX_ON) && defined(__x86_64__) && defined(__GNUC__)
+#if defined(LSTM_HTM_ON) && defined(__x86_64__) && defined(__GNUC__)
             (void)m;
             (void)n;
             if (sizeof(std::atomic<Integral>) == sizeof(Integral))

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1)
 
-project(LSTM CXX)
+project(LSTM)
 
 enable_testing()
 include(CTest)
