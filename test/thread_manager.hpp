@@ -3,6 +3,8 @@
 
 #include <lstm/thread_data.hpp>
 
+#include "statsd_client.hpp"
+
 // clang-format off
 #ifndef LSTM_USE_BOOST_FIBERS
     #include <thread>
@@ -77,7 +79,11 @@ public:
 
     ~thread_manager()
     {
+#if defined(LSTM_STATSD_AVAILABLE) && defined(LSTM_PERF_STATS_ON) && defined(NDEBUG)
+        statsd_client::dump_log();
+#else
         LSTM_PERF_STATS_DUMP();
+#endif
         LSTM_PERF_STATS_CLEAR();
     }
 };

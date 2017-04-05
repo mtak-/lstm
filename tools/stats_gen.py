@@ -84,6 +84,55 @@ stat_output_ordering = [
 
 include_guard = 'LSTM_DETAIL_PERF_STATS_HPP'
 
+_STATSD_TEMPLATE = '''#ifndef LSTM_TEST_STATSD_CLIENT_HPP
+#define LSTM_TEST_STATSD_CLIENT_HPP
+
+#include <lstm/lstm.hpp>
+
+#if defined(LSTM_STATSD_AVAILABLE) && defined(LSTM_PERF_STATS_ON) && defined(NDEBUG)
+
+extern "C" {{
+#include <statsd-client.h>
+}}
+
+struct statsd_client
+{{
+private:
+    statsd_link* link;
+
+    statsd_client()
+    {{
+        link = statsd_init("127.0.0.1", 8125);
+        LSTM_ASSERT(link);
+    }}
+    ~statsd_client() {{ statsd_finalize(link); }}
+
+    static statsd_client& get()
+    {{
+        static statsd_client client;
+        return client;
+    }}
+
+public:
+    static void dump_log()
+    {{
+        statsd_link*              link  = get().link;
+        lstm::detail::perf_stats& stats = lstm::detail::perf_stats::get();
+{STATSD_OUTPUT}
+    }}
+}};
+
+#else /* defined(LSTM_STATSD_AVAILABLE) && defined(LSTM_PERF_STATS_ON) && defined(NDEBUG) */
+
+struct statsd_client
+{{
+    static constexpr void dump_log() noexcept {{}}
+}};
+
+#endif /* defined(LSTM_STATSD_AVAILABLE) && defined(LSTM_PERF_STATS_ON) && defined(NDEBUG) */
+
+#endif /* LSTM_TEST_STATSD_CLIENT_HPP */'''
+
 def main():
     p = os.path.realpath(os.path.join(os.path.dirname(__file__), '../include/lstm/detail/perf_stats.hpp'))
     f = open(p, 'w')
@@ -95,10 +144,28 @@ def main():
         namespace_access = 'lstm::detail::',
         namespace_begin = 'LSTM_DETAIL_BEGIN',
         namespace_end = 'LSTM_DETAIL_END',
+        includes = '''#include <lstm/detail/compiler.hpp>
+#include <lstm/detail/namespace_macros.hpp>''',
         stat_output_ordering = stat_output_ordering,
         stats_member_ordering = stats_member_ordering,
         compound_stats_member_func_ordering = compound_stats_member_func_ordering,
     ))
+    f.close()
+    p = os.path.realpath(os.path.join(os.path.dirname(__file__), '../test/statsd_client.hpp'))
+    f = open(p, 'w')
+    f.write(_STATSD_TEMPLATE.format(STATSD_OUTPUT = sgl.gen_statsd_output(
+        stats,
+        include_guard,
+        class_name = 'perf_stats',
+        macro_prefix = 'LSTM_PERF_STATS_',
+        namespace_access = 'lstm::detail::',
+        namespace_begin = 'LSTM_DETAIL_BEGIN',
+        namespace_end = 'LSTM_DETAIL_END',
+        stat_output_ordering = stat_output_ordering,
+        stats_member_ordering = stats_member_ordering,
+        compound_stats_member_func_ordering = compound_stats_member_func_ordering,
+    )))
+    f.close()
     
 if __name__ == '__main__':
     main()

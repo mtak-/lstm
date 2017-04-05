@@ -332,39 +332,12 @@ def get_singleton_class_stream_output(all_stats):
     return '\n'.join(['<< "' + name + '" << ' + value + ' << \'\\n\''
                         for name, value in zip(names, values)])
 
-def get_includes():
-    return indent('''#include <lstm/detail/compiler.hpp>
-#include <lstm/detail/namespace_macros.hpp>''')
-
-all_stats_kinds = {
-    'user failures'         : 'counter',
-    'failures'              : 'counter',
-    'successes'             : 'counter',
-    'bloom collisions'      : 'counter',
-    'bloom successes'       : 'counter',
-    'quiesces'              : 'counter',
-    'max write size'        : 'max',
-    'max read size'         : 'max',
-    'reads'                 : 'sum',
-    'writes'                : 'sum',
-    'transactions'          : {'op' : '+', 'operands': ['failures', 'successes']},
-    'internal failures'     : {'op' : '-', 'operands' : ['failures', 'user failures']},
-    'success rate'          : {'op' : '/', 'operands' : ['successes', 'transactions']},
-    'failure rate'          : {'op' : '/', 'operands' : ['failures', 'transactions']},
-    'internal failure rate' : {'op' : '/', 'operands' : ['internal failures', 'transactions']},
-    'user failure rate'     : {'op' : '/', 'operands' : ['user failures', 'transactions']},
-    'bloom checks'          : {'op' : '+', 'operands' : ['bloom successes', 'bloom collisions']},
-    'bloom collision rate'  : {'op' : '/', 'operands' : ['bloom collisions', 'bloom checks']},
-    'quiesce rate'          : {'op' : '/', 'operands' : ['quiesces', 'transactions']},
-    'average read size'     : {'op' : '/', 'operands' : ['reads', 'transactions']},
-    'average write size'    : {'op' : '/', 'operands' : ['writes', 'transactions']},
-}
-
 def gen_stats(
     the_stats,
     include_guard,
     class_name = 'perf_stats',
     macro_prefix = '',
+    includes = '',
     namespace_begin = '',
     namespace_end = '',
     namespace_access = '',
@@ -389,7 +362,7 @@ def gen_stats(
     return _STATS_TEMPLATE.format(
         INCLUDE_GUARD = include_guard,
         MACRO_PREFIX = macro_prefix,
-        INCLUDES = get_includes(),
+        INCLUDES = indent(includes),
         CLASS_NAME = class_name,
         NAMESPACE_BEGIN = namespace_begin,
         NAMESPACE_END = namespace_end,
@@ -411,3 +384,64 @@ def gen_stats(
                                                                                compound_stats_kinds), 2),
         TRANSACTION_LOG_STREAM_OUTPUT = indent(get_singleton_class_stream_output(all_stats), 4),
     )
+    
+def get_stats_func(stat, compound_stats, compound_stats_kinds):
+    if stat in compound_stats:
+        if compound_stats_kinds[stat]['op'] == '/':
+            return 'statsd_gauged'
+    return 'statsd_gauge'
+
+def get_singleton_statsd_output(all_stats, compound_stats, compound_stats_kinds):
+    _FORMAT_NAME = 'const_cast<char*>(LSTM_TESTNAME ".process.{NAME}")'
+    stats_funcs = [get_stats_func(s, compound_stats, compound_stats_kinds) for s in all_stats]
+    names = [_FORMAT_NAME.format(NAME = get_mem_name(s)) for s in all_stats]
+    values = ['stats.' + get_mem_fun_for_stat(s) for s in all_stats]
+    return '\n'.join([stats_func + '(link, ' + name + ', ' + value + ');'
+                        for stats_func, name, value in zip(stats_funcs, names, values)])
+
+def get_thread_record_statsd_output(all_stats, stats, compound_stats, compound_stats_kinds):
+    _FORMAT_NAME = 'const_cast<char*>((std::string{{LSTM_TESTNAME}} + ".thread" + std::to_string(i) + ".{NAME}").c_str())'
+    stats_funcs = [get_stats_func(s, compound_stats, compound_stats_kinds) for s in all_stats]
+    names = [_FORMAT_NAME.format(NAME = get_mem_name(s)) for s in all_stats]
+    values = ['record.' + get_mem_or_func_call(s, stats, compound_stats) for s in all_stats]
+    
+    header = '''
+int i = 0;
+for (auto& record : stats.records()) {{'''
+    body = indent('\n'.join([stats_func + '(link, ' + name + ', ' + value + ');'
+                        for stats_func, name, value in zip(stats_funcs, names, values)]))
+    footer = '''    ++i;
+}}'''
+    return '\n'.join([header, body, footer])
+
+def gen_statsd_output(
+    the_stats,
+    include_guard,
+    class_name = 'perf_stats',
+    macro_prefix = '',
+    namespace_begin = '',
+    namespace_end = '',
+    namespace_access = '',
+    stat_output_ordering = [],
+    stats_member_ordering = [],
+    compound_stats_member_func_ordering = []
+    ):
+    stats = stats_member_ordering
+    stats += [k for k,v in the_stats.items() if type(v) == type('') and not k in stats]
+    compound_stats = compound_stats_member_func_ordering
+    compound_stats += [k for k,v in the_stats.items()
+                          if type(v) != type('') and not k in compound_stats]
+    
+    stats_kinds = {k:v for k,v in the_stats.items() if type(v) == type('')}
+    compound_stats_kinds = {k:v for k,v in the_stats.items() if type(v) != type('')}
+    
+    all_stats = stat_output_ordering
+    all_stats += [k for k in the_stats.keys() if not k in all_stats]
+    
+    assert(sorted(all_stats) == sorted(compound_stats + stats))
+    
+    result = '\n'.join([
+        get_singleton_statsd_output(all_stats, compound_stats, compound_stats_kinds),
+        get_thread_record_statsd_output(all_stats, stats, compound_stats, compound_stats_kinds)])
+    return indent(result, 2)
+    

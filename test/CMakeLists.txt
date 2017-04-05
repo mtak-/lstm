@@ -1,44 +1,34 @@
+function(make_test t)
+    add_executable(${t} ${t}.cpp)
+    target_compile_definitions(${t} PRIVATE LSTM_TESTNAME="${t}")
+    add_test(test.${t} ${t})
+    conditional_link_statsd(${t})
+endfunction()
+
 add_subdirectory(include)
 add_subdirectory(multi_file_test)
 add_subdirectory(rbtree_tests)
 
-add_executable(var var.cpp)
-add_test(test.var var)
-
-add_executable(transaction transaction.cpp)
-add_test(test.transaction transaction)
-
-add_executable(dining_philosophers dining_philosophers.cpp)
-add_test(test.dining_philosophers dining_philosophers)
-
-add_executable(nesting nesting.cpp)
-add_test(test.nesting nesting)
-
-add_executable(transfer_funds transfer_funds.cpp)
-add_test(test.transfer_funds transfer_funds)
-
-add_executable(list list.cpp)
-add_test(test.list list)
-
-add_executable(thread_data_synchronization thread_data_synchronization.cpp)
-add_test(test.thread_data_synchronization thread_data_synchronization)
-
-add_executable(exception exception.cpp)
-add_test(test.exception exception)
-
-# add_executable(destructor_transaction destructor_transaction.cpp)
-# add_test(test.destructor_transaction destructor_transaction)
-
-add_executable(delete_var_and_modify delete_var_and_modify.cpp)
-add_test(test.delete_var_and_modify delete_var_and_modify)
-
-add_executable(throwing_constructor throwing_constructor.cpp)
-add_test(test.throwing_constructor throwing_constructor)
+make_test(var)
+make_test(transaction)
+make_test(dining_philosophers)
+make_test(nesting)
+make_test(transfer_funds)
+make_test(list)
+make_test(thread_data_synchronization)
+make_test(exception)
+make_test(delete_var_and_modify)
+make_test(throwing_constructor)
 
 find_package(Boost 1.62.0 OPTIONAL_COMPONENTS context fiber)
-if(Boost_FOUND)
-  include_directories(${Boost_INCLUDE_DIRS})
-  add_executable(fiber_support fiber_support.cpp)
-  add_test(test.fiber_support fiber_support)
-  target_link_libraries(fiber_support ${Boost_LIBRARIES})
+if (Boost_FOUND)
+    include_directories(${Boost_INCLUDE_DIRS})
+    add_executable(fiber_support fiber_support.cpp)
+    add_test(test.fiber_support fiber_support)
+    target_compile_definitions(fiber_support PRIVATE LSTM_TESTNAME="fiber_support")
+    if (STATSD)
+        target_link_libraries(fiber_support ${Boost_LIBRARIES} statsd_client)
+    else()
+        target_link_libraries(fiber_support ${Boost_LIBRARIES})
+    endif()
 endif()
