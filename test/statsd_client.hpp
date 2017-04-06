@@ -28,7 +28,7 @@ private:
     }
 
 public:
-    static void dump_log()
+    LSTM_NOINLINE static void dump_log()
     {
         statsd_link*              link  = get().link;
         lstm::detail::perf_stats& stats = lstm::detail::perf_stats::get();
@@ -96,142 +96,117 @@ public:
         for (auto& record : stats.records()) {
             {
                 statsd_gauge(link,
-                             const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                + std::to_string(i)
-                                                + ".transactions")
-                                                   .c_str()),
+                             const_cast<char*>(
+                                 (LSTM_TESTNAME ".thread" + std::to_string(i) + ".transactions")
+                                     .c_str()),
                              record.transactions());
                 statsd_gauged(link,
-                              const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                 + std::to_string(i)
-                                                 + ".success_rate")
-                                                    .c_str()),
+                              const_cast<char*>(
+                                  (LSTM_TESTNAME ".thread" + std::to_string(i) + ".success_rate")
+                                      .c_str()),
                               record.success_rate());
                 statsd_gauged(link,
-                              const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                 + std::to_string(i)
-                                                 + ".failure_rate")
-                                                    .c_str()),
+                              const_cast<char*>(
+                                  (LSTM_TESTNAME ".thread" + std::to_string(i) + ".failure_rate")
+                                      .c_str()),
                               record.failure_rate());
                 statsd_gauged(link,
-                              const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                 + std::to_string(i)
-                                                 + ".quiesce_rate")
-                                                    .c_str()),
+                              const_cast<char*>(
+                                  (LSTM_TESTNAME ".thread" + std::to_string(i) + ".quiesce_rate")
+                                      .c_str()),
                               record.quiesce_rate());
                 statsd_gauged(link,
-                              const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                 + std::to_string(i)
-                                                 + ".backoff_rate")
-                                                    .c_str()),
+                              const_cast<char*>(
+                                  (LSTM_TESTNAME ".thread" + std::to_string(i) + ".backoff_rate")
+                                      .c_str()),
                               record.backoff_rate());
                 statsd_gauged(link,
-                              const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                 + std::to_string(i)
+                              const_cast<char*>((LSTM_TESTNAME ".thread" + std::to_string(i)
                                                  + ".average_write_size")
                                                     .c_str()),
                               record.average_write_size());
                 statsd_gauged(link,
-                              const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                 + std::to_string(i)
+                              const_cast<char*>((LSTM_TESTNAME ".thread" + std::to_string(i)
                                                  + ".average_read_size")
                                                     .c_str()),
                               record.average_read_size());
                 statsd_gauge(link,
-                             const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                + std::to_string(i)
-                                                + ".max_write_size")
-                                                   .c_str()),
+                             const_cast<char*>(
+                                 (LSTM_TESTNAME ".thread" + std::to_string(i) + ".max_write_size")
+                                     .c_str()),
                              record.max_write_size);
                 statsd_gauge(link,
-                             const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                + std::to_string(i)
-                                                + ".max_read_size")
-                                                   .c_str()),
+                             const_cast<char*>(
+                                 (LSTM_TESTNAME ".thread" + std::to_string(i) + ".max_read_size")
+                                     .c_str()),
                              record.max_read_size);
                 statsd_gauged(link,
-                              const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                 + std::to_string(i)
+                              const_cast<char*>((LSTM_TESTNAME ".thread" + std::to_string(i)
                                                  + ".bloom_collision_rate")
                                                     .c_str()),
                               record.bloom_collision_rate());
                 statsd_gauge(link,
-                             const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                + std::to_string(i)
-                                                + ".reads")
-                                                   .c_str()),
+                             const_cast<char*>(
+                                 (LSTM_TESTNAME ".thread" + std::to_string(i) + ".reads").c_str()),
                              record.reads);
                 statsd_gauge(link,
-                             const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                + std::to_string(i)
-                                                + ".writes")
-                                                   .c_str()),
+                             const_cast<char*>(
+                                 (LSTM_TESTNAME ".thread" + std::to_string(i) + ".writes").c_str()),
                              record.writes);
                 statsd_gauge(link,
-                             const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                + std::to_string(i)
-                                                + ".quiesces")
-                                                   .c_str()),
+                             const_cast<char*>(
+                                 (LSTM_TESTNAME ".thread" + std::to_string(i) + ".quiesces")
+                                     .c_str()),
                              record.quiesces);
                 statsd_gauge(link,
-                             const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                + std::to_string(i)
-                                                + ".backoffs")
-                                                   .c_str()),
+                             const_cast<char*>(
+                                 (LSTM_TESTNAME ".thread" + std::to_string(i) + ".backoffs")
+                                     .c_str()),
                              record.backoffs);
                 statsd_gauge(link,
-                             const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                + std::to_string(i)
-                                                + ".successes")
-                                                   .c_str()),
+                             const_cast<char*>(
+                                 (LSTM_TESTNAME ".thread" + std::to_string(i) + ".successes")
+                                     .c_str()),
                              record.successes);
                 statsd_gauge(link,
-                             const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                + std::to_string(i)
-                                                + ".failures")
-                                                   .c_str()),
+                             const_cast<char*>(
+                                 (LSTM_TESTNAME ".thread" + std::to_string(i) + ".failures")
+                                     .c_str()),
                              record.failures);
                 statsd_gauged(link,
-                              const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                 + std::to_string(i)
+                              const_cast<char*>((LSTM_TESTNAME ".thread" + std::to_string(i)
                                                  + ".internal_failure_rate")
                                                     .c_str()),
                               record.internal_failure_rate());
                 statsd_gauged(link,
-                              const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                 + std::to_string(i)
+                              const_cast<char*>((LSTM_TESTNAME ".thread" + std::to_string(i)
                                                  + ".user_failure_rate")
                                                     .c_str()),
                               record.user_failure_rate());
                 statsd_gauge(link,
-                             const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                + std::to_string(i)
+                             const_cast<char*>((LSTM_TESTNAME ".thread" + std::to_string(i)
                                                 + ".internal_failures")
                                                    .c_str()),
                              record.internal_failures());
                 statsd_gauge(link,
-                             const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                + std::to_string(i)
-                                                + ".user_failures")
-                                                   .c_str()),
+                             const_cast<char*>(
+                                 (LSTM_TESTNAME ".thread" + std::to_string(i) + ".user_failures")
+                                     .c_str()),
                              record.user_failures);
                 statsd_gauge(link,
-                             const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                + std::to_string(i)
-                                                + ".bloom_collisions")
-                                                   .c_str()),
+                             const_cast<char*>(
+                                 (LSTM_TESTNAME ".thread" + std::to_string(i) + ".bloom_collisions")
+                                     .c_str()),
                              record.bloom_collisions);
                 statsd_gauge(link,
-                             const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                + std::to_string(i)
-                                                + ".bloom_successes")
-                                                   .c_str()),
+                             const_cast<char*>(
+                                 (LSTM_TESTNAME ".thread" + std::to_string(i) + ".bloom_successes")
+                                     .c_str()),
                              record.bloom_successes);
                 statsd_gauge(link,
-                             const_cast<char*>((std::string{LSTM_TESTNAME} + ".thread"
-                                                + std::to_string(i)
-                                                + ".bloom_checks")
-                                                   .c_str()),
+                             const_cast<char*>(
+                                 (LSTM_TESTNAME ".thread" + std::to_string(i) + ".bloom_checks")
+                                     .c_str()),
                              record.bloom_checks());
                 ++i;
             }

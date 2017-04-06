@@ -400,7 +400,7 @@ def get_singleton_statsd_output(all_stats, compound_stats, compound_stats_kinds)
                         for stats_func, name, value in zip(stats_funcs, names, values)])
 
 def get_thread_record_statsd_output(all_stats, stats, compound_stats, compound_stats_kinds):
-    _FORMAT_NAME = 'const_cast<char*>((std::string{{LSTM_TESTNAME}} + ".thread" + std::to_string(i) + ".{NAME}").c_str())'
+    _FORMAT_NAME = 'const_cast<char*>((LSTM_TESTNAME ".thread" + std::to_string(i) + ".{NAME}").c_str())'
     stats_funcs = [get_stats_func(s, compound_stats, compound_stats_kinds) for s in all_stats]
     names = [_FORMAT_NAME.format(NAME = get_mem_name(s)) for s in all_stats]
     values = ['record.' + get_mem_or_func_call(s, stats, compound_stats) for s in all_stats]

@@ -15,7 +15,7 @@ stats = {
     'max read size'         : 'max',
     'reads'                 : 'sum',
     'writes'                : 'sum',
-    'transactions'          : {'op' : '+', 'operands': ['failures', 'successes']},
+    'transactions'          : {'op' : '+', 'operands' : ['failures', 'successes']},
     'internal failures'     : {'op' : '-', 'operands' : ['failures', 'user failures']},
     'success rate'          : {'op' : '/', 'operands' : ['successes', 'transactions']},
     'failure rate'          : {'op' : '/', 'operands' : ['failures', 'transactions']},
@@ -114,7 +114,7 @@ private:
     }}
 
 public:
-    static void dump_log()
+    LSTM_NOINLINE static void dump_log()
     {{
         statsd_link*              link  = get().link;
         lstm::detail::perf_stats& stats = lstm::detail::perf_stats::get();
