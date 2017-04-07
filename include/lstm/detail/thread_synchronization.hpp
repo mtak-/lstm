@@ -2,6 +2,7 @@
 #define LSTM_DETAIL_THREAD_SYNCHRONIZATION_HPP
 
 #include <lstm/detail/fast_rw_mutex.hpp>
+#include <lstm/detail/pod_vector.hpp>
 
 LSTM_DETAIL_BEGIN
     using mutex_type = fast_rw_mutex;
@@ -21,8 +22,8 @@ LSTM_DETAIL_BEGIN
     template<std::size_t CacheLineOffset>
     struct thread_synchronization_list
     {
-        LSTM_CACHE_ALIGNED mutex_type                 mut{};
-        thread_synchronization_node<CacheLineOffset>* root{nullptr};
+        LSTM_CACHE_ALIGNED mutex_type                                   mut{};
+        pod_vector<const thread_synchronization_node<CacheLineOffset>*> nodes;
     };
 
     template<std::size_t                         CacheLineOffset>
@@ -50,56 +51,42 @@ LSTM_DETAIL_BEGIN
             char                 padding3_[LSTM_CACHE_LINE_SIZE];
         };
 
-        union
-        {
-            thread_synchronization_node* next;
-            char                         padding2_[LSTM_CACHE_LINE_SIZE];
-        };
-
         static void lock_all() noexcept
         {
             global_synchronization_list<CacheLineOffset>.mut.lock();
 
-            thread_synchronization_node* current
-                = global_synchronization_list<CacheLineOffset>.root;
-            while (current) {
-                current->mut.lock();
-                current = current->next;
-            }
+            for (const thread_synchronization_node* node :
+                 global_synchronization_list<CacheLineOffset>.nodes)
+                node->mut.lock();
         }
 
         static void unlock_all() noexcept
         {
-            thread_synchronization_node* current
-                = global_synchronization_list<CacheLineOffset>.root;
-            while (current) {
-                current->mut.unlock();
-                current = current->next;
-            }
+            for (const thread_synchronization_node* node :
+                 global_synchronization_list<CacheLineOffset>.nodes)
+                node->mut.unlock();
 
             global_synchronization_list<CacheLineOffset>.mut.unlock();
         }
 
         LSTM_NOINLINE_LUKEWARM static void
-        wait_on_epoch(const epoch_t epoch, const thread_synchronization_node* const q) noexcept
+        wait_on_epoch(const epoch_t epoch, const thread_synchronization_node* const node) noexcept
         {
             default_backoff backoff;
             do {
                 backoff();
-            } while (q->epoch_less_equal_to(epoch));
+            } while (node->epoch_less_equal_to(epoch));
         }
 
         static epoch_t wait_min_epoch(const epoch_t epoch) noexcept
         {
             epoch_t result = off_state;
-            for (const thread_synchronization_node* q
-                 = global_synchronization_list<CacheLineOffset>.root;
-                 q != nullptr;
-                 q = q->next) {
-                const epoch_t td_epoch = q->active.load(LSTM_ACQUIRE);
+            for (const thread_synchronization_node* node :
+                 global_synchronization_list<CacheLineOffset>.nodes) {
+                const epoch_t td_epoch = node->active.load(LSTM_ACQUIRE);
 
                 if (LSTM_UNLIKELY(td_epoch <= epoch))
-                    wait_on_epoch(epoch, q);
+                    wait_on_epoch(epoch, node);
                 else if (td_epoch < result)
                     result = td_epoch;
             }
@@ -115,14 +102,12 @@ LSTM_DETAIL_BEGIN
             , active(off_state)
         {
             LSTM_ASSERT(std::uintptr_t(this) % LSTM_CACHE_LINE_SIZE == CacheLineOffset);
-            LSTM_ASSERT(std::uintptr_t(&next) % LSTM_CACHE_LINE_SIZE == 0);
             LSTM_ASSERT(std::uintptr_t(&active) % LSTM_CACHE_LINE_SIZE == 0);
 
             mut.lock();
             lock_all(); // this->mut does not get locked here
             {
-                next = global_synchronization_list<CacheLineOffset>.root;
-                global_synchronization_list<CacheLineOffset>.root = this;
+                global_synchronization_list<CacheLineOffset>.nodes.emplace_back(this);
             }
             unlock_all(); // this->mut gets unlocked here
         }
@@ -136,15 +121,14 @@ LSTM_DETAIL_BEGIN
 
             lock_all(); // this->mut gets locked here
             {
-                thread_synchronization_node** indirect
-                    = &global_synchronization_list<CacheLineOffset>.root;
-                LSTM_ASSERT(*indirect);
-                while (*indirect != this) {
-                    indirect = &(*indirect)->next;
-                    LSTM_ASSERT(*indirect);
+                for (const thread_synchronization_node*& node :
+                     global_synchronization_list<CacheLineOffset>.nodes) {
+                    LSTM_ASSERT(node);
+                    if (node == this) {
+                        global_synchronization_list<CacheLineOffset>.nodes.unordered_erase(&node);
+                        break;
+                    }
                 }
-                *indirect = next;
-
                 LSTM_PERF_STATS_PUBLISH_RECORD();
             }
             unlock_all(); // this->mut does not get unlocked here
