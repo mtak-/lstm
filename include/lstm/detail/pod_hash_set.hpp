@@ -48,7 +48,7 @@ LSTM_DETAIL_BEGIN
         hash_t filter_;
         data_t data;
 
-        iterator find_impl(const var_base& value) noexcept
+        LSTM_NOINLINE_LUKEWARM iterator find_impl(const var_base& value) noexcept LSTM_PURE
         {
             iterator              result = begin();
             const var_base* const ptr    = &value;
@@ -57,7 +57,7 @@ LSTM_DETAIL_BEGIN
             return result;
         }
 
-        LSTM_NOINLINE const_iterator find_slow_path(const var_base& dest_var) const noexcept
+        const_iterator find_slow_path(const var_base& dest_var) const noexcept LSTM_PURE
         {
             const const_iterator iter = const_cast<pod_hash_set&>(*this).find_impl(dest_var);
 
@@ -69,8 +69,7 @@ LSTM_DETAIL_BEGIN
             return iter;
         }
 
-        LSTM_NOINLINE write_set_lookup lookup_slow_path(const var_base& dest_var,
-                                                        const hash_t    hash) noexcept
+        write_set_lookup lookup_slow_path(const var_base& dest_var, const hash_t hash) noexcept
         {
             const iterator iter = find_impl(dest_var);
 
