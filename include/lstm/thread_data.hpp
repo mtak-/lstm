@@ -55,19 +55,6 @@ LSTM_BEGIN
         tx_kind                                                                tx_state;
         detail::thread_synchronization_node<synchronization_cache_line_offset> synchronization_node;
 
-        void remove_read_set(const detail::var_base& src_var) noexcept
-        {
-            LSTM_ASSERT(in_critical_section());
-            LSTM_ASSERT(in_read_write_transaction());
-
-            const read_set_const_iter begin = read_set.begin();
-            for (read_set_const_iter read_iter = read_set.end(); read_iter != begin;) {
-                --read_iter;
-                if (read_iter->is_src_var(src_var))
-                    read_set.unordered_erase(read_iter);
-            }
-        }
-
         void add_write_set_unchecked(detail::var_base&         dest_var,
                                      const detail::var_storage pending_write,
                                      const detail::hash_t      hash) noexcept
@@ -76,7 +63,6 @@ LSTM_BEGIN
             LSTM_ASSERT(in_critical_section());
             LSTM_ASSERT(in_read_write_transaction());
 
-            remove_read_set(dest_var);
             write_set.unchecked_push_back(&dest_var, pending_write, hash);
         }
 
@@ -90,7 +76,6 @@ LSTM_BEGIN
             LSTM_ASSERT(in_critical_section());
             LSTM_ASSERT(in_read_write_transaction());
 
-            remove_read_set(dest_var);
             write_set.push_back(&dest_var, pending_write, hash);
         }
 

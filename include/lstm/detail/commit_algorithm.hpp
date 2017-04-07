@@ -14,8 +14,9 @@ LSTM_DETAIL_BEGIN
     struct commit_algorithm
     {
     private:
-        using write_set_t    = typename thread_data::write_set_t;
-        using write_set_iter = typename thread_data::write_set_iter;
+        using write_set_t         = typename thread_data::write_set_t;
+        using write_set_iter      = typename thread_data::write_set_iter;
+        using read_set_const_iter = typename thread_data::read_set_const_iter;
 
         commit_algorithm()                        = delete;
         commit_algorithm(const commit_algorithm&) = delete;
@@ -54,6 +55,16 @@ LSTM_DETAIL_BEGIN
                 unlock(begin->dest_var());
         }
 
+        static void remove_writes_from_reads(thread_data& tls_td) noexcept
+        {
+            const read_set_const_iter begin = tls_td.read_set.begin();
+            for (read_set_const_iter read_iter = tls_td.read_set.end(); read_iter != begin;) {
+                --read_iter;
+                if (tls_td.write_set.end() != tls_td.write_set.find(read_iter->src_var()))
+                    tls_td.read_set.unordered_erase(read_iter);
+            }
+        }
+
         static bool lock_writes(const transaction tx) noexcept
         {
             thread_data&         tls_td      = tx.get_thread_data();
@@ -61,7 +72,7 @@ LSTM_DETAIL_BEGIN
             const write_set_iter write_end   = tls_td.write_set.end();
 
             for (write_set_iter write_iter = write_begin; write_iter != write_end; ++write_iter) {
-                if (!lock(write_iter->dest_var(), tx)) {
+                if (LSTM_UNLIKELY(!lock(write_iter->dest_var(), tx))) {
                     unlock_write_set(write_begin, write_iter);
                     return false;
                 }
@@ -74,7 +85,7 @@ LSTM_DETAIL_BEGIN
         {
             thread_data& tls_td = tx.get_thread_data();
             for (read_set_value_type read_set_vaue : tls_td.read_set) {
-                if (!tx.read_write_valid(read_set_vaue.src_var())) {
+                if (LSTM_UNLIKELY(!tx.read_write_valid(read_set_vaue.src_var()))) {
                     unlock_write_set(tls_td.write_set.begin(), tls_td.write_set.end());
                     return false;
                 }
@@ -115,6 +126,7 @@ LSTM_DETAIL_BEGIN
 
         static epoch_t slow_path(const transaction tx) noexcept
         {
+            remove_writes_from_reads(tx.get_thread_data());
             if (!lock_writes(tx))
                 return commit_failed;
             return slower_path(tx);
