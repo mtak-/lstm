@@ -48,7 +48,7 @@ LSTM_DETAIL_BEGIN
         hash_t filter_;
         data_t data;
 
-        LSTM_NOINLINE_LUKEWARM iterator find_impl(const var_base& value) noexcept LSTM_PURE
+        iterator find_impl(const var_base& value) noexcept LSTM_PURE
         {
             iterator              result = begin();
             const var_base* const ptr    = &value;
