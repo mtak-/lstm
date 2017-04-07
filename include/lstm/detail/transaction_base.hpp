@@ -17,7 +17,7 @@ LSTM_DETAIL_BEGIN
         /*************************/
         /* read write operations */
         /*************************/
-        LSTM_NOINLINE var_storage rw_read_slow_path(const var_base& src_var) const
+        LSTM_NOINLINE_LUKEWARM var_storage rw_read_slow_path(const var_base& src_var) const
         {
             const write_set_const_iter iter = tls_td->write_set.find(src_var);
             if (iter == tls_td->write_set.end()) {
@@ -53,7 +53,7 @@ LSTM_DETAIL_BEGIN
                  typename U = T,
                  LSTM_REQUIRES_(!var<T, Alloc>::atomic && std::is_assignable<T&, U&&>()
                                 && std::is_constructible<T, U&&>())>
-        LSTM_NOINLINE void rw_write_slow_path(var<T, Alloc>& dest_var, U&& u) const
+        LSTM_NOINLINE_LUKEWARM void rw_write_slow_path(var<T, Alloc>& dest_var, U&& u) const
         {
             const write_set_lookup lookup = tls_td->write_set.lookup(dest_var);
             if (LSTM_LIKELY(!lookup.success())) {
@@ -78,7 +78,7 @@ LSTM_DETAIL_BEGIN
             internal_retry();
         }
 
-        LSTM_NOINLINE void
+        LSTM_NOINLINE_LUKEWARM void
         rw_atomic_write_slow_path(var_base& dest_var, const var_storage storage) const
         {
             const write_set_lookup lookup = tls_td->write_set.lookup(dest_var);
@@ -107,7 +107,8 @@ LSTM_DETAIL_BEGIN
                 tls_td->add_write_set_unchecked(dest_var, storage, hash);
         }
 
-        LSTM_NOINLINE var_storage rw_untracked_read_slow_path(const var_base& src_var) const
+        LSTM_NOINLINE_LUKEWARM var_storage
+        rw_untracked_read_slow_path(const var_base& src_var) const
         {
             const write_set_const_iter iter = tls_td->write_set.find(src_var);
             if (iter == tls_td->write_set.end()) {
@@ -136,7 +137,7 @@ LSTM_DETAIL_BEGIN
         /************************/
         /* read only operations */
         /************************/
-        LSTM_NOINLINE var_storage ro_read_slow_path(const var_base& src_var) const
+        LSTM_NOINLINE_LUKEWARM var_storage ro_read_slow_path(const var_base& src_var) const
         {
             if (can_write())
                 return rw_read_base(src_var);
@@ -156,7 +157,8 @@ LSTM_DETAIL_BEGIN
             return ro_read_slow_path(src_var);
         }
 
-        LSTM_NOINLINE var_storage ro_untracked_read_slow_path(const var_base& src_var) const
+        LSTM_NOINLINE_LUKEWARM var_storage
+        ro_untracked_read_slow_path(const var_base& src_var) const
         {
             if (can_write())
                 return rw_untracked_read_base(src_var);
