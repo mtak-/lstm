@@ -69,7 +69,7 @@ LSTM_DETAIL_BEGIN
             global_synchronization_list<CacheLineOffset>.mut.unlock();
         }
 
-        LSTM_NOINLINE_LUKEWARM static void
+        LSTM_NOINLINE static void
         wait_on_epoch(const epoch_t epoch, const thread_synchronization_node* const node) noexcept
         {
             default_backoff backoff;
