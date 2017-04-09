@@ -127,7 +127,7 @@ LSTM_DETAIL_BEGIN
             && noexcept(alloc_traits::construct(alloc(), (T*)nullptr, (Us &&) us...)))
         {
             T* ptr = alloc_traits::allocate(alloc(), 1);
-            if (noexcept(alloc_traits::construct(alloc(), (T*)nullptr, (Us &&) us...))) {
+            if (noexcept(alloc_traits::construct(alloc(), ptr, (Us &&) us...))) {
                 alloc_traits::construct(alloc(), ptr, (Us &&) us...);
             } else {
                 try {

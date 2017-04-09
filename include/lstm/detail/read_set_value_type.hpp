@@ -12,19 +12,19 @@ LSTM_DETAIL_BEGIN
         inline read_set_value_type() noexcept = default;
 
     public:
-        inline constexpr read_set_value_type(const var_base* const in_src_var) noexcept
+        inline read_set_value_type(const var_base* const in_src_var) noexcept
             : src_var_(in_src_var)
         {
             LSTM_ASSERT(src_var_);
         }
 
-        inline constexpr const var_base& src_var() const noexcept
+        inline const var_base& src_var() const noexcept
         {
             LSTM_ASSERT(src_var_);
             return *src_var_;
         }
 
-        inline constexpr bool is_src_var(const var_base& rhs) const noexcept
+        inline bool is_src_var(const var_base& rhs) const noexcept
         {
             LSTM_ASSERT(src_var_);
             return src_var_ == &rhs;

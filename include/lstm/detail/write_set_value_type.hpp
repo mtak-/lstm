@@ -13,33 +13,33 @@ LSTM_DETAIL_BEGIN
         inline write_set_value_type() noexcept = default;
 
     public:
-        inline constexpr write_set_value_type(var_base* const in_dest_var,
-                                              var_storage     in_pending_write) noexcept
+        inline write_set_value_type(var_base* const in_dest_var,
+                                    var_storage     in_pending_write) noexcept
             : dest_var_(in_dest_var)
             , pending_write_(std::move(in_pending_write))
         {
             LSTM_ASSERT(dest_var_);
         }
 
-        inline constexpr var_base& dest_var() const noexcept
+        inline var_base& dest_var() const noexcept
         {
             LSTM_ASSERT(dest_var_);
             return *dest_var_;
         }
 
-        inline constexpr var_storage& pending_write() noexcept
+        inline var_storage& pending_write() noexcept
         {
             LSTM_ASSERT(dest_var_);
             return pending_write_;
         }
 
-        inline constexpr var_storage pending_write() const noexcept
+        inline var_storage pending_write() const noexcept
         {
             LSTM_ASSERT(dest_var_);
             return pending_write_;
         }
 
-        inline constexpr bool is_dest_var(const var_base& rhs) const noexcept
+        inline bool is_dest_var(const var_base& rhs) const noexcept
         {
             LSTM_ASSERT(dest_var_);
             return dest_var_ == &rhs;
