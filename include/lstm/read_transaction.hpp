@@ -21,10 +21,6 @@ LSTM_BEGIN
 
         bool    nested_in_rw() const noexcept { return can_write(); }
         epoch_t version() const noexcept { return transaction_base::version(); }
-        void unsafe_reset_version(const epoch_t new_version) noexcept
-        {
-            transaction_base::unsafe_reset_version(new_version);
-        }
 
         bool valid(const thread_data& td) const noexcept { return transaction_base::valid(&td); }
         bool read_valid(const epoch_t version) const noexcept { return rw_valid(version); }

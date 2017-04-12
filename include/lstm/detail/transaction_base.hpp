@@ -185,30 +185,10 @@ LSTM_DETAIL_BEGIN
         {
             LSTM_ASSERT(version_ != off_state);
             LSTM_ASSERT(!locked(version_));
-            LSTM_ASSERT(valid(tls_td));
         }
 
         thread_data& get_thread_data() const noexcept { return *tls_td; }
         epoch_t      version() const noexcept { return version_; }
-
-        void unsafe_reset_version(const epoch_t new_version) noexcept
-        {
-            // TODO: could these asserts fail for correct code?
-            if (tls_td) {
-                LSTM_ASSERT(tls_td->write_set.empty());
-                LSTM_ASSERT(tls_td->read_set.empty());
-                LSTM_ASSERT(tls_td->fail_callbacks.empty());
-                LSTM_ASSERT(tls_td->succ_callbacks.working_epoch_empty());
-            }
-
-            LSTM_ASSERT(version_ <= new_version);
-
-            version_ = new_version;
-
-            LSTM_ASSERT(version_ != off_state);
-            LSTM_ASSERT(!locked(version_));
-            LSTM_ASSERT(valid(tls_td));
-        }
 
         bool can_write() const noexcept { return tls_td; }
         bool can_demote_safely() const noexcept { return tls_td->write_set.empty(); }

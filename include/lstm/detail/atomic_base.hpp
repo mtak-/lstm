@@ -26,21 +26,15 @@ LSTM_DETAIL_BEGIN
             return ((Func &&) func)((Args &&) args...);
         }
 
+        static void set_rw(thread_data& tls_td) noexcept { tls_td.tx_state = tx_kind::read_write; }
+        static void set_read(thread_data& tls_td) noexcept { tls_td.tx_state = tx_kind::read_only; }
+
         template<tx_kind kind>
-        static epoch_t tx_start(thread_data& tls_td) noexcept
+        static void tx_failure_no_backoff(thread_data& tls_td) noexcept
         {
             static_assert(kind != tx_kind::none);
 
-            const epoch_t version = default_domain().get_clock();
-            tls_td.access_lock(version);
-            tls_td.tx_state = kind;
-            return version;
-        }
-
-        template<tx_kind kind>
-        static void tx_failure(thread_data& tls_td) noexcept
-        {
-            static_assert(kind != tx_kind::none);
+            tls_td.access_unlock();
 
             LSTM_PERF_STATS_FAILURES();
             LSTM_PERF_STATS_READS(tls_td.read_set.size());
@@ -48,10 +42,8 @@ LSTM_DETAIL_BEGIN
             LSTM_PERF_STATS_WRITES(tls_td.write_set.size());
             LSTM_PERF_STATS_MAX_WRITE_SIZE(tls_td.write_set.size());
 
-            if (kind != tx_kind::read_only)
-                tls_td.clear_read_write_sets();
-
             if (kind != tx_kind::read_only) {
+                tls_td.clear_read_write_sets();
                 tls_td.succ_callbacks.clear_working_epoch();
                 tls_td.do_fail_callbacks();
             } else {
@@ -62,29 +54,21 @@ LSTM_DETAIL_BEGIN
             }
         }
 
+        template<tx_kind kind>
+        static void tx_failure(thread_data& tls_td) noexcept
+        {
+            tx_failure_no_backoff<kind>(tls_td);
+            default_backoff{}();
+        }
+
         template<tx_kind         kind>
         [[noreturn]] static void unhandled_exception(thread_data& tls_td)
         {
-            tls_td.access_unlock();
+            tx_failure_no_backoff<kind>(tls_td);
+
             tls_td.tx_state = tx_kind::none;
 
-            tx_failure<kind>(tls_td);
             throw;
-        }
-
-        template<tx_kind                  kind>
-        LSTM_ALWAYS_INLINE static epoch_t tx_restart(thread_data& tls_td) noexcept
-        {
-            static_assert(kind != tx_kind::none);
-
-            tx_failure<kind>(tls_td);
-
-            tls_td.access_unlock();
-            default_backoff{}();
-            const epoch_t new_version = default_domain().get_clock();
-            tls_td.access_lock(new_version);
-
-            return new_version;
         }
 
         template<tx_kind kind>
@@ -101,10 +85,8 @@ LSTM_DETAIL_BEGIN
             LSTM_PERF_STATS_WRITES(tls_td.write_set.size());
             LSTM_PERF_STATS_MAX_WRITE_SIZE(tls_td.write_set.size());
 
-            if (kind != tx_kind::read_only)
-                tls_td.clear_read_write_sets();
-
             if (kind != tx_kind::read_only) {
+                tls_td.clear_read_write_sets();
                 tls_td.fail_callbacks.clear();
                 tls_td.reclaim(sync_epoch);
             } else {

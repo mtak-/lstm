@@ -16,17 +16,18 @@ LSTM_DETAIL_BEGIN
                  typename Result = transact_result<Func, transaction, Args&&...>>
         static Result slow_path(thread_data& tls_td, Func func, Args&&... args)
         {
-            transaction tx{tls_td, tx_start<tx_kind::read_write>(tls_td)};
-
             while (true) {
+                const epoch_t     version = default_domain().get_clock();
+                const transaction tx{tls_td, version};
+                tls_td.access_lock(version);
                 try {
                     LSTM_ASSERT(valid_start_state(tls_td));
 
                     Result result = atomic_base_fn::call(func, tx, (Args &&) args...);
 
                     // commit does not throw
-                    epoch_t sync_epoch;
-                    if ((sync_epoch = detail::commit_algorithm::try_commit(tx)) != commit_failed) {
+                    const epoch_t sync_epoch = detail::commit_algorithm::try_commit(tx);
+                    if (LSTM_LIKELY(sync_epoch != commit_failed)) {
                         tx_success<tx_kind::read_write>(tls_td, sync_epoch);
                         LSTM_ASSERT(valid_start_state(tls_td));
                         LSTM_ASSERT(!tls_td.in_critical_section());
@@ -41,9 +42,7 @@ LSTM_DETAIL_BEGIN
                 } catch (...) {
                     unhandled_exception<tx_kind::read_write>(tls_td);
                 }
-                tx.unsafe_reset_version(tx_restart<tx_kind::read_write>(tls_td));
-
-                // TODO: add backoff here?
+                tx_failure<tx_kind::read_write>(tls_td);
             }
         }
 
@@ -52,17 +51,18 @@ LSTM_DETAIL_BEGIN
                  LSTM_REQUIRES_(is_void_transact_function<Func&, transaction, Args&&...>())>
         static void slow_path(thread_data& tls_td, Func func, Args&&... args)
         {
-            transaction tx{tls_td, tx_start<tx_kind::read_write>(tls_td)};
-
             while (true) {
+                const epoch_t     version = default_domain().get_clock();
+                const transaction tx{tls_td, version};
+                tls_td.access_lock(version);
                 try {
                     LSTM_ASSERT(valid_start_state(tls_td));
 
                     atomic_base_fn::call(func, tx, (Args &&) args...);
 
                     // commit does not throw
-                    epoch_t sync_epoch;
-                    if ((sync_epoch = detail::commit_algorithm::try_commit(tx)) != commit_failed) {
+                    const epoch_t sync_epoch = detail::commit_algorithm::try_commit(tx);
+                    if (LSTM_LIKELY(sync_epoch != commit_failed)) {
                         tx_success<tx_kind::read_write>(tls_td, sync_epoch);
                         LSTM_ASSERT(valid_start_state(tls_td));
                         LSTM_ASSERT(!tls_td.in_critical_section());
@@ -74,9 +74,7 @@ LSTM_DETAIL_BEGIN
                 } catch (...) {
                     unhandled_exception<tx_kind::read_write>(tls_td);
                 }
-                tx.unsafe_reset_version(tx_restart<tx_kind::read_write>(tls_td));
-
-                // TODO: add backoff here?
+                tx_failure<tx_kind::read_write>(tls_td);
             }
         }
 
@@ -93,6 +91,7 @@ LSTM_DETAIL_BEGIN
                                             transaction{tls_td, tls_td.epoch()},
                                             (Args &&) args...);
 
+            set_rw(tls_td);
             return read_write_fn::slow_path(tls_td, (Func &&) func, (Args &&) args...);
         }
 

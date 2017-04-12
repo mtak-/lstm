@@ -46,6 +46,10 @@ LSTM_BEGIN
         };
         static constexpr std::size_t synchronization_cache_line_offset
             = offsetof(_cache_line_offset_calculation, desired) % LSTM_CACHE_LINE_SIZE;
+        static_assert(
+            alignof(detail::thread_synchronization_node<synchronization_cache_line_offset>)
+                == alignof(void*),
+            "");
 
         read_set_t                                                             read_set;
         write_set_t                                                            write_set;

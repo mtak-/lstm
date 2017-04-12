@@ -15,15 +15,15 @@ LSTM_DETAIL_BEGIN
                  typename Result = transact_result<Func, read_transaction, Args&&...>>
         static Result slow_path(thread_data& tls_td, Func func, Args&&... args)
         {
-            read_transaction tx{tx_start<tx_kind::read_only>(tls_td)};
-
             while (true) {
+                const epoch_t          version = default_domain().get_clock();
+                const read_transaction tx{version};
+                tls_td.access_lock(version);
                 try {
                     LSTM_ASSERT(valid_start_state(tls_td));
 
                     Result result = atomic_base_fn::call(func, tx, (Args &&) args...);
 
-                    // commit does not throw
                     tx_success<tx_kind::read_only>(tls_td, 0);
                     LSTM_ASSERT(valid_start_state(tls_td));
                     LSTM_ASSERT(!tls_td.in_critical_section());
@@ -37,9 +37,7 @@ LSTM_DETAIL_BEGIN
                 } catch (...) {
                     unhandled_exception<tx_kind::read_only>(tls_td);
                 }
-                tx.unsafe_reset_version(tx_restart<tx_kind::read_only>(tls_td));
-
-                // TODO: add backoff here?
+                tx_failure<tx_kind::read_only>(tls_td);
             }
         }
 
@@ -48,15 +46,15 @@ LSTM_DETAIL_BEGIN
                  LSTM_REQUIRES_(is_void_transact_function<Func&, read_transaction, Args&&...>())>
         static void slow_path(thread_data& tls_td, Func func, Args&&... args)
         {
-            read_transaction tx{tx_start<tx_kind::read_only>(tls_td)};
-
             while (true) {
+                const epoch_t          version = default_domain().get_clock();
+                const read_transaction tx{version};
+                tls_td.access_lock(version);
                 try {
                     LSTM_ASSERT(valid_start_state(tls_td));
 
                     atomic_base_fn::call(func, tx, (Args &&) args...);
 
-                    // commit does not throw
                     tx_success<tx_kind::read_only>(tls_td, 0);
                     LSTM_ASSERT(valid_start_state(tls_td));
                     LSTM_ASSERT(!tls_td.in_critical_section());
@@ -67,9 +65,7 @@ LSTM_DETAIL_BEGIN
                 } catch (...) {
                     unhandled_exception<tx_kind::read_only>(tls_td);
                 }
-                tx.unsafe_reset_version(tx_restart<tx_kind::read_only>(tls_td));
-
-                // TODO: add backoff here?
+                tx_failure<tx_kind::read_only>(tls_td);
             }
         }
 
@@ -90,6 +86,7 @@ LSTM_DETAIL_BEGIN
                                             read_transaction{tls_td, tls_td.epoch()},
                                             (Args &&) args...);
             case tx_kind::none:
+                set_read(tls_td);
                 return read_only_fn::slow_path(tls_td, (Func &&) func, (Args &&) args...);
             }
         }
