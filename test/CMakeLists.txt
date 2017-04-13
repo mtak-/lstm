@@ -19,6 +19,7 @@ make_test(thread_data_synchronization)
 make_test(exception)
 make_test(delete_var_and_modify)
 make_test(throwing_constructor)
+make_test(thread_data_creation)
 
 find_package(Boost 1.62.0 OPTIONAL_COMPONENTS context fiber)
 if (Boost_FOUND)
