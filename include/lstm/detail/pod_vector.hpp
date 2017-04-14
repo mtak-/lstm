@@ -12,18 +12,19 @@ LSTM_DETAIL_BEGIN
     {
         using allocator_type  = Alloc;
         using value_type      = T;
-        using reference       = T&;
-        using const_reference = const T&;
-        using pointer         = T*;
-        using const_pointer   = const T*;
-        using iterator        = T*;
-        using const_iterator  = const T*;
+        using reference       = value_type&;
+        using const_reference = const value_type&;
+        using pointer         = value_type*;
+        using const_pointer   = const value_type*;
+        using iterator        = value_type*;
+        using const_iterator  = const value_type*;
 
     private:
         static_assert(std::is_pod<value_type>{}, "only works with POD types");
         static_assert(std::is_same<value_type, typename allocator_type::value_type>{}, "");
         static constexpr bool has_noexcept_alloc
-            = noexcept(std::declval<Alloc&>().allocate(std::declval<std::size_t>()));
+            = noexcept(std::declval<allocator_type&>().allocate(std::declval<std::size_t>()));
+        static constexpr uword start_size = 1024;
 
         iterator end_;
         iterator begin_;
@@ -54,8 +55,8 @@ LSTM_DETAIL_BEGIN
     public:
         pod_vector(const allocator_type& alloc = {}) noexcept(has_noexcept_alloc)
             : allocator_type(alloc)
-            , begin_(this->alloc().allocate(1024))
-            , last_valid_address_(begin_ + 1024 - 1)
+            , begin_(this->alloc().allocate(start_size))
+            , last_valid_address_(begin_ + start_size - 1)
         {
             end_ = begin_;
         }
