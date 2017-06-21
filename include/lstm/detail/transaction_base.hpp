@@ -122,7 +122,7 @@ LSTM_DETAIL_BEGIN
             internal_retry();
         }
 
-        LSTM_NOINLINE_LUKEWARM var_storage rw_untracked_read_base(const var_base& src_var) const
+        var_storage rw_untracked_read_base(const var_base& src_var) const
         {
             LSTM_ASSERT(valid(tls_td));
 

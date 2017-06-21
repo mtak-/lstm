@@ -84,8 +84,8 @@ LSTM_DETAIL_BEGIN
         static bool validate_reads(const transaction tx) noexcept
         {
             thread_data& tls_td = tx.get_thread_data();
-            for (read_set_value_type read_set_vaue : tls_td.read_set) {
-                if (LSTM_UNLIKELY(!tx.read_write_valid(read_set_vaue.src_var()))) {
+            for (const read_set_value_type read_set_value : tls_td.read_set) {
+                if (LSTM_UNLIKELY(!tx.read_write_valid(read_set_value.src_var()))) {
                     unlock_write_set(tls_td.write_set.begin(), tls_td.write_set.end());
                     return false;
                 }
