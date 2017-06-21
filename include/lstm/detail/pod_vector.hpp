@@ -37,28 +37,13 @@ LSTM_DETAIL_BEGIN
 
         inline allocator_type& alloc() noexcept { return *this; }
 
-        LSTM_NOINLINE void reserve_more() noexcept(has_noexcept_alloc)
-        {
-            LSTM_ASSERT((capacity() << 1) > size()); // zomg big transaction
-            const pointer new_begin = alloc().allocate(capacity() << 1);
-            LSTM_ASSERT(new_begin);
-
-            std::memcpy(new_begin, begin_, sizeof(value_type) * size());
-
-            alloc().deallocate(begin_, capacity());
-
-            last_valid_address_ = new_begin + (capacity() << 1) - 1;
-            end_                = new_begin + size();
-            begin_              = new_begin;
-        }
-
     public:
         pod_vector(const allocator_type& alloc = {}) noexcept(has_noexcept_alloc)
             : allocator_type(alloc)
-            , begin_(this->alloc().allocate(start_size))
+            , end_(this->alloc().allocate(start_size))
+            , begin_(end_)
             , last_valid_address_(begin_ + start_size - 1)
         {
-            end_ = begin_;
         }
 
         pod_vector(const pod_vector&) = delete;
@@ -120,6 +105,21 @@ LSTM_DETAIL_BEGIN
                 end_                = new_begin + size();
                 begin_              = new_begin;
             }
+        }
+
+        LSTM_NOINLINE void reserve_more() noexcept(has_noexcept_alloc)
+        {
+            LSTM_ASSERT((capacity() << 1) > size()); // zomg big transaction
+            const pointer new_begin = alloc().allocate(capacity() << 1);
+            LSTM_ASSERT(new_begin);
+
+            std::memcpy(new_begin, begin_, sizeof(value_type) * size());
+
+            alloc().deallocate(begin_, capacity());
+
+            last_valid_address_ = new_begin + (capacity() << 1) - 1;
+            end_                = new_begin + size();
+            begin_              = new_begin;
         }
 
         iterator       begin() noexcept { return begin_; }
