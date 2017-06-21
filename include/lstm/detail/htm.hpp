@@ -3,10 +3,16 @@
 
 #include <lstm/detail/lstm_fwd.hpp>
 
+// clang-format off
+#if defined(LSTM_HTM_ON) && defined(__x86_64__) && defined(__GNUC__)
+#   define LSTM_INTEL_RTM_SUPPORT
+#endif
+// clang-format on
+
 LSTM_DETAIL_BEGIN
     namespace htm
     {
-#if defined(LSTM_HTM_ON) && defined(__x86_64__) && defined(__GNUC__)
+#ifdef LSTM_INTEL_RTM_SUPPORT
         enum begin_code : unsigned int
         {
             started        = _XBEGIN_STARTED,
@@ -32,7 +38,7 @@ LSTM_DETAIL_BEGIN
         inline unsigned int get_abort_code(const begin_code c) noexcept { return (c >> 24) & 0xFF; }
 #endif
 
-#if defined(LSTM_HTM_ON) && defined(__x86_64__) && defined(__GNUC__)
+#ifdef LSTM_INTEL_RTM_SUPPORT
         inline begin_code begin() noexcept { return static_cast<begin_code>(_xbegin()); }
 #else
         // assumes capacity will always lead into the STM
@@ -41,7 +47,7 @@ LSTM_DETAIL_BEGIN
 
         inline void end() noexcept
         {
-#if defined(LSTM_HTM_ON) && defined(__x86_64__) && defined(__GNUC__)
+#ifdef LSTM_INTEL_RTM_SUPPORT
             _xend();
 #else
             std::terminate(); // oops, bug, shouldn't call end()
@@ -50,7 +56,7 @@ LSTM_DETAIL_BEGIN
 
         inline bool in_hardware_tx() noexcept
         {
-#if defined(LSTM_HTM_ON) && defined(__x86_64__) && defined(__GNUC__)
+#ifdef LSTM_INTEL_RTM_SUPPORT
             return _xtest();
 #else
             return false;
@@ -59,7 +65,7 @@ LSTM_DETAIL_BEGIN
 
         [[noreturn]] inline void abort() noexcept
         {
-#if defined(LSTM_HTM_ON) && defined(__x86_64__) && defined(__GNUC__)
+#ifdef LSTM_INTEL_RTM_SUPPORT
             _xabort(1);
             __builtin_unreachable();
 #else
@@ -130,7 +136,7 @@ LSTM_DETAIL_BEGIN
                                            std::memory_order      m,
                                            std::memory_order      n) noexcept
         {
-#if defined(LSTM_HTM_ON) && defined(__x86_64__) && defined(__GNUC__)
+#ifdef LSTM_INTEL_RTM_SUPPORT
             (void)m;
             (void)n;
             if (sizeof(std::atomic<Integral>) == sizeof(Integral))
@@ -146,7 +152,7 @@ LSTM_DETAIL_BEGIN
                                            std::memory_order      m,
                                            std::memory_order      n) noexcept
         {
-#if defined(LSTM_HTM_ON) && defined(__x86_64__) && defined(__GNUC__)
+#ifdef LSTM_INTEL_RTM_SUPPORT
             (void)m;
             (void)n;
             if (sizeof(std::atomic<Integral>) == sizeof(Integral))
@@ -162,7 +168,7 @@ LSTM_DETAIL_BEGIN
                                          std::memory_order      m,
                                          std::memory_order      n) noexcept
         {
-#if defined(LSTM_HTM_ON) && defined(__x86_64__) && defined(__GNUC__)
+#ifdef LSTM_INTEL_RTM_SUPPORT
             (void)m;
             (void)n;
             if (sizeof(std::atomic<Integral>) == sizeof(Integral))
@@ -178,7 +184,7 @@ LSTM_DETAIL_BEGIN
                                          std::memory_order      m,
                                          std::memory_order      n) noexcept
         {
-#if defined(LSTM_HTM_ON) && defined(__x86_64__) && defined(__GNUC__)
+#ifdef LSTM_INTEL_RTM_SUPPORT
             (void)m;
             (void)n;
             if (sizeof(std::atomic<Integral>) == sizeof(Integral))
